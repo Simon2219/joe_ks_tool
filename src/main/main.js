@@ -40,15 +40,21 @@ function createMainWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
         show: false,
-        backgroundColor: '#1a1a2e'
+        backgroundColor: '#1a1a2e',
+        // Native window frame for proper Windows look
+        frame: true,
+        // Enable Windows-style controls
+        autoHideMenuBar: true
     });
 
     // Load the main HTML file
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
-    // Show window when ready
+    // Show window when ready and maximize for better experience
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
+        // Optionally maximize on start
+        // mainWindow.maximize();
     });
 
     // Handle window close
@@ -56,7 +62,7 @@ function createMainWindow() {
         mainWindow = null;
     });
 
-    // Remove default menu for cleaner look
+    // Remove default menu for cleaner look (keeps native title bar)
     Menu.setApplicationMenu(null);
 }
 
