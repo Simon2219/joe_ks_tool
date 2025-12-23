@@ -23,17 +23,26 @@ const { initializeDatabase } = require('./database/dbInit');
 
 let mainWindow = null;
 
+// Get the correct base path (works both in dev and production)
+function getBasePath() {
+    // In development, app.getAppPath() returns the project root
+    // __dirname is the directory of this file (src/main/)
+    return path.join(__dirname, '..');
+}
+
 /**
  * Creates the main application window
  */
 function createMainWindow() {
+    const basePath = getBasePath();
+    
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
         minWidth: 1000,
         minHeight: 700,
         title: 'Customer Support Tool',
-        icon: path.join(__dirname, '../../assets/icon.png'),
+        icon: path.join(basePath, '../assets/icon.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -47,20 +56,36 @@ function createMainWindow() {
         autoHideMenuBar: true
     });
 
+    // Build the correct path to index.html
+    const indexPath = path.join(basePath, 'renderer', 'index.html');
+    console.log('Loading HTML from:', indexPath);
+    
     // Load the main HTML file
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    mainWindow.loadFile(indexPath).catch(err => {
+        console.error('Failed to load index.html:', err);
+        // Fallback: try alternative path
+        const altPath = path.join(__dirname, '..', 'renderer', 'index.html');
+        console.log('Trying alternative path:', altPath);
+        mainWindow.loadFile(altPath);
+    });
 
     // Show window when ready and maximize for better experience
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        // Optionally maximize on start
-        // mainWindow.maximize();
     });
 
     // Handle window close
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
+
+    // Handle load failures
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('Page failed to load:', errorCode, errorDescription);
+    });
+
+    // Open DevTools in development to see errors (remove in production)
+    // mainWindow.webContents.openDevTools();
 
     // Remove default menu for cleaner look (keeps native title bar)
     Menu.setApplicationMenu(null);
