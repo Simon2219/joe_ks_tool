@@ -4,12 +4,15 @@
   "description": "A comprehensive customer support desktop application with User Management, Ticket System, and Quality Management",
   "main": "src/main/main.js",
   "scripts": {
-    "start": "npx electron .",
-    "dev": "npx electron . --dev",
-    "build": "npx electron-builder",
-    "build:win": "npx electron-builder --win",
-    "build:mac": "npx electron-builder --mac",
-    "build:linux": "npx electron-builder --linux"
+    "start": "electron .",
+    "start:npx": "npx electron .",
+    "start:direct": "node node_modules/electron/cli.js .",
+    "dev": "electron . --enable-logging",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [
     "electron",
