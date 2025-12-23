@@ -2,20 +2,12 @@
   "name": "customer-support-tool",
   "version": "1.0.0",
   "description": "A comprehensive customer support desktop application with User Management, Ticket System, and Quality Management",
-  "main": "src/main/main.js",
+  "main": "server.js",
   "scripts": {
-    "start": "electron .",
-    "start:npx": "npx electron .",
-    "start:direct": "node node_modules/electron/cli.js .",
-    "dev": "electron . --enable-logging",
-    "build": "electron-builder",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "keywords": [
-    "electron",
     "customer-support",
     "ticket-system",
     "user-management",
@@ -23,34 +15,11 @@
   ],
   "author": "Customer Support Agency",
   "license": "MIT",
-  "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
-  },
   "dependencies": {
-    "better-sqlite3": "^9.2.2",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
     "bcryptjs": "^2.4.3",
     "uuid": "^9.0.1",
-    "axios": "^1.6.2",
-    "date-fns": "^3.0.6"
-  },
-  "build": {
-    "appId": "com.customersupport.tool",
-    "productName": "Customer Support Tool",
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.icns"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png"
-    }
+    "axios": "^1.6.2"
   }
 }
