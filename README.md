@@ -131,6 +131,35 @@ customer-support-tool/
 
 ---
 
+## Integrations
+
+### Microsoft SharePoint
+Connect to SharePoint Online to:
+- Browse and manage SharePoint lists
+- Create, update, delete list items
+- Upload and download documents
+- Search SharePoint content
+
+**Configuration required:**
+- Site URL (e.g., `https://yourcompany.sharepoint.com/sites/support`)
+- Azure AD Tenant ID
+- App Registration Client ID
+- Client Secret
+
+### Atlassian JIRA
+Connect to JIRA Cloud to:
+- View projects and issues
+- Create and update issues
+- Sync local tickets with JIRA
+- Add comments and transitions
+
+**Configuration required:**
+- JIRA Base URL (e.g., `https://yourcompany.atlassian.net`)
+- Email address
+- API Token (generate at https://id.atlassian.com/manage-profile/security/api-tokens)
+
+---
+
 ## Permissions
 
 | Permission | Description |
@@ -156,6 +185,8 @@ customer-support-tool/
 | `role_delete` | Delete roles |
 | `settings_view` | View settings |
 | `settings_edit` | Edit settings |
+| `integration_sharepoint` | Use SharePoint integration |
+| `integration_jira` | Use JIRA integration |
 | `admin_access` | Full admin access |
 
 ---

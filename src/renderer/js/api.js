@@ -140,6 +140,44 @@ window.electronAPI = {
         get: (key) => API.get(`/settings/${key}`),
         set: (key, value) => API.put(`/settings/${key}`, { value }),
         getAll: () => API.get('/settings')
+    },
+
+    sharepoint: {
+        connect: (config) => API.post('/sharepoint/connect', config),
+        disconnect: () => API.post('/sharepoint/disconnect'),
+        getStatus: () => API.get('/sharepoint/status'),
+        getLists: () => API.get('/sharepoint/lists'),
+        getListItems: (listTitle, options = {}) => {
+            const params = new URLSearchParams(options).toString();
+            return API.get(`/sharepoint/lists/${encodeURIComponent(listTitle)}/items${params ? '?' + params : ''}`);
+        },
+        createListItem: (listTitle, data) => API.post(`/sharepoint/lists/${encodeURIComponent(listTitle)}/items`, data),
+        updateListItem: (listTitle, itemId, data) => API.put(`/sharepoint/lists/${encodeURIComponent(listTitle)}/items/${itemId}`, data),
+        deleteListItem: (listTitle, itemId) => API.delete(`/sharepoint/lists/${encodeURIComponent(listTitle)}/items/${itemId}`),
+        uploadDocument: (libraryName, fileName, fileContent) => API.post('/sharepoint/documents/upload', { libraryName, fileName, fileContent }),
+        downloadDocument: (serverRelativeUrl) => API.get(`/sharepoint/documents/download?serverRelativeUrl=${encodeURIComponent(serverRelativeUrl)}`),
+        search: (queryText, options = {}) => API.post('/sharepoint/search', { queryText, ...options })
+    },
+
+    jira: {
+        connect: (config) => API.post('/jira/connect', config),
+        disconnect: () => API.post('/jira/disconnect'),
+        getStatus: () => API.get('/jira/status'),
+        getProjects: () => API.get('/jira/projects'),
+        getIssues: (projectKey, options = {}) => {
+            const params = new URLSearchParams({ projectKey, ...options }).toString();
+            return API.get(`/jira/issues?${params}`);
+        },
+        getIssue: (issueKey) => API.get(`/jira/issues/${issueKey}`),
+        createIssue: (data) => API.post('/jira/issues', data),
+        updateIssue: (issueKey, data) => API.put(`/jira/issues/${issueKey}`, data),
+        deleteIssue: (issueKey) => API.delete(`/jira/issues/${issueKey}`),
+        getTransitions: (issueKey) => API.get(`/jira/issues/${issueKey}/transitions`),
+        transitionIssue: (issueKey, transitionId, comment) => API.post(`/jira/issues/${issueKey}/transitions`, { transitionId, comment }),
+        getComments: (issueKey) => API.get(`/jira/issues/${issueKey}/comments`),
+        addComment: (issueKey, body) => API.post(`/jira/issues/${issueKey}/comments`, { body }),
+        search: (jql, options = {}) => API.post('/jira/search', { jql, ...options }),
+        syncWithTickets: (projectKey) => API.post('/jira/sync', { projectKey })
     }
 };
 

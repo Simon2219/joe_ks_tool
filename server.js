@@ -14,6 +14,8 @@ const ticketRoutes = require('./src/server/routes/tickets');
 const qualityRoutes = require('./src/server/routes/quality');
 const roleRoutes = require('./src/server/routes/roles');
 const settingsRoutes = require('./src/server/routes/settings');
+const sharepointRoutes = require('./src/server/routes/sharepoint');
+const jiraRoutes = require('./src/server/routes/jira');
 
 // Import database initialization
 const { initializeDatabase } = require('./src/server/database/dbInit');
@@ -36,6 +38,8 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/quality', qualityRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/sharepoint', sharepointRoutes);
+app.use('/api/jira', jiraRoutes);
 
 // Serve the main HTML file for all other routes
 app.get('*', (req, res) => {
