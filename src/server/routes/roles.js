@@ -1,114 +1,85 @@
 /**
- * Role Management Routes
- * CRUD operations for roles and permissions
+ * Role Routes - RoleSystem
+ * Handles role and permission management
  */
 
 const express = require('express');
 const router = express.Router();
 
-const { RoleModel, UserModel } = require('../database');
-const { authenticate, requirePermission } = require('../middleware/auth');
+const { RoleSystem, UserSystem } = require('../database');
+const { authenticate, requirePermission, requireAdmin } = require('../middleware/auth');
 
-/**
- * Formats role for response
- */
-function formatRole(role) {
-    return {
-        id: role.id,
-        name: role.name,
-        description: role.description,
-        isAdmin: !!role.is_admin,
-        isSystem: !!role.is_system,
-        permissions: role.permissions || [],
-        userCount: role.user_count || 0,
-        createdAt: role.created_at,
-        updatedAt: role.updated_at
-    };
-}
+router.use(authenticate);
 
 /**
  * GET /api/roles
- * Returns all roles
  */
-router.get('/', authenticate, requirePermission('role_view'), (req, res) => {
+router.get('/', requirePermission('role_view'), (req, res) => {
     try {
-        const roles = RoleModel.getAll().map(formatRole);
+        const roles = RoleSystem.getAll();
         res.json({ success: true, roles });
     } catch (error) {
         console.error('Get roles error:', error);
-        res.status(500).json({ success: false, error: 'Failed to retrieve roles' });
+        res.status(500).json({ success: false, error: 'Failed to fetch roles' });
     }
 });
 
 /**
  * GET /api/roles/permissions
- * Returns all available permissions
  */
-router.get('/permissions', authenticate, requirePermission('role_view'), (req, res) => {
+router.get('/permissions', requirePermission('role_view'), (req, res) => {
     try {
-        const permissions = RoleModel.getAllPermissions();
-        const grouped = RoleModel.getPermissionsGrouped();
-
-        res.json({ 
-            success: true, 
-            permissions,
-            grouped 
+        const permissions = RoleSystem.getAllPermissions();
+        
+        // Group by module
+        const grouped = {};
+        permissions.forEach(p => {
+            if (!grouped[p.module]) grouped[p.module] = [];
+            grouped[p.module].push(p);
         });
+        
+        res.json({ success: true, permissions, grouped });
     } catch (error) {
         console.error('Get permissions error:', error);
-        res.status(500).json({ success: false, error: 'Failed to retrieve permissions' });
+        res.status(500).json({ success: false, error: 'Failed to fetch permissions' });
     }
 });
 
 /**
  * GET /api/roles/:id
- * Returns a specific role
  */
-router.get('/:id', authenticate, requirePermission('role_view'), (req, res) => {
+router.get('/:id', requirePermission('role_view'), (req, res) => {
     try {
-        const role = RoleModel.getById(req.params.id);
+        const role = RoleSystem.getById(req.params.id);
         if (!role) {
             return res.status(404).json({ success: false, error: 'Role not found' });
         }
-        res.json({ success: true, role: formatRole(role) });
+        res.json({ success: true, role });
     } catch (error) {
         console.error('Get role error:', error);
-        res.status(500).json({ success: false, error: 'Failed to retrieve role' });
+        res.status(500).json({ success: false, error: 'Failed to fetch role' });
     }
 });
 
 /**
  * POST /api/roles
- * Creates a new role
  */
-router.post('/', authenticate, requirePermission('role_create'), (req, res) => {
+router.post('/', requireAdmin, (req, res) => {
     try {
-        const roleData = req.body;
+        const { name, description, isAdmin, permissions } = req.body;
 
-        // Validation
-        if (!roleData.name || roleData.name.trim().length < 2) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Role name must be at least 2 characters' 
-            });
-        }
-        if (!roleData.permissions || roleData.permissions.length === 0) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'At least one permission is required' 
-            });
+        if (!name) {
+            return res.status(400).json({ success: false, error: 'Name is required' });
         }
 
-        // Check duplicate name
-        if (RoleModel.nameExists(roleData.name)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'A role with this name already exists' 
-            });
+        // Check for duplicate name
+        const existing = RoleSystem.getAll().find(r => r.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+            return res.status(400).json({ success: false, error: 'Role name already exists' });
         }
 
-        const newRole = RoleModel.create(roleData);
-        res.status(201).json({ success: true, role: formatRole(newRole) });
+        const role = RoleSystem.create({ name, description, isAdmin, permissions });
+        res.status(201).json({ success: true, role });
     } catch (error) {
         console.error('Create role error:', error);
         res.status(500).json({ success: false, error: 'Failed to create role' });
@@ -117,36 +88,24 @@ router.post('/', authenticate, requirePermission('role_create'), (req, res) => {
 
 /**
  * PUT /api/roles/:id
- * Updates a role
  */
-router.put('/:id', authenticate, requirePermission('role_edit'), (req, res) => {
+router.put('/:id', requireAdmin, (req, res) => {
     try {
-        const { id } = req.params;
-        const roleData = req.body;
-
-        const existingRole = RoleModel.getById(id);
-        if (!existingRole) {
+        const role = RoleSystem.getById(req.params.id);
+        if (!role) {
             return res.status(404).json({ success: false, error: 'Role not found' });
         }
 
-        // Check duplicate name
-        if (roleData.name && RoleModel.nameExists(roleData.name, id)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'A role with this name already exists' 
-            });
+        // Check name uniqueness if changing
+        if (req.body.name && req.body.name.toLowerCase() !== role.name.toLowerCase()) {
+            const existing = RoleSystem.getAll().find(r => r.name.toLowerCase() === req.body.name.toLowerCase());
+            if (existing) {
+                return res.status(400).json({ success: false, error: 'Role name already exists' });
+            }
         }
 
-        // Prevent changing admin status of system roles
-        if (existingRole.is_system && roleData.isAdmin !== undefined && roleData.isAdmin !== existingRole.is_admin) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Cannot change admin status of system roles' 
-            });
-        }
-
-        const updatedRole = RoleModel.update(id, roleData);
-        res.json({ success: true, role: formatRole(updatedRole) });
+        const updated = RoleSystem.update(req.params.id, req.body);
+        res.json({ success: true, role: updated });
     } catch (error) {
         console.error('Update role error:', error);
         res.status(500).json({ success: false, error: 'Failed to update role' });
@@ -155,14 +114,15 @@ router.put('/:id', authenticate, requirePermission('role_edit'), (req, res) => {
 
 /**
  * DELETE /api/roles/:id
- * Deletes a role
  */
-router.delete('/:id', authenticate, requirePermission('role_delete'), (req, res) => {
+router.delete('/:id', requireAdmin, (req, res) => {
     try {
-        const result = RoleModel.delete(req.params.id);
+        const result = RoleSystem.delete(req.params.id);
+        
         if (!result.success) {
-            return res.status(400).json(result);
+            return res.status(400).json({ success: false, error: result.error });
         }
+
         res.json({ success: true });
     } catch (error) {
         console.error('Delete role error:', error);

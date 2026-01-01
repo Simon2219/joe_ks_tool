@@ -4,7 +4,6 @@
  */
 
 const JwtService = require('../services/jwtService');
-const { UserModel, RoleModel } = require('../database');
 
 /**
  * Authentication middleware
@@ -137,8 +136,6 @@ function requireAdmin(req, res, next) {
 
 /**
  * Checks if user has a specific permission
- * @param {object} user - User object with role
- * @param {string} permission - Permission to check
  */
 function hasPermission(user, permission) {
     if (!user || !user.role) return false;
@@ -148,13 +145,11 @@ function hasPermission(user, permission) {
 
 /**
  * Checks if user can access a specific resource
- * Used for row-level security (e.g., can only view own tickets)
  */
 function canAccessResource(user, resource, resourceUserId) {
     if (!user || !user.role) return false;
     if (user.role.isAdmin) return true;
     
-    // Check for "view all" permission
     const viewAllPermissions = {
         ticket: 'ticket_view_all',
         quality: 'quality_view_all'
@@ -164,20 +159,12 @@ function canAccessResource(user, resource, resourceUserId) {
         return true;
     }
     
-    // Otherwise, user can only access their own resources
     return user.id === resourceUserId;
 }
 
-/**
- * Rate limiting state (simple in-memory implementation)
- */
+// Simple rate limiting
 const rateLimitState = new Map();
 
-/**
- * Simple rate limiting middleware
- * @param {number} maxRequests - Max requests per window
- * @param {number} windowMs - Time window in milliseconds
- */
 function rateLimit(maxRequests = 100, windowMs = 60000) {
     return (req, res, next) => {
         const key = req.ip || req.connection.remoteAddress || 'unknown';
@@ -186,10 +173,7 @@ function rateLimit(maxRequests = 100, windowMs = 60000) {
         let state = rateLimitState.get(key);
         
         if (!state || now > state.resetTime) {
-            state = {
-                count: 1,
-                resetTime: now + windowMs
-            };
+            state = { count: 1, resetTime: now + windowMs };
             rateLimitState.set(key, state);
         } else {
             state.count++;
@@ -208,9 +192,6 @@ function rateLimit(maxRequests = 100, windowMs = 60000) {
     };
 }
 
-/**
- * Login rate limiting (stricter)
- */
 const loginRateLimit = rateLimit(5, 60000); // 5 attempts per minute
 
 module.exports = {

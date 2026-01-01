@@ -1,136 +1,118 @@
 /**
- * Settings Routes
- * System settings and configuration
+ * Settings Routes - SettingsSystem
+ * Handles application settings and integration credentials
  */
 
 const express = require('express');
 const router = express.Router();
 
-const { SettingsModel, IntegrationCredentialsModel } = require('../database');
+const { SettingsSystem, IntegrationSystem } = require('../database');
 const encryptionService = require('../services/encryptionService');
 const { authenticate, requirePermission, requireAdmin } = require('../middleware/auth');
 
+router.use(authenticate);
+
 /**
  * GET /api/settings
- * Returns all settings
  */
-router.get('/', authenticate, requirePermission('settings_view'), (req, res) => {
+router.get('/', requirePermission('settings_view'), (req, res) => {
     try {
-        const settings = SettingsModel.getAll();
+        const settings = SettingsSystem.getAll();
         res.json({ success: true, settings });
     } catch (error) {
         console.error('Get settings error:', error);
-        res.status(500).json({ success: false, error: 'Failed to get settings' });
+        res.status(500).json({ success: false, error: 'Failed to fetch settings' });
     }
 });
 
 /**
  * GET /api/settings/:key
- * Returns a specific setting
  */
-router.get('/:key', authenticate, requirePermission('settings_view'), (req, res) => {
+router.get('/:key', requirePermission('settings_view'), (req, res) => {
     try {
-        const value = SettingsModel.get(req.params.key);
-        res.json({ success: true, value });
+        const value = SettingsSystem.get(req.params.key);
+        res.json({ success: true, key: req.params.key, value });
     } catch (error) {
         console.error('Get setting error:', error);
-        res.status(500).json({ success: false, error: 'Failed to get setting' });
-    }
-});
-
-/**
- * PUT /api/settings/:key
- * Updates a setting
- */
-router.put('/:key', authenticate, requirePermission('settings_edit'), (req, res) => {
-    try {
-        const { key } = req.params;
-        const { value } = req.body;
-
-        SettingsModel.set(key, value);
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Set setting error:', error);
-        res.status(500).json({ success: false, error: 'Failed to update setting' });
+        res.status(500).json({ success: false, error: 'Failed to fetch setting' });
     }
 });
 
 /**
  * PUT /api/settings
- * Updates multiple settings
  */
-router.put('/', authenticate, requirePermission('settings_edit'), (req, res) => {
+router.put('/', requireAdmin, (req, res) => {
     try {
-        const settings = req.body;
-        SettingsModel.setMany(settings);
+        const { settings } = req.body;
+        if (!settings || typeof settings !== 'object') {
+            return res.status(400).json({ success: false, error: 'Settings object required' });
+        }
+        
+        SettingsSystem.setMany(settings);
         res.json({ success: true });
     } catch (error) {
-        console.error('Set settings error:', error);
+        console.error('Update settings error:', error);
         res.status(500).json({ success: false, error: 'Failed to update settings' });
     }
 });
 
-// ==========================================
-// INTEGRATION CREDENTIALS (Admin Only)
-// ==========================================
+/**
+ * PUT /api/settings/:key
+ */
+router.put('/:key', requireAdmin, (req, res) => {
+    try {
+        const { value } = req.body;
+        if (value === undefined) {
+            return res.status(400).json({ success: false, error: 'Value is required' });
+        }
+
+        SettingsSystem.set(req.params.key, String(value));
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Update setting error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update setting' });
+    }
+});
 
 /**
  * GET /api/settings/integrations/status
- * Returns status of all integrations
  */
-router.get('/integrations/status', authenticate, requireAdmin, (req, res) => {
+router.get('/integrations/status', requireAdmin, (req, res) => {
     try {
-        const credentials = IntegrationCredentialsModel.getAll();
-        
-        const status = {
-            sharepoint: {
-                configured: credentials.some(c => c.integration_type === 'sharepoint'),
-                connected: credentials.find(c => c.integration_type === 'sharepoint')?.is_connected || false
-            },
-            jira: {
-                configured: credentials.some(c => c.integration_type === 'jira'),
-                connected: credentials.find(c => c.integration_type === 'jira')?.is_connected || false
-            },
+        const status = IntegrationSystem.getStatus();
+        res.json({ 
+            success: true, 
+            integrations: status,
             encryptionEnabled: encryptionService.isEnabled()
-        };
-
-        res.json({ success: true, status });
+        });
     } catch (error) {
         console.error('Get integration status error:', error);
-        res.status(500).json({ success: false, error: 'Failed to get status' });
+        res.status(500).json({ success: false, error: 'Failed to fetch integration status' });
     }
 });
 
 /**
  * POST /api/settings/integrations/sharepoint
- * Saves SharePoint credentials
  */
-router.post('/integrations/sharepoint', authenticate, requireAdmin, (req, res) => {
+router.post('/integrations/sharepoint', requireAdmin, (req, res) => {
     try {
-        const { siteUrl, tenantId, clientId, clientSecret } = req.body;
-
-        if (!siteUrl || !tenantId || !clientId || !clientSecret) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'All SharePoint credentials are required' 
-            });
+        const { siteUrl, clientId, clientSecret, tenantId } = req.body;
+        
+        if (!siteUrl || !clientId || !clientSecret) {
+            return res.status(400).json({ success: false, error: 'Required credentials missing' });
         }
 
-        const credentials = { siteUrl, tenantId, clientId, clientSecret };
-        
-        // Encrypt if encryption is enabled
-        const isEncrypted = encryptionService.isEnabled();
-        const credentialsToStore = isEncrypted 
-            ? encryptionService.encrypt(credentials)
-            : JSON.stringify(credentials);
+        const credentials = { siteUrl, clientId, clientSecret, tenantId };
+        let encrypted = false;
+        let credData = JSON.stringify(credentials);
 
-        IntegrationCredentialsModel.save('sharepoint', credentialsToStore, isEncrypted);
+        if (encryptionService.isEnabled()) {
+            credData = encryptionService.encrypt(credData);
+            encrypted = true;
+        }
 
-        res.json({ 
-            success: true, 
-            message: 'SharePoint credentials saved',
-            encrypted: isEncrypted
-        });
+        IntegrationSystem.saveCredentials('sharepoint', credData, encrypted);
+        res.json({ success: true, encrypted });
     } catch (error) {
         console.error('Save SharePoint credentials error:', error);
         res.status(500).json({ success: false, error: 'Failed to save credentials' });
@@ -139,34 +121,26 @@ router.post('/integrations/sharepoint', authenticate, requireAdmin, (req, res) =
 
 /**
  * POST /api/settings/integrations/jira
- * Saves JIRA credentials
  */
-router.post('/integrations/jira', authenticate, requireAdmin, (req, res) => {
+router.post('/integrations/jira', requireAdmin, (req, res) => {
     try {
-        const { baseUrl, email, apiToken } = req.body;
-
+        const { baseUrl, email, apiToken, projectKey } = req.body;
+        
         if (!baseUrl || !email || !apiToken) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'All JIRA credentials are required' 
-            });
+            return res.status(400).json({ success: false, error: 'Required credentials missing' });
         }
 
-        const credentials = { baseUrl, email, apiToken };
-        
-        // Encrypt if encryption is enabled
-        const isEncrypted = encryptionService.isEnabled();
-        const credentialsToStore = isEncrypted 
-            ? encryptionService.encrypt(credentials)
-            : JSON.stringify(credentials);
+        const credentials = { baseUrl, email, apiToken, projectKey };
+        let encrypted = false;
+        let credData = JSON.stringify(credentials);
 
-        IntegrationCredentialsModel.save('jira', credentialsToStore, isEncrypted);
+        if (encryptionService.isEnabled()) {
+            credData = encryptionService.encrypt(credData);
+            encrypted = true;
+        }
 
-        res.json({ 
-            success: true, 
-            message: 'JIRA credentials saved',
-            encrypted: isEncrypted
-        });
+        IntegrationSystem.saveCredentials('jira', credData, encrypted);
+        res.json({ success: true, encrypted });
     } catch (error) {
         console.error('Save JIRA credentials error:', error);
         res.status(500).json({ success: false, error: 'Failed to save credentials' });
@@ -175,42 +149,20 @@ router.post('/integrations/jira', authenticate, requireAdmin, (req, res) => {
 
 /**
  * DELETE /api/settings/integrations/:type
- * Deletes integration credentials
  */
-router.delete('/integrations/:type', authenticate, requireAdmin, (req, res) => {
+router.delete('/integrations/:type', requireAdmin, (req, res) => {
     try {
         const { type } = req.params;
-        
         if (!['sharepoint', 'jira'].includes(type)) {
             return res.status(400).json({ success: false, error: 'Invalid integration type' });
         }
 
-        IntegrationCredentialsModel.delete(type);
+        IntegrationSystem.deleteCredentials(type);
         res.json({ success: true });
     } catch (error) {
-        console.error('Delete credentials error:', error);
-        res.status(500).json({ success: false, error: 'Failed to delete credentials' });
+        console.error('Delete integration error:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete integration' });
     }
 });
 
-/**
- * Helper to get decrypted credentials
- */
-function getDecryptedCredentials(integrationType) {
-    const record = IntegrationCredentialsModel.get(integrationType);
-    if (!record) return null;
-
-    try {
-        if (record.encrypted) {
-            return encryptionService.decrypt(record.credentials);
-        }
-        return JSON.parse(record.credentials);
-    } catch (error) {
-        console.error(`Failed to decrypt ${integrationType} credentials:`, error);
-        return null;
-    }
-}
-
-// Export helper for use in integration routes
 module.exports = router;
-module.exports.getDecryptedCredentials = getDecryptedCredentials;

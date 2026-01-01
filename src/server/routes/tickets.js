@@ -1,150 +1,79 @@
 /**
- * Ticket System Routes
- * CRUD operations for tickets
+ * Ticket Routes - TicketSystem
+ * Handles ticket management operations
  */
 
 const express = require('express');
 const router = express.Router();
 
-const { TicketModel, UserModel } = require('../database');
-const { authenticate, requirePermission, hasPermission } = require('../middleware/auth');
+const { TicketSystem, UserSystem } = require('../database');
+const { authenticate, requirePermission, hasPermission, canAccessResource } = require('../middleware/auth');
 
-/**
- * Formats ticket for response
- */
-function formatTicket(ticket) {
-    return {
-        id: ticket.id,
-        ticketNumber: ticket.ticket_number,
-        title: ticket.title,
-        description: ticket.description,
-        status: ticket.status,
-        priority: ticket.priority,
-        category: ticket.category,
-        customerName: ticket.customer_name,
-        customerEmail: ticket.customer_email,
-        customerPhone: ticket.customer_phone,
-        assignedTo: ticket.assigned_to,
-        assignedToName: ticket.assigned_to_name || 'Unassigned',
-        createdBy: ticket.created_by,
-        createdByName: ticket.created_by_name || 'Unknown',
-        dueDate: ticket.due_date,
-        resolvedAt: ticket.resolved_at,
-        closedAt: ticket.closed_at,
-        jiraKey: ticket.jira_key,
-        tags: ticket.tags || [],
-        createdAt: ticket.created_at,
-        updatedAt: ticket.updated_at
-    };
-}
+router.use(authenticate);
 
 /**
  * GET /api/tickets
- * Returns tickets (filtered by permissions)
  */
-router.get('/', authenticate, requirePermission('ticket_view'), (req, res) => {
+router.get('/', requirePermission('ticket_view'), (req, res) => {
     try {
         let tickets;
-        const { status, priority, assignedTo } = req.query;
-
-        // Check if user can view all tickets
+        
         if (hasPermission(req.user, 'ticket_view_all')) {
-            tickets = TicketModel.getAll({ status, priority, assignedTo });
+            tickets = TicketSystem.getAll(req.query);
         } else {
-            // User can only see their own tickets
-            tickets = TicketModel.getByUser(req.user.id);
-            // Apply filters
-            if (status) tickets = tickets.filter(t => t.status === status);
-            if (priority) tickets = tickets.filter(t => t.priority === priority);
+            tickets = TicketSystem.getByUser(req.user.id);
         }
-
-        res.json({ 
-            success: true, 
-            tickets: tickets.map(formatTicket) 
-        });
+        
+        res.json({ success: true, tickets });
     } catch (error) {
         console.error('Get tickets error:', error);
-        res.status(500).json({ success: false, error: 'Failed to retrieve tickets' });
+        res.status(500).json({ success: false, error: 'Failed to fetch tickets' });
     }
 });
 
 /**
- * GET /api/tickets/statistics
- * Returns ticket statistics
+ * GET /api/tickets/stats
  */
-router.get('/statistics', authenticate, requirePermission('ticket_view'), (req, res) => {
+router.get('/stats', requirePermission('ticket_view'), (req, res) => {
     try {
-        const statistics = TicketModel.getStatistics();
-        res.json({ success: true, statistics });
+        res.json({ success: true, stats: TicketSystem.getStatistics() });
     } catch (error) {
-        console.error('Get statistics error:', error);
-        res.status(500).json({ success: false, error: 'Failed to get statistics' });
+        console.error('Get ticket stats error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch stats' });
     }
 });
 
 /**
  * GET /api/tickets/:id
- * Returns a specific ticket
  */
-router.get('/:id', authenticate, requirePermission('ticket_view'), (req, res) => {
+router.get('/:id', requirePermission('ticket_view'), (req, res) => {
     try {
-        const ticket = TicketModel.getById(req.params.id);
+        const ticket = TicketSystem.getById(req.params.id);
         if (!ticket) {
             return res.status(404).json({ success: false, error: 'Ticket not found' });
         }
 
-        // Check if user can view this ticket
-        if (!hasPermission(req.user, 'ticket_view_all')) {
-            if (ticket.assigned_to !== req.user.id && ticket.created_by !== req.user.id) {
-                return res.status(403).json({ 
-                    success: false, 
-                    error: 'You can only view your own tickets' 
-                });
-            }
+        if (!canAccessResource(req.user, 'ticket', ticket.assigned_to || ticket.created_by)) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
-        res.json({ success: true, ticket: formatTicket(ticket) });
+        ticket.comments = TicketSystem.getComments(req.params.id);
+        ticket.history = TicketSystem.getHistory(req.params.id);
+        
+        res.json({ success: true, ticket });
     } catch (error) {
         console.error('Get ticket error:', error);
-        res.status(500).json({ success: false, error: 'Failed to retrieve ticket' });
+        res.status(500).json({ success: false, error: 'Failed to fetch ticket' });
     }
 });
 
 /**
  * POST /api/tickets
- * Creates a new ticket
  */
-router.post('/', authenticate, requirePermission('ticket_create'), (req, res) => {
+router.post('/', requirePermission('ticket_create'), (req, res) => {
     try {
-        const ticketData = req.body;
-
-        // Validation
-        if (!ticketData.title || ticketData.title.length < 5) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Title must be at least 5 characters' 
-            });
-        }
-        if (!ticketData.description || ticketData.description.length < 10) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Description must be at least 10 characters' 
-            });
-        }
-
-        // Validate assignee if provided
-        if (ticketData.assignedTo) {
-            const assignee = UserModel.getById(ticketData.assignedTo);
-            if (!assignee) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: 'Invalid assignee' 
-                });
-            }
-        }
-
-        const newTicket = TicketModel.create(ticketData, req.user.id);
-        res.status(201).json({ success: true, ticket: formatTicket(newTicket) });
+        const ticket = TicketSystem.create(req.body, req.user.id);
+        res.status(201).json({ success: true, ticket });
     } catch (error) {
         console.error('Create ticket error:', error);
         res.status(500).json({ success: false, error: 'Failed to create ticket' });
@@ -153,20 +82,20 @@ router.post('/', authenticate, requirePermission('ticket_create'), (req, res) =>
 
 /**
  * PUT /api/tickets/:id
- * Updates a ticket
  */
-router.put('/:id', authenticate, requirePermission('ticket_edit'), (req, res) => {
+router.put('/:id', requirePermission('ticket_edit'), (req, res) => {
     try {
-        const { id } = req.params;
-        const ticketData = req.body;
-
-        const existingTicket = TicketModel.getById(id);
-        if (!existingTicket) {
+        const ticket = TicketSystem.getById(req.params.id);
+        if (!ticket) {
             return res.status(404).json({ success: false, error: 'Ticket not found' });
         }
 
-        const updatedTicket = TicketModel.update(id, ticketData, req.user.id);
-        res.json({ success: true, ticket: formatTicket(updatedTicket) });
+        if (!canAccessResource(req.user, 'ticket', ticket.assigned_to || ticket.created_by)) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
+
+        const updated = TicketSystem.update(req.params.id, req.body, req.user.id);
+        res.json({ success: true, ticket: updated });
     } catch (error) {
         console.error('Update ticket error:', error);
         res.status(500).json({ success: false, error: 'Failed to update ticket' });
@@ -175,55 +104,44 @@ router.put('/:id', authenticate, requirePermission('ticket_edit'), (req, res) =>
 
 /**
  * PUT /api/tickets/:id/status
- * Changes ticket status
  */
-router.put('/:id/status', authenticate, requirePermission('ticket_edit'), (req, res) => {
+router.put('/:id/status', requirePermission('ticket_edit'), (req, res) => {
     try {
-        const { id } = req.params;
-        const { status } = req.body;
-
-        const validStatuses = ['new', 'open', 'in_progress', 'pending', 'resolved', 'closed'];
-        if (!validStatuses.includes(status)) {
-            return res.status(400).json({ success: false, error: 'Invalid status' });
-        }
-
-        const ticket = TicketModel.getById(id);
+        const ticket = TicketSystem.getById(req.params.id);
         if (!ticket) {
             return res.status(404).json({ success: false, error: 'Ticket not found' });
         }
 
-        const updatedTicket = TicketModel.changeStatus(id, status, req.user.id);
-        res.json({ success: true, ticket: formatTicket(updatedTicket) });
+        const { status } = req.body;
+        if (!['new', 'open', 'pending', 'resolved', 'closed'].includes(status)) {
+            return res.status(400).json({ success: false, error: 'Invalid status' });
+        }
+
+        const updated = TicketSystem.changeStatus(req.params.id, status, req.user.id);
+        res.json({ success: true, ticket: updated });
     } catch (error) {
         console.error('Change status error:', error);
-        res.status(500).json({ success: false, error: 'Failed to change status' });
+        res.status(500).json({ success: false, error: 'Failed to update status' });
     }
 });
 
 /**
  * PUT /api/tickets/:id/assign
- * Assigns ticket to user
  */
-router.put('/:id/assign', authenticate, requirePermission('ticket_assign'), (req, res) => {
+router.put('/:id/assign', requirePermission('ticket_assign'), (req, res) => {
     try {
-        const { id } = req.params;
-        const { userId } = req.body;
-
-        const ticket = TicketModel.getById(id);
+        const ticket = TicketSystem.getById(req.params.id);
         if (!ticket) {
             return res.status(404).json({ success: false, error: 'Ticket not found' });
         }
 
-        // Validate assignee if provided
-        if (userId) {
-            const user = UserModel.getById(userId);
-            if (!user) {
-                return res.status(400).json({ success: false, error: 'User not found' });
-            }
+        const { assignedTo } = req.body;
+        if (assignedTo && !UserSystem.getById(assignedTo)) {
+            return res.status(400).json({ success: false, error: 'Invalid user' });
         }
 
-        const updatedTicket = TicketModel.assign(id, userId, req.user.id);
-        res.json({ success: true, ticket: formatTicket(updatedTicket) });
+        const updated = TicketSystem.assign(req.params.id, assignedTo, req.user.id);
+        res.json({ success: true, ticket: updated });
     } catch (error) {
         console.error('Assign ticket error:', error);
         res.status(500).json({ success: false, error: 'Failed to assign ticket' });
@@ -231,83 +149,22 @@ router.put('/:id/assign', authenticate, requirePermission('ticket_assign'), (req
 });
 
 /**
- * DELETE /api/tickets/:id
- * Deletes a ticket
- */
-router.delete('/:id', authenticate, requirePermission('ticket_delete'), (req, res) => {
-    try {
-        const ticket = TicketModel.getById(req.params.id);
-        if (!ticket) {
-            return res.status(404).json({ success: false, error: 'Ticket not found' });
-        }
-
-        TicketModel.delete(req.params.id);
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Delete ticket error:', error);
-        res.status(500).json({ success: false, error: 'Failed to delete ticket' });
-    }
-});
-
-/**
- * GET /api/tickets/:id/comments
- * Returns comments for a ticket
- */
-router.get('/:id/comments', authenticate, requirePermission('ticket_view'), (req, res) => {
-    try {
-        const ticket = TicketModel.getById(req.params.id);
-        if (!ticket) {
-            return res.status(404).json({ success: false, error: 'Ticket not found' });
-        }
-
-        const comments = TicketModel.getComments(req.params.id);
-        res.json({ 
-            success: true, 
-            comments: comments.map(c => ({
-                id: c.id,
-                ticketId: c.ticket_id,
-                userId: c.user_id,
-                userName: c.user_name,
-                content: c.content,
-                createdAt: c.created_at
-            }))
-        });
-    } catch (error) {
-        console.error('Get comments error:', error);
-        res.status(500).json({ success: false, error: 'Failed to get comments' });
-    }
-});
-
-/**
  * POST /api/tickets/:id/comments
- * Adds a comment to a ticket
  */
-router.post('/:id/comments', authenticate, requirePermission('ticket_view'), (req, res) => {
+router.post('/:id/comments', requirePermission('ticket_view'), (req, res) => {
     try {
-        const { content } = req.body;
-        const ticketId = req.params.id;
-
-        if (!content || content.trim().length < 1) {
-            return res.status(400).json({ success: false, error: 'Comment cannot be empty' });
-        }
-
-        const ticket = TicketModel.getById(ticketId);
+        const ticket = TicketSystem.getById(req.params.id);
         if (!ticket) {
             return res.status(404).json({ success: false, error: 'Ticket not found' });
         }
 
-        const comment = TicketModel.addComment(ticketId, req.user.id, content);
-        res.status(201).json({ 
-            success: true, 
-            comment: {
-                id: comment.id,
-                ticketId: comment.ticket_id,
-                userId: comment.user_id,
-                userName: comment.user_name,
-                content: comment.content,
-                createdAt: comment.created_at
-            }
-        });
+        const { content } = req.body;
+        if (!content) {
+            return res.status(400).json({ success: false, error: 'Content is required' });
+        }
+
+        const comment = TicketSystem.addComment(req.params.id, req.user.id, content);
+        res.status(201).json({ success: true, comment });
     } catch (error) {
         console.error('Add comment error:', error);
         res.status(500).json({ success: false, error: 'Failed to add comment' });
@@ -315,32 +172,20 @@ router.post('/:id/comments', authenticate, requirePermission('ticket_view'), (re
 });
 
 /**
- * GET /api/tickets/:id/history
- * Returns history for a ticket
+ * DELETE /api/tickets/:id
  */
-router.get('/:id/history', authenticate, requirePermission('ticket_view'), (req, res) => {
+router.delete('/:id', requirePermission('ticket_delete'), (req, res) => {
     try {
-        const ticket = TicketModel.getById(req.params.id);
+        const ticket = TicketSystem.getById(req.params.id);
         if (!ticket) {
             return res.status(404).json({ success: false, error: 'Ticket not found' });
         }
 
-        const history = TicketModel.getHistory(req.params.id);
-        res.json({ 
-            success: true, 
-            history: history.map(h => ({
-                id: h.id,
-                ticketId: h.ticket_id,
-                userId: h.user_id,
-                userName: h.user_name,
-                action: h.action,
-                details: h.details,
-                createdAt: h.created_at
-            }))
-        });
+        TicketSystem.delete(req.params.id);
+        res.json({ success: true });
     } catch (error) {
-        console.error('Get history error:', error);
-        res.status(500).json({ success: false, error: 'Failed to get history' });
+        console.error('Delete ticket error:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete ticket' });
     }
 });
 

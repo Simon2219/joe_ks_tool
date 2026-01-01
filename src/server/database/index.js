@@ -1,42 +1,23 @@
 /**
- * Database Module
- * Main entry point for database operations
+ * Database - Entry Point
+ * Exports the consolidated database systems
  */
 
-const { initializeSchema, closeDatabase, getDatabase, DB_PATH, DATA_DIR } = require('./sqlite');
-const { seedDatabase } = require('./seed');
-const models = require('./models');
+const Database = require('./Database');
 
-/**
- * Initializes the database
- */
 async function initializeDatabase() {
-    console.log('Initializing database...');
-    console.log(`  Database path: ${DB_PATH}`);
-    
-    // Initialize schema
-    initializeSchema();
-    
-    // Seed default data
-    await seedDatabase();
-    
-    console.log('Database initialization complete!');
-    return true;
+    Database.initSchema();
+    await Database.seedData();
+    console.log('Database initialization complete');
 }
 
-/**
- * Graceful shutdown
- */
 function shutdown() {
-    console.log('Closing database connection...');
-    closeDatabase();
+    Database.closeDb();
+    console.log('Database connection closed');
 }
 
 module.exports = {
     initializeDatabase,
     shutdown,
-    getDatabase,
-    DB_PATH,
-    DATA_DIR,
-    ...models
+    ...Database
 };
