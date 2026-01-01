@@ -1,16 +1,129 @@
 /**
  * Settings Routes - SettingsSystem
  * Handles application settings and integration credentials
+ * Configuration controlled via config/default.json or config/local.json
  */
 
 const express = require('express');
 const router = express.Router();
 
+const Config = require('../../../config/Config');
 const { SettingsSystem, IntegrationSystem } = require('../database');
 const encryptionService = require('../services/encryptionService');
 const { authenticate, requirePermission, requireAdmin } = require('../middleware/auth');
 
 router.use(authenticate);
+
+// ============================================
+// SYSTEM CONFIGURATION (from config files)
+// ============================================
+
+/**
+ * GET /api/settings/config
+ * Returns current system configuration
+ */
+router.get('/config', requireAdmin, (req, res) => {
+    try {
+        res.json({
+            success: true,
+            config: {
+                server: Config.server,
+                security: {
+                    encryptionEnabled: Config.isEncryptionEnabled(),
+                    jwtAccessTokenExpiry: Config.get('security.jwtAccessTokenExpiry'),
+                    jwtRefreshTokenExpiryDays: Config.get('security.jwtRefreshTokenExpiryDays'),
+                    rateLimitMaxRequests: Config.get('security.rateLimitMaxRequests'),
+                    loginRateLimitMaxAttempts: Config.get('security.loginRateLimitMaxAttempts')
+                },
+                users: Config.users,
+                tickets: Config.tickets,
+                quality: Config.quality,
+                integrations: Config.integrations,
+                logging: Config.logging,
+                app: Config.app
+            }
+        });
+    } catch (error) {
+        console.error('Get config error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch config' });
+    }
+});
+
+/**
+ * PUT /api/settings/config
+ * Updates system configuration (saves to local.json)
+ */
+router.put('/config', requireAdmin, (req, res) => {
+    try {
+        const { config } = req.body;
+        if (!config || typeof config !== 'object') {
+            return res.status(400).json({ success: false, error: 'Config object required' });
+        }
+
+        // Apply allowed configuration changes
+        const allowedKeys = [
+            'security.encryptionEnabled',
+            'security.jwtAccessTokenExpiry',
+            'security.jwtRefreshTokenExpiryDays',
+            'security.rateLimitMaxRequests',
+            'security.loginRateLimitMaxAttempts',
+            'tickets.slaEnabled',
+            'tickets.slaDurations',
+            'tickets.defaultPriority',
+            'quality.passingScore',
+            'logging.logRequests',
+            'logging.logErrors',
+            'app.companyName',
+            'app.timezone'
+        ];
+
+        for (const key of allowedKeys) {
+            const keys = key.split('.');
+            let value = config;
+            for (const k of keys) {
+                if (value && typeof value === 'object' && k in value) {
+                    value = value[k];
+                } else {
+                    value = undefined;
+                    break;
+                }
+            }
+            if (value !== undefined) {
+                Config.set(key, value);
+            }
+        }
+
+        // Save to local.json
+        const saved = Config.saveLocal();
+        
+        res.json({ 
+            success: true, 
+            saved,
+            message: saved ? 'Configuration saved' : 'Configuration updated (not persisted)'
+        });
+    } catch (error) {
+        console.error('Update config error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update config' });
+    }
+});
+
+/**
+ * POST /api/settings/config/reload
+ * Reloads configuration from files
+ */
+router.post('/config/reload', requireAdmin, (req, res) => {
+    try {
+        Config.reload();
+        res.json({ success: true, message: 'Configuration reloaded' });
+    } catch (error) {
+        console.error('Reload config error:', error);
+        res.status(500).json({ success: false, error: 'Failed to reload config' });
+    }
+});
+
+// ============================================
+// DATABASE SETTINGS
+// ============================================
 
 /**
  * GET /api/settings

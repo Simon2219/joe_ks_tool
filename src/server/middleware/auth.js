@@ -1,8 +1,10 @@
 /**
  * Authentication Middleware
  * Handles JWT-based authentication and authorization
+ * Configuration controlled via config/default.json or config/local.json
  */
 
+const Config = require('../../../config/Config');
 const JwtService = require('../services/jwtService');
 
 /**
@@ -31,7 +33,6 @@ function authenticate(req, res, next) {
         });
     }
 
-    // Get fresh user data
     const user = JwtService.getUserForToken(payload.userId);
     if (!user) {
         return res.status(401).json({ 
@@ -49,7 +50,6 @@ function authenticate(req, res, next) {
         });
     }
 
-    // Attach user to request
     req.user = user;
     req.tokenPayload = payload;
     next();
@@ -57,7 +57,6 @@ function authenticate(req, res, next) {
 
 /**
  * Optional authentication middleware
- * Attaches user if token is valid, but doesn't fail if not
  */
 function optionalAuth(req, res, next) {
     const authHeader = req.headers.authorization;
@@ -80,7 +79,6 @@ function optionalAuth(req, res, next) {
 
 /**
  * Permission check middleware factory
- * @param {string} permission - Required permission
  */
 function requirePermission(permission) {
     return (req, res, next) => {
@@ -92,12 +90,10 @@ function requirePermission(permission) {
             });
         }
 
-        // Admins have all permissions
         if (req.user.role?.isAdmin) {
             return next();
         }
 
-        // Check if user has the required permission
         if (!req.user.role?.permissions?.includes(permission)) {
             return res.status(403).json({ 
                 success: false, 
@@ -162,10 +158,14 @@ function canAccessResource(user, resource, resourceUserId) {
     return user.id === resourceUserId;
 }
 
-// Simple rate limiting
+// Rate limiting using config values
 const rateLimitState = new Map();
 
-function rateLimit(maxRequests = 100, windowMs = 60000) {
+function rateLimit(maxRequests, windowMs) {
+    // Use config defaults if not specified
+    const max = maxRequests || Config.get('security.rateLimitMaxRequests', 100);
+    const window = windowMs || Config.get('security.rateLimitWindowMs', 60000);
+    
     return (req, res, next) => {
         const key = req.ip || req.connection.remoteAddress || 'unknown';
         const now = Date.now();
@@ -173,13 +173,13 @@ function rateLimit(maxRequests = 100, windowMs = 60000) {
         let state = rateLimitState.get(key);
         
         if (!state || now > state.resetTime) {
-            state = { count: 1, resetTime: now + windowMs };
+            state = { count: 1, resetTime: now + window };
             rateLimitState.set(key, state);
         } else {
             state.count++;
         }
         
-        if (state.count > maxRequests) {
+        if (state.count > max) {
             return res.status(429).json({
                 success: false,
                 error: 'Too many requests',
@@ -192,7 +192,11 @@ function rateLimit(maxRequests = 100, windowMs = 60000) {
     };
 }
 
-const loginRateLimit = rateLimit(5, 60000); // 5 attempts per minute
+// Login rate limiting using config
+const loginRateLimit = rateLimit(
+    Config.get('security.loginRateLimitMaxAttempts', 5),
+    Config.get('security.loginRateLimitWindowMs', 60000)
+);
 
 module.exports = {
     authenticate,

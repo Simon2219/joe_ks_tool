@@ -1,0 +1,35 @@
+{
+  "_comment": "Copy this file to local.json and modify as needed. local.json is gitignored.",
+  
+  "server": {
+    "port": 3000
+  },
+  
+  "security": {
+    "encryptionEnabled": true,
+    "jwtAccessTokenExpiry": "15m",
+    "jwtRefreshTokenExpiryDays": 7
+  },
+  
+  "tickets": {
+    "slaEnabled": true,
+    "slaDurations": {
+      "critical": 2,
+      "high": 8,
+      "medium": 24,
+      "low": 72
+    }
+  },
+  
+  "quality": {
+    "passingScore": 80
+  },
+  
+  "logging": {
+    "logRequests": true
+  },
+  
+  "app": {
+    "companyName": "Your Company Name"
+  }
+}

@@ -1,6 +1,7 @@
 /**
  * Database.js
  * Consolidated SQLite database operations for all subsystems
+ * Configuration controlled via config/default.json or config/local.json
  */
 
 const Database = require('better-sqlite3');
@@ -8,13 +9,14 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
+const Config = require('../../../config/Config');
 
 // ============================================
 // DATABASE CONNECTION
 // ============================================
 
 const DATA_DIR = path.join(__dirname, '../../../data');
-const DB_PATH = path.join(DATA_DIR, 'customer-support.db');
+const DB_PATH = path.join(__dirname, '../../../', Config.get('database.path', 'data/customer-support.db'));
 
 let db = null;
 
@@ -24,8 +26,13 @@ function getDb() {
             fs.mkdirSync(DATA_DIR, { recursive: true });
         }
         db = new Database(DB_PATH);
-        db.pragma('foreign_keys = ON');
-        db.pragma('journal_mode = WAL');
+        
+        if (Config.get('database.enableForeignKeys', true)) {
+            db.pragma('foreign_keys = ON');
+        }
+        if (Config.get('database.enableWAL', true)) {
+            db.pragma('journal_mode = WAL');
+        }
     }
     return db;
 }
@@ -349,13 +356,15 @@ const UserSystem = {
     async create(data) {
         const now = new Date().toISOString();
         const id = uuidv4();
-        const hashedPw = await bcrypt.hash(data.password, 10);
+        const bcryptRounds = Config.get('security.bcryptRounds', 10);
+        const hashedPw = await bcrypt.hash(data.password, bcryptRounds);
+        const defaultRole = Config.get('users.defaultRole', 'agent');
         
         getDb().prepare(`
             INSERT INTO users (id, username, email, password, first_name, last_name, role_id, department, phone, is_active, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(id, data.username.toLowerCase(), data.email.toLowerCase(), hashedPw, data.firstName, data.lastName, 
-               data.roleId || 'agent', data.department || '', data.phone || '', data.isActive !== false ? 1 : 0, now, now);
+               data.roleId || defaultRole, data.department || '', data.phone || '', data.isActive !== false ? 1 : 0, now, now);
         
         return this.getById(id);
     },
@@ -367,7 +376,7 @@ const UserSystem = {
         
         if (data.username) { fields.push('username = ?'); values.push(data.username.toLowerCase()); }
         if (data.email) { fields.push('email = ?'); values.push(data.email.toLowerCase()); }
-        if (data.password) { fields.push('password = ?'); values.push(await bcrypt.hash(data.password, 10)); }
+        if (data.password) { fields.push('password = ?'); values.push(await bcrypt.hash(data.password, Config.get('security.bcryptRounds', 10))); }
         if (data.firstName) { fields.push('first_name = ?'); values.push(data.firstName); }
         if (data.lastName) { fields.push('last_name = ?'); values.push(data.lastName); }
         if (data.roleId) { fields.push('role_id = ?'); values.push(data.roleId); }
@@ -505,8 +514,9 @@ const TicketSystem = {
     },
     
     calculateDueDate(priority) {
-        const hours = { critical: 2, high: 8, medium: 24, low: 72 };
-        return new Date(Date.now() + (hours[priority] || 24) * 60 * 60 * 1000).toISOString();
+        const slaDurations = Config.get('tickets.slaDurations', { critical: 2, high: 8, medium: 24, low: 72 });
+        const hours = slaDurations[priority] || slaDurations.medium || 24;
+        return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
     },
     
     getAll(filters = {}) {
@@ -713,7 +723,7 @@ const QualitySystem = {
         const id = uuidv4();
         const categories = this.getActiveCategories();
         const overallScore = this.calculateScore(data.categoryScores, categories);
-        const passingScore = parseInt(SettingsSystem.get('quality.passingScore') || '80');
+        const passingScore = parseInt(SettingsSystem.get('quality.passingScore') || Config.get('quality.passingScore', 80));
         
         getDb().transaction(() => {
             getDb().prepare(`
@@ -739,7 +749,7 @@ const QualitySystem = {
             const categories = this.getActiveCategories();
             overallScore = this.calculateScore(data.categoryScores, categories);
         }
-        const passingScore = parseInt(SettingsSystem.get('quality.passingScore') || '80');
+        const passingScore = parseInt(SettingsSystem.get('quality.passingScore') || Config.get('quality.passingScore', 80));
         
         getDb().transaction(() => {
             getDb().prepare(`
