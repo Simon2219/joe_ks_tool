@@ -1,68 +1,121 @@
-# Customer Support Tool - Setup Guide
+# Customer Support Tool - Complete Setup Guide
 
-Complete setup guide for installing, configuring, and running the Customer Support Tool.
-
-## Prerequisites
-
-- **Node.js** version 18 or higher ([Download](https://nodejs.org/))
-- **npm** (comes with Node.js)
-- **Windows 10/11**, macOS, or Linux
+This guide covers **everything** you need to set up and run the Customer Support Tool.
 
 ---
 
-## Quick Start
+## Table of Contents
 
-### 1. Install Dependencies
+1. [Prerequisites](#1-prerequisites)
+2. [Installation](#2-installation)
+3. [Configuration](#3-configuration)
+4. [Running the Application](#4-running-the-application)
+5. [First Login](#5-first-login)
+6. [System Features](#6-system-features)
+7. [Building for Production](#7-building-for-production)
+8. [Troubleshooting](#8-troubleshooting)
 
-```bash
+---
+
+## 1. Prerequisites
+
+### Required Software
+
+| Software | Version | Download |
+|----------|---------|----------|
+| Node.js | 18.x or 20.x LTS | https://nodejs.org/ |
+| npm | Comes with Node.js | - |
+
+### Check Your Installation
+
+Open PowerShell and run:
+
+```powershell
+node --version
+npm --version
+```
+
+Both should show version numbers. If not, install Node.js first.
+
+---
+
+## 2. Installation
+
+### Step 2.1: Clean Previous Installation (if any)
+
+```powershell
+Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force data -ErrorAction SilentlyContinue
+```
+
+### Step 2.2: Install Dependencies
+
+```powershell
 npm install
 ```
 
-### 2. Start the Application
-
-**Option A: Web Server (Browser Access)**
-```bash
-npm start
-```
-Then open `http://localhost:3000` in your browser.
-
-**Option B: Desktop App (Electron)**
-```bash
-npm run electron
-```
-
-### 3. Login
-
-Default credentials:
-- **Username:** `admin`
-- **Password:** `admin123`
-
-⚠️ **Change this password immediately after first login!**
+**Expected:** Installation completes with some warnings (safe to ignore).
 
 ---
 
-## Configuration
+## 3. Configuration
 
-All configuration is managed through JSON files in the `config/` directory.
+All configuration is done through JSON files - **no code changes needed**.
 
-### Configuration Files
+### Step 3.1: Create Your Local Configuration
 
-| File | Purpose |
-|------|---------|
-| `config/default.json` | Default settings (do not modify) |
-| `config/local.json` | Your overrides (gitignored) |
-
-### Creating Your Configuration
-
-```bash
-cp config/local.json.example config/local.json
+```powershell
+Copy-Item config/local.json.example config/local.json
 ```
 
-Then edit `config/local.json` with your settings.
+### Step 3.2: Edit Configuration
 
-### Available Settings
+Open `config/local.json` in any text editor and customize:
 
-#### Server Settings
+```json
+{
+  "server": {
+    "port": 3000
+  },
+  
+  "security": {
+    "encryptionEnabled": true,
+    "jwtSecret": "your-secret-key-here-make-it-long-and-random-at-least-32-characters"
+  },
+  
+  "app": {
+    "companyName": "Your Company Name"
+  }
+}
+```
+
+### Step 3.3: Generate a Secure JWT Secret
+
+**Option A: Use PowerShell to generate:**
+
+```powershell
+-join ((65..90) + (97..122) + (48..57) | Get-Random -Count 64 | ForEach-Object {[char]$_})
+```
+
+Copy the output and paste it as your `jwtSecret` value.
+
+**Option B: Use Node.js to generate:**
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**Option C: Use any random string** (at least 32 characters):
+
+```
+MySecretKey2024CustomerSupportToolProduction!@#$
+```
+
+### Complete Configuration Reference
+
+Here's every setting you can configure in `config/local.json`:
+
 ```json
 {
   "server": {
@@ -70,15 +123,11 @@ Then edit `config/local.json` with your settings.
     "host": "localhost",
     "corsOrigin": "*",
     "trustProxy": true
-  }
-}
-```
-
-#### Security Settings
-```json
-{
+  },
+  
   "security": {
     "encryptionEnabled": true,
+    "jwtSecret": "your-secret-key-minimum-32-characters",
     "jwtAccessTokenExpiry": "15m",
     "jwtRefreshTokenExpiryDays": 7,
     "bcryptRounds": 10,
@@ -86,22 +135,17 @@ Then edit `config/local.json` with your settings.
     "rateLimitWindowMs": 60000,
     "loginRateLimitMaxAttempts": 5,
     "loginRateLimitWindowMs": 60000
-  }
-}
-```
-
-| Setting | Description |
-|---------|-------------|
-| `encryptionEnabled` | Enable/disable AES-256 encryption for credentials |
-| `jwtAccessTokenExpiry` | Access token lifetime (e.g., "15m", "1h") |
-| `jwtRefreshTokenExpiryDays` | Refresh token lifetime in days |
-| `bcryptRounds` | Password hashing strength (10-12 recommended) |
-| `rateLimitMaxRequests` | Max API requests per window |
-| `loginRateLimitMaxAttempts` | Max login attempts before lockout |
-
-#### Ticket Settings
-```json
-{
+  },
+  
+  "database": {
+    "path": "data/customer-support.db"
+  },
+  
+  "users": {
+    "defaultRole": "agent",
+    "minPasswordLength": 8
+  },
+  
   "tickets": {
     "defaultPriority": "medium",
     "defaultStatus": "new",
@@ -112,25 +156,30 @@ Then edit `config/local.json` with your settings.
       "medium": 24,
       "low": 72
     }
-  }
-}
-```
-
-SLA durations are in **hours**.
-
-#### Quality Settings
-```json
-{
+  },
+  
   "quality": {
     "passingScore": 80,
     "defaultWeight": 25
-  }
-}
-```
-
-#### Application Settings
-```json
-{
+  },
+  
+  "integrations": {
+    "sharepoint": {
+      "enabled": false,
+      "timeout": 30000
+    },
+    "jira": {
+      "enabled": false,
+      "timeout": 30000
+    }
+  },
+  
+  "logging": {
+    "level": "info",
+    "logRequests": true,
+    "logErrors": true
+  },
+  
   "app": {
     "name": "Customer Support Tool",
     "companyName": "Your Company Name",
@@ -139,49 +188,136 @@ SLA durations are in **hours**.
 }
 ```
 
-### Environment Variables
+### Configuration Settings Explained
 
-For sensitive values (like JWT secrets), use environment variables:
-
-```bash
-# .env file
-JWT_SECRET=your-secret-key-here
-PORT=3000
-```
-
-Generate a secure JWT secret:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-### Runtime Configuration
-
-Administrators can also modify some settings through the UI:
-1. Go to **SettingsSystem**
-2. Click **System Configuration**
-3. Modify settings and save
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `server.port` | `3000` | Port the server runs on |
+| `security.encryptionEnabled` | `true` | Encrypt integration credentials (SharePoint/JIRA passwords) |
+| `security.jwtSecret` | auto-generated | **IMPORTANT:** Set this to stop the warning messages |
+| `security.jwtAccessTokenExpiry` | `"15m"` | How long login sessions last before refresh |
+| `security.jwtRefreshTokenExpiryDays` | `7` | Days before requiring re-login |
+| `tickets.slaDurations.critical` | `2` | Hours until critical tickets are due |
+| `tickets.slaDurations.high` | `8` | Hours until high priority tickets are due |
+| `tickets.slaDurations.medium` | `24` | Hours until medium priority tickets are due |
+| `tickets.slaDurations.low` | `72` | Hours until low priority tickets are due |
+| `quality.passingScore` | `80` | Minimum score (%) to pass quality evaluation |
+| `app.companyName` | `"Customer Support Agency"` | Your company name shown in the app |
 
 ---
 
-## Building the Desktop App
+## 4. Running the Application
 
-### Windows
+### Option A: Web Browser Mode
 
-```bash
+```powershell
+npm start
+```
+
+Then open your browser to: **http://localhost:3000**
+
+### Option B: Desktop Application (Electron)
+
+```powershell
+npm run electron
+```
+
+This opens the app as a standalone desktop window.
+
+### Option C: Windows Quick Start
+
+Double-click `start.bat` in the project folder.
+
+---
+
+## 5. First Login
+
+### Default Admin Credentials
+
+| Field | Value |
+|-------|-------|
+| **Username** | `admin` |
+| **Password** | `admin123` |
+
+### ⚠️ IMPORTANT: Change the Default Password!
+
+1. Login with `admin` / `admin123`
+2. Go to **SettingsSystem** (bottom of sidebar)
+3. Enter current password: `admin123`
+4. Enter new password (minimum 8 characters)
+5. Confirm new password
+6. Click **Change Password**
+
+---
+
+## 6. System Features
+
+### 6.1 Dashboard
+- Overview statistics for Users, Tickets, Quality
+- Recent activity feed
+
+### 6.2 UserSystem (User Management)
+- Create, edit, delete users
+- Assign roles to users
+- Activate/deactivate accounts
+- **Note:** Only Administrators can create new users
+
+### 6.3 TicketSystem (Ticket Management)
+- Create support tickets
+- Assign tickets to agents
+- Track ticket status: New → Open → In Progress → Pending → Resolved → Closed
+- Set priority: Critical, High, Medium, Low
+- Add comments and view history
+- SLA tracking with automatic due dates
+
+### 6.4 QualitySystem (Quality Evaluations)
+- Create quality evaluations for agents
+- Score by categories (Communication, Problem Resolution, etc.)
+- Automatic pass/fail based on configurable passing score
+- View evaluation history and statistics
+
+### 6.5 RoleSystem (Roles & Permissions)
+- View and manage roles
+- Create custom roles
+- Assign permissions to roles
+- Default roles: Administrator, Supervisor, QA Analyst, Support Agent
+
+### 6.6 IntegrationSystem (External Integrations)
+- **SharePoint:** Connect to Microsoft SharePoint for file management
+- **JIRA:** Connect to Atlassian JIRA for issue tracking
+- Credentials are encrypted when `security.encryptionEnabled` is `true`
+
+### 6.7 SettingsSystem (Settings)
+- Change your password
+- System settings (Admins only):
+  - Company name
+  - Timezone
+  - QA passing score
+
+---
+
+## 7. Building for Production
+
+### Build Windows Installer
+
+```powershell
 npm run build:win
 ```
 
-Creates:
-- `dist/Customer Support Tool-1.0.0-x64.exe` (Installer)
-- `dist/Customer Support Tool-1.0.0-portable.exe` (Portable)
+**Output:** `dist/Customer Support Tool-1.0.0-x64.exe`
 
-### macOS
+### Build Portable Version
+
+Included automatically with Windows build:
+`dist/Customer Support Tool-1.0.0-portable.exe`
+
+### Build for macOS (requires Mac)
 
 ```bash
 npm run build:mac
 ```
 
-### Linux
+### Build for Linux
 
 ```bash
 npm run build:linux
@@ -189,143 +325,34 @@ npm run build:linux
 
 ---
 
-## Data Storage
+## 8. Troubleshooting
 
-All data is stored in the `data/` directory:
+### Problem: "WARNING: No JWT_SECRET configured"
 
-| File | Description |
-|------|-------------|
-| `customer-support.db` | SQLite database |
-| `.encryption-key` | Encryption key (auto-generated) |
+**Solution:** Add a JWT secret to your configuration.
 
-### Backup
+1. Open `config/local.json`
+2. Add the security section with a jwtSecret:
 
-```bash
-cp -r data/ backup/
-```
-
-### Reset Database
-
-```bash
-rm -rf data/
-npm start
-```
-
----
-
-## Security Features
-
-### Encryption
-
-Integration credentials are encrypted at rest using AES-256-GCM.
-
-**To disable encryption** (testing only):
 ```json
-// config/local.json
 {
   "security": {
-    "encryptionEnabled": false
+    "jwtSecret": "your-secret-key-here-at-least-32-characters-long"
   }
 }
 ```
 
-### JWT Authentication
-
-- Access tokens: Short-lived (default 15 minutes)
-- Refresh tokens: Long-lived (default 7 days)
-- Automatic token refresh
-
-### Rate Limiting
-
-- General API: 100 requests/minute
-- Login: 5 attempts/minute
-
-### Permissions
-
-| Role | Description |
-|------|-------------|
-| Administrator | Full access |
-| Supervisor | Team management |
-| QA Analyst | Quality evaluations |
-| Support Agent | Ticket handling |
+3. Restart the server
 
 ---
 
-## API Reference
+### Problem: Port 3000 Already in Use
 
-### Authentication
+**Solution:** Change the port in configuration.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/login` | Login |
-| POST | `/api/auth/logout` | Logout |
-| POST | `/api/auth/refresh` | Refresh tokens |
-| GET | `/api/auth/me` | Current user |
-| POST | `/api/auth/change-password` | Change password |
+1. Open `config/local.json`
+2. Add:
 
-### Users
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/users` | List users |
-| POST | `/api/users` | Create user |
-| PUT | `/api/users/:id` | Update user |
-| DELETE | `/api/users/:id` | Delete user |
-
-### Tickets
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/tickets` | List tickets |
-| POST | `/api/tickets` | Create ticket |
-| PUT | `/api/tickets/:id` | Update ticket |
-| PUT | `/api/tickets/:id/status` | Change status |
-| PUT | `/api/tickets/:id/assign` | Assign ticket |
-
-### Quality
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/quality/reports` | List reports |
-| POST | `/api/quality/reports` | Create report |
-| GET | `/api/quality/categories` | List categories |
-
-### Configuration
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/settings/config` | Get system config |
-| PUT | `/api/settings/config` | Update config |
-| POST | `/api/settings/config/reload` | Reload config |
-
----
-
-## Integrations
-
-### SharePoint
-
-1. Go to **IntegrationSystem**
-2. Enter credentials:
-   - Site URL
-   - Tenant ID
-   - Client ID
-   - Client Secret
-
-### JIRA
-
-1. Go to **IntegrationSystem**
-2. Enter credentials:
-   - Base URL
-   - Email
-   - API Token ([Generate](https://id.atlassian.com/manage-profile/security/api-tokens))
-
----
-
-## Troubleshooting
-
-### Port Already in Use
-
-Change the port in `config/local.json`:
 ```json
 {
   "server": {
@@ -334,56 +361,122 @@ Change the port in `config/local.json`:
 }
 ```
 
-### Module Not Found
+3. Restart and access http://localhost:3001
 
-```bash
-rm -rf node_modules
+---
+
+### Problem: DevTools Console Errors (Autofill.enable, language-mismatch)
+
+**Solution:** These are Electron DevTools internal messages and can be **safely ignored**. They don't affect the application.
+
+To hide them, don't open DevTools (F12) or close the DevTools panel.
+
+---
+
+### Problem: Database Reset Needed
+
+**Solution:** Delete the data folder:
+
+```powershell
+Remove-Item -Recurse -Force data
+npm start
+```
+
+This creates a fresh database with the default admin user.
+
+---
+
+### Problem: Module Not Found Errors
+
+**Solution:** Reinstall dependencies:
+
+```powershell
+Remove-Item -Recurse -Force node_modules
+Remove-Item -Force package-lock.json
 npm install
 ```
 
-### SQLite Errors (Windows)
-
-```bash
-npm install --global windows-build-tools
-```
-
-### Configuration Not Loading
-
-1. Check JSON syntax in config files
-2. Restart the server
-3. Check console for errors
-
 ---
 
-## Project Structure
+### Problem: Login Doesn't Work / Invalid Credentials
 
-```
-customer-support-tool/
-├── config/
-│   ├── Config.js           # Configuration loader
-│   ├── default.json        # Default settings
-│   ├── local.json          # Your overrides (gitignored)
-│   └── local.json.example  # Example overrides
-├── electron/
-│   ├── main.js             # Electron main process
-│   └── preload.js          # Preload script
-├── src/
-│   ├── server/
-│   │   ├── database/
-│   │   │   ├── Database.js # All database operations
-│   │   │   └── index.js
-│   │   ├── middleware/
-│   │   │   └── auth.js     # Authentication
-│   │   ├── routes/         # API routes
-│   │   └── services/       # Business logic
-│   └── renderer/           # Frontend
-├── data/                   # Database (auto-created)
-├── server.js               # Server entry point
-└── package.json
+**Possible causes:**
+1. Wrong username/password
+2. Database corrupted
+
+**Solution:**
+- Default login: `admin` / `admin123`
+- If that doesn't work, reset the database:
+
+```powershell
+Remove-Item -Recurse -Force data
+npm start
 ```
 
 ---
 
-## License
+### Problem: Encryption Key Lost
 
-MIT License
+If you delete `data/.encryption-key` but keep the database, encrypted credentials (SharePoint/JIRA) cannot be decrypted.
+
+**Solution:** 
+1. Re-enter your integration credentials in IntegrationSystem
+2. Or delete the entire `data` folder to start fresh
+
+---
+
+## Quick Reference
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm install` | Install dependencies |
+| `npm start` | Start web server (browser access) |
+| `npm run electron` | Start desktop application |
+| `npm run build:win` | Build Windows installer |
+
+### Important Files
+
+| File/Folder | Purpose |
+|-------------|---------|
+| `config/local.json` | Your custom configuration |
+| `config/default.json` | Default settings (don't edit) |
+| `data/customer-support.db` | SQLite database |
+| `data/.encryption-key` | Encryption key for credentials |
+
+### Default Login
+
+| Username | Password |
+|----------|----------|
+| `admin` | `admin123` |
+
+---
+
+## Minimum Configuration for Production
+
+Create `config/local.json` with at least:
+
+```json
+{
+  "security": {
+    "jwtSecret": "your-very-long-random-secret-key-at-least-32-characters"
+  },
+  "app": {
+    "companyName": "Your Company Name"
+  }
+}
+```
+
+This stops the JWT warning and sets your company name.
+
+---
+
+## Support
+
+If you encounter issues:
+
+1. Check this troubleshooting section
+2. Look at the console output for error messages
+3. Ensure `config/local.json` is valid JSON (no trailing commas, proper quotes)
+4. Try resetting: delete `data` folder and restart
