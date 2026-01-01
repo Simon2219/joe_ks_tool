@@ -7,7 +7,7 @@ const Permissions = {
     currentUser: null,
 
     /**
-     * Sets the current user
+     * Sets the current user and updates UI
      */
     setUser(user) {
         this.currentUser = user;
@@ -19,6 +19,13 @@ const Permissions = {
      */
     clearUser() {
         this.currentUser = null;
+    },
+
+    /**
+     * Gets current user ID
+     */
+    getUserId() {
+        return this.currentUser?.id || null;
     },
 
     /**
@@ -34,7 +41,7 @@ const Permissions = {
             return true;
         }
         
-        return this.currentUser.role.permissions.includes(permission);
+        return this.currentUser.role.permissions?.includes(permission) || false;
     },
 
     /**
@@ -45,17 +52,20 @@ const Permissions = {
     },
 
     /**
-     * Updates the UI based on permissions
+     * Gets user's role name
+     */
+    getRoleName() {
+        return this.currentUser?.role?.name || 'Unknown';
+    },
+
+    /**
+     * Updates the entire UI based on permissions
      */
     updateUI() {
-        // Update navigation visibility
         this.updateNavigation();
-        
-        // Update admin-only sections
         this.updateAdminSections();
-        
-        // Update action buttons
         this.updateActionButtons();
+        this.updateViewElements();
     },
 
     /**
@@ -67,6 +77,7 @@ const Permissions = {
         navItems.forEach(item => {
             const permission = item.dataset.permission;
             const hasAccess = this.hasPermission(permission);
+            // Hide completely - not just disable
             item.style.display = hasAccess ? '' : 'none';
         });
 
@@ -101,34 +112,65 @@ const Permissions = {
      */
     updateActionButtons() {
         // User management buttons
-        this.toggleButton('add-user-btn', 'user_create');
-        this.toggleButton('export-users-btn', 'user_export');
+        this.toggleElement('add-user-btn', 'user_create');
+        this.toggleElement('export-users-btn', 'user_export');
         
         // Ticket buttons
-        this.toggleButton('add-ticket-btn', 'ticket_create');
-        this.toggleButton('export-tickets-btn', 'ticket_export');
+        this.toggleElement('add-ticket-btn', 'ticket_create');
+        this.toggleElement('export-tickets-btn', 'ticket_export');
         
         // Quality buttons
-        this.toggleButton('add-quality-btn', 'quality_create');
-        this.toggleButton('manage-categories-btn', 'quality_manage_categories');
-        this.toggleButton('export-quality-btn', 'quality_export');
+        this.toggleElement('add-quality-btn', 'quality_create');
+        this.toggleElement('manage-categories-btn', 'quality_manage_categories');
+        this.toggleElement('export-quality-btn', 'quality_export');
         
         // Role buttons
-        this.toggleButton('add-role-btn', 'role_create');
+        this.toggleElement('add-role-btn', 'role_create');
     },
 
     /**
-     * Toggles a button's visibility based on permission
+     * Updates view-specific elements
      */
-    toggleButton(buttonId, permission) {
-        const button = document.getElementById(buttonId);
-        if (button) {
-            button.style.display = this.hasPermission(permission) ? '' : 'none';
+    updateViewElements() {
+        // Update any elements with data-permission attribute
+        document.querySelectorAll('[data-permission]').forEach(el => {
+            if (!el.classList.contains('nav-item')) {
+                const permission = el.dataset.permission;
+                el.style.display = this.hasPermission(permission) ? '' : 'none';
+            }
+        });
+
+        // Update elements that require admin
+        document.querySelectorAll('[data-require-admin]').forEach(el => {
+            el.style.display = this.isAdmin() ? '' : 'none';
+        });
+    },
+
+    /**
+     * Toggles an element's visibility based on permission
+     */
+    toggleElement(elementId, permission) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.style.display = this.hasPermission(permission) ? '' : 'none';
         }
     },
 
     /**
-     * Checks if user can perform action on an entity
+     * Checks if user can perform action on an entity type
+     */
+    canCreate(entityType) {
+        const createPermissions = {
+            user: 'user_create',
+            ticket: 'ticket_create',
+            quality: 'quality_create',
+            role: 'role_create'
+        };
+        return this.hasPermission(createPermissions[entityType]);
+    },
+
+    /**
+     * Checks if user can edit an entity type
      */
     canEdit(entityType) {
         const editPermissions = {
@@ -141,7 +183,7 @@ const Permissions = {
     },
 
     /**
-     * Checks if user can delete an entity
+     * Checks if user can delete an entity type
      */
     canDelete(entityType) {
         const deletePermissions = {
@@ -165,7 +207,69 @@ const Permissions = {
     },
 
     /**
-     * Gets a list of permission names for a permission ID
+     * Checks if user can assign tickets
+     */
+    canAssignTickets() {
+        return this.hasPermission('ticket_assign');
+    },
+
+    /**
+     * Checks if user can access integrations
+     */
+    canAccessIntegration(type) {
+        const integrationPermissions = {
+            sharepoint: 'integration_sharepoint',
+            jira: 'integration_jira'
+        };
+        return this.hasPermission(integrationPermissions[type]) || this.hasPermission('admin_access');
+    },
+
+    /**
+     * Creates action buttons for a table row based on permissions
+     */
+    createActionButtons(entityType, entityId, extraActions = []) {
+        const actions = [];
+
+        // View action (usually always allowed if they can see the table)
+        actions.push({
+            icon: 'view',
+            title: 'View',
+            className: 'btn-icon',
+            action: 'view'
+        });
+
+        // Edit action
+        if (this.canEdit(entityType)) {
+            actions.push({
+                icon: 'edit',
+                title: 'Edit',
+                className: 'btn-icon',
+                action: 'edit'
+            });
+        }
+
+        // Delete action
+        if (this.canDelete(entityType)) {
+            actions.push({
+                icon: 'delete',
+                title: 'Delete',
+                className: 'btn-icon btn-danger',
+                action: 'delete'
+            });
+        }
+
+        // Extra actions
+        for (const extra of extraActions) {
+            if (!extra.permission || this.hasPermission(extra.permission)) {
+                actions.push(extra);
+            }
+        }
+
+        return actions;
+    },
+
+    /**
+     * Gets a permission's display name
      */
     getPermissionName(permissionId) {
         const permissionNames = {
@@ -174,22 +278,19 @@ const Permissions = {
             'user_edit': 'Edit Users',
             'user_delete': 'Delete Users',
             'user_export': 'Export Users',
-            'user_import': 'Import Users',
-            'ticket_view': 'View Tickets',
+            'ticket_view': 'View Own Tickets',
             'ticket_view_all': 'View All Tickets',
             'ticket_create': 'Create Tickets',
             'ticket_edit': 'Edit Tickets',
             'ticket_delete': 'Delete Tickets',
             'ticket_assign': 'Assign Tickets',
-            'ticket_bulk_update': 'Bulk Update Tickets',
             'ticket_export': 'Export Tickets',
-            'quality_view': 'View Quality Reports',
-            'quality_view_all': 'View All Reports',
+            'quality_view': 'View Own Evaluations',
+            'quality_view_all': 'View All Evaluations',
             'quality_create': 'Create Evaluations',
             'quality_edit': 'Edit Evaluations',
             'quality_delete': 'Delete Evaluations',
             'quality_manage_categories': 'Manage Categories',
-            'quality_manage_templates': 'Manage Templates',
             'quality_export': 'Export Quality Data',
             'role_view': 'View Roles',
             'role_create': 'Create Roles',
@@ -197,7 +298,7 @@ const Permissions = {
             'role_delete': 'Delete Roles',
             'settings_view': 'View Settings',
             'settings_edit': 'Edit Settings',
-            'admin_access': 'Admin Access',
+            'admin_access': 'Admin Panel Access',
             'integration_sharepoint': 'SharePoint Integration',
             'integration_jira': 'JIRA Integration'
         };

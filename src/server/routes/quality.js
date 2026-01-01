@@ -1,243 +1,201 @@
 /**
- * Quality Management Routes
+ * Quality Routes - QualitySystem
+ * Handles quality evaluation operations
  */
 
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 
-const { QualityReportsDB, QualityCategoriesDB, UsersDB } = require('../database/dbService');
-const { authenticate, requirePermission, hasPermission } = require('../middleware/auth');
+const { QualitySystem, UserSystem } = require('../database');
+const { authenticate, requirePermission, hasPermission, canAccessResource } = require('../middleware/auth');
 
-// Calculate overall score
-function calculateOverallScore(categoryScores, categories) {
-    let totalWeight = 0;
-    let weightedScore = 0;
+router.use(authenticate);
 
-    for (const catScore of categoryScores) {
-        const category = categories.find(c => c.id === catScore.categoryId);
-        if (category) {
-            totalWeight += category.weight;
-            weightedScore += (catScore.score / catScore.maxScore) * category.weight;
-        }
-    }
-
-    return totalWeight > 0 ? Math.round((weightedScore / totalWeight) * 100) : 0;
-}
-
-// Enrich report with user names
-function enrichReport(report) {
-    const agent = UsersDB.getById(report.agentId);
-    const evaluator = UsersDB.getById(report.evaluatorId);
-    return {
-        ...report,
-        agentName: agent ? `${agent.firstName} ${agent.lastName}` : 'Unknown',
-        evaluatorName: evaluator ? `${evaluator.firstName} ${evaluator.lastName}` : 'Unknown'
-    };
-}
-
-// GET /api/quality
-router.get('/', authenticate, requirePermission('quality_view'), (req, res) => {
+/**
+ * GET /api/quality/reports
+ */
+router.get('/reports', requirePermission('quality_view'), (req, res) => {
     try {
         let reports;
-        const { agentId, startDate, endDate } = req.query;
-
+        
         if (hasPermission(req.user, 'quality_view_all')) {
-            reports = QualityReportsDB.getAll();
+            reports = QualitySystem.getAllReports(req.query);
         } else {
-            reports = QualityReportsDB.getByAgent(req.user.id);
+            reports = QualitySystem.getByAgent(req.user.id);
         }
-
-        // Apply filters
-        if (agentId) reports = reports.filter(r => r.agentId === agentId);
-        if (startDate) reports = reports.filter(r => new Date(r.evaluationDate) >= new Date(startDate));
-        if (endDate) reports = reports.filter(r => new Date(r.evaluationDate) <= new Date(endDate));
-
-        reports = reports.map(enrichReport);
-        reports.sort((a, b) => new Date(b.evaluationDate) - new Date(a.evaluationDate));
-
+        
         res.json({ success: true, reports });
     } catch (error) {
         console.error('Get reports error:', error);
-        res.json({ success: false, error: 'Failed to retrieve reports' });
+        res.status(500).json({ success: false, error: 'Failed to fetch reports' });
     }
 });
 
-// GET /api/quality/statistics
-router.get('/statistics', authenticate, requirePermission('quality_view'), (req, res) => {
+/**
+ * GET /api/quality/reports/:id
+ */
+router.get('/reports/:id', requirePermission('quality_view'), (req, res) => {
     try {
-        const reports = QualityReportsDB.getAll();
-        const categories = QualityCategoriesDB.getAll().filter(c => c.isActive);
-
-        const thisMonth = new Date();
-        thisMonth.setDate(1);
-        thisMonth.setHours(0, 0, 0, 0);
-
-        const reportsThisMonth = reports.filter(r => new Date(r.evaluationDate) >= thisMonth);
-
-        const avgScore = reports.length > 0
-            ? Math.round(reports.reduce((sum, r) => sum + r.overallScore, 0) / reports.length)
-            : 0;
-
-        res.json({
-            success: true,
-            statistics: {
-                totalReports: reports.length,
-                reportsThisMonth: reportsThisMonth.length,
-                averageScore: avgScore,
-                passingRate: reports.length > 0
-                    ? Math.round(reports.filter(r => r.passed).length / reports.length * 100)
-                    : 0,
-                categoryCount: categories.length
-            }
-        });
-    } catch (error) {
-        console.error('Get statistics error:', error);
-        res.json({ success: false, error: 'Failed to get statistics' });
-    }
-});
-
-// GET /api/quality/categories
-router.get('/categories', authenticate, (req, res) => {
-    try {
-        const categories = QualityCategoriesDB.getAll();
-        res.json({ success: true, categories });
-    } catch (error) {
-        console.error('Get categories error:', error);
-        res.json({ success: false, error: 'Failed to get categories' });
-    }
-});
-
-// GET /api/quality/:id
-router.get('/:id', authenticate, requirePermission('quality_view'), (req, res) => {
-    try {
-        const report = QualityReportsDB.getById(req.params.id);
+        const report = QualitySystem.getReportById(req.params.id);
         if (!report) {
-            return res.json({ success: false, error: 'Report not found' });
+            return res.status(404).json({ success: false, error: 'Report not found' });
         }
-        res.json({ success: true, report: enrichReport(report) });
+
+        if (!canAccessResource(req.user, 'quality', report.agent_id)) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
+
+        res.json({ success: true, report });
     } catch (error) {
         console.error('Get report error:', error);
-        res.json({ success: false, error: 'Failed to retrieve report' });
+        res.status(500).json({ success: false, error: 'Failed to fetch report' });
     }
 });
 
-// POST /api/quality
-router.post('/', authenticate, requirePermission('quality_create'), (req, res) => {
+/**
+ * POST /api/quality/reports
+ */
+router.post('/reports', requirePermission('quality_create'), (req, res) => {
     try {
-        const reportData = req.body;
+        const { agentId, evaluationType, categoryScores, strengths, areasForImprovement, coachingNotes } = req.body;
 
-        if (!reportData.agentId) {
-            return res.json({ success: false, error: 'Agent is required' });
-        }
-        if (!reportData.evaluationType) {
-            return res.json({ success: false, error: 'Evaluation type is required' });
-        }
-        if (!reportData.categoryScores || reportData.categoryScores.length === 0) {
-            return res.json({ success: false, error: 'Category scores are required' });
+        if (!agentId || !evaluationType || !categoryScores) {
+            return res.status(400).json({ success: false, error: 'Required fields missing' });
         }
 
-        const categories = QualityCategoriesDB.getAll().filter(c => c.isActive);
-        const overallScore = calculateOverallScore(reportData.categoryScores, categories);
+        if (!UserSystem.getById(agentId)) {
+            return res.status(400).json({ success: false, error: 'Invalid agent' });
+        }
 
-        const newReport = {
-            id: uuidv4(),
-            reportNumber: `QA-${Date.now().toString(36).toUpperCase()}`,
-            agentId: reportData.agentId,
-            evaluatorId: req.user.id,
-            evaluationType: reportData.evaluationType,
-            evaluationDate: new Date().toISOString(),
-            categoryScores: reportData.categoryScores,
-            overallScore,
-            passed: overallScore >= 80,
-            strengths: reportData.strengths || '',
-            areasForImprovement: reportData.areasForImprovement || '',
-            coachingNotes: reportData.coachingNotes || '',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
+        const report = QualitySystem.createReport({
+            agentId, evaluationType, categoryScores, strengths, areasForImprovement, coachingNotes
+        }, req.user.id);
 
-        QualityReportsDB.create(newReport);
-        res.json({ success: true, report: enrichReport(newReport) });
+        res.status(201).json({ success: true, report });
     } catch (error) {
         console.error('Create report error:', error);
-        res.json({ success: false, error: 'Failed to create report' });
+        res.status(500).json({ success: false, error: 'Failed to create report' });
     }
 });
 
-// PUT /api/quality/:id
-router.put('/:id', authenticate, requirePermission('quality_edit'), (req, res) => {
+/**
+ * PUT /api/quality/reports/:id
+ */
+router.put('/reports/:id', requirePermission('quality_edit'), (req, res) => {
     try {
-        const { id } = req.params;
-        const reportData = req.body;
-
-        const existingReport = QualityReportsDB.getById(id);
-        if (!existingReport) {
-            return res.json({ success: false, error: 'Report not found' });
+        const report = QualitySystem.getReportById(req.params.id);
+        if (!report) {
+            return res.status(404).json({ success: false, error: 'Report not found' });
         }
 
-        const categories = QualityCategoriesDB.getAll().filter(c => c.isActive);
-        const categoryScores = reportData.categoryScores || existingReport.categoryScores;
-        const overallScore = calculateOverallScore(categoryScores, categories);
+        // Only allow evaluator or admin to edit
+        if (report.evaluator_id !== req.user.id && !req.user.role?.isAdmin) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
 
-        const updates = {
-            evaluationType: reportData.evaluationType ?? existingReport.evaluationType,
-            categoryScores,
-            overallScore,
-            passed: overallScore >= 80,
-            strengths: reportData.strengths ?? existingReport.strengths,
-            areasForImprovement: reportData.areasForImprovement ?? existingReport.areasForImprovement,
-            coachingNotes: reportData.coachingNotes ?? existingReport.coachingNotes
-        };
-
-        const updatedReport = QualityReportsDB.update(id, updates);
-        res.json({ success: true, report: enrichReport(updatedReport) });
+        const updated = QualitySystem.updateReport(req.params.id, req.body);
+        res.json({ success: true, report: updated });
     } catch (error) {
         console.error('Update report error:', error);
-        res.json({ success: false, error: 'Failed to update report' });
+        res.status(500).json({ success: false, error: 'Failed to update report' });
     }
 });
 
-// DELETE /api/quality/:id
-router.delete('/:id', authenticate, requirePermission('quality_delete'), (req, res) => {
+/**
+ * DELETE /api/quality/reports/:id
+ */
+router.delete('/reports/:id', requirePermission('quality_delete'), (req, res) => {
     try {
-        const report = QualityReportsDB.getById(req.params.id);
+        const report = QualitySystem.getReportById(req.params.id);
         if (!report) {
-            return res.json({ success: false, error: 'Report not found' });
+            return res.status(404).json({ success: false, error: 'Report not found' });
         }
 
-        QualityReportsDB.delete(req.params.id);
+        QualitySystem.deleteReport(req.params.id);
         res.json({ success: true });
     } catch (error) {
         console.error('Delete report error:', error);
-        res.json({ success: false, error: 'Failed to delete report' });
+        res.status(500).json({ success: false, error: 'Failed to delete report' });
     }
 });
 
-// POST /api/quality/categories
-router.post('/categories', authenticate, requirePermission('quality_manage_categories'), (req, res) => {
+/**
+ * GET /api/quality/categories
+ */
+router.get('/categories', requirePermission('quality_view'), (req, res) => {
     try {
-        const categoryData = req.body;
+        const categories = QualitySystem.getAllCategories();
+        res.json({ success: true, categories });
+    } catch (error) {
+        console.error('Get categories error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch categories' });
+    }
+});
 
-        if (!categoryData.name || categoryData.name.trim() === '') {
-            return res.json({ success: false, error: 'Category name is required' });
+/**
+ * POST /api/quality/categories
+ */
+router.post('/categories', requirePermission('quality_manage'), (req, res) => {
+    try {
+        const { name, description, weight, criteria } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ success: false, error: 'Name is required' });
         }
 
-        const newCategory = {
-            id: uuidv4(),
-            name: categoryData.name.trim(),
-            description: categoryData.description || '',
-            weight: categoryData.weight || 25,
-            isActive: true,
-            criteria: categoryData.criteria || [],
-            createdAt: new Date().toISOString()
-        };
-
-        QualityCategoriesDB.create(newCategory);
-        res.json({ success: true, category: newCategory });
+        const category = QualitySystem.createCategory({ name, description, weight, criteria });
+        res.status(201).json({ success: true, category });
     } catch (error) {
         console.error('Create category error:', error);
-        res.json({ success: false, error: 'Failed to create category' });
+        res.status(500).json({ success: false, error: 'Failed to create category' });
+    }
+});
+
+/**
+ * PUT /api/quality/categories/:id
+ */
+router.put('/categories/:id', requirePermission('quality_manage'), (req, res) => {
+    try {
+        const category = QualitySystem.getCategoryById(req.params.id);
+        if (!category) {
+            return res.status(404).json({ success: false, error: 'Category not found' });
+        }
+
+        const updated = QualitySystem.updateCategory(req.params.id, req.body);
+        res.json({ success: true, category: updated });
+    } catch (error) {
+        console.error('Update category error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update category' });
+    }
+});
+
+/**
+ * DELETE /api/quality/categories/:id
+ */
+router.delete('/categories/:id', requirePermission('quality_manage'), (req, res) => {
+    try {
+        const result = QualitySystem.deleteCategory(req.params.id);
+        
+        if (!result.success) {
+            return res.status(400).json({ success: false, error: result.error });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Delete category error:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete category' });
+    }
+});
+
+/**
+ * GET /api/quality/stats
+ */
+router.get('/stats', requirePermission('quality_view'), (req, res) => {
+    try {
+        res.json({ success: true, stats: QualitySystem.getStatistics() });
+    } catch (error) {
+        console.error('Get quality stats error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch stats' });
     }
 });
 

@@ -237,12 +237,12 @@ const App = {
         // Update page title
         const titles = {
             dashboard: 'Dashboard',
-            users: 'User Management',
-            tickets: 'Ticket System',
-            quality: 'Quality Management',
-            roles: 'Roles & Permissions',
-            integrations: 'Integrations',
-            settings: 'Settings'
+            users: 'UserSystem',
+            tickets: 'TicketSystem',
+            quality: 'QualitySystem',
+            roles: 'RoleSystem',
+            integrations: 'IntegrationSystem',
+            settings: 'SettingsSystem'
         };
         document.getElementById('page-title').textContent = titles[viewName] || viewName;
 

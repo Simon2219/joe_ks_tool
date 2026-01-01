@@ -1,201 +1,169 @@
 /**
- * JIRA Routes
- * API endpoints for Atlassian JIRA integration
+ * JIRA Routes - IntegrationSystem
+ * Handles JIRA integration operations
  */
 
 const express = require('express');
 const router = express.Router();
 
+const { IntegrationSystem } = require('../database');
 const jiraService = require('../services/jiraService');
-const { TicketsDB } = require('../database/dbService');
+const encryptionService = require('../services/encryptionService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 
-// All JIRA routes require authentication and integration permission
 router.use(authenticate);
-router.use(requirePermission('integration_jira'));
+router.use(requirePermission('integration_access'));
 
-// POST /api/jira/connect
-router.post('/connect', async (req, res) => {
+/**
+ * Gets and decrypts JIRA credentials
+ */
+function getCredentials() {
+    const stored = IntegrationSystem.getCredentials('jira');
+    if (!stored) return null;
+
     try {
-        const result = await jiraService.connect(req.body);
-        res.json({ success: true, ...result });
+        let data = stored.credentials;
+        if (stored.encrypted && encryptionService.isEnabled()) {
+            data = encryptionService.decrypt(data);
+        }
+        return JSON.parse(data);
     } catch (error) {
-        console.error('JIRA connect error:', error);
-        res.json({ success: false, error: error.message });
+        console.error('Failed to parse JIRA credentials:', error);
+        return null;
+    }
+}
+
+/**
+ * GET /api/jira/status
+ */
+router.get('/status', (req, res) => {
+    try {
+        const credentials = getCredentials();
+        const stored = IntegrationSystem.getCredentials('jira');
+        
+        res.json({
+            success: true,
+            status: {
+                configured: !!credentials,
+                connected: stored?.is_connected || false
+            }
+        });
+    } catch (error) {
+        console.error('JIRA status error:', error);
+        res.status(500).json({ success: false, error: 'Failed to get status' });
     }
 });
 
-// POST /api/jira/disconnect
+/**
+ * POST /api/jira/connect
+ */
+router.post('/connect', async (req, res) => {
+    try {
+        const credentials = getCredentials();
+        if (!credentials) {
+            return res.status(400).json({ success: false, error: 'JIRA not configured' });
+        }
+
+        const connected = await jiraService.connect(credentials);
+        if (connected) {
+            IntegrationSystem.setConnected('jira', true);
+            res.json({ success: true });
+        } else {
+            res.status(500).json({ success: false, error: 'Failed to connect to JIRA' });
+        }
+    } catch (error) {
+        console.error('JIRA connect error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/jira/disconnect
+ */
 router.post('/disconnect', (req, res) => {
     try {
         jiraService.disconnect();
+        IntegrationSystem.setConnected('jira', false);
         res.json({ success: true });
     } catch (error) {
-        res.json({ success: false, error: error.message });
+        console.error('JIRA disconnect error:', error);
+        res.status(500).json({ success: false, error: 'Failed to disconnect' });
     }
 });
 
-// GET /api/jira/status
-router.get('/status', (req, res) => {
-    res.json({ success: true, ...jiraService.getStatus() });
-});
-
-// GET /api/jira/projects
-router.get('/projects', async (req, res) => {
-    try {
-        const projects = await jiraService.getProjects();
-        res.json({ success: true, projects });
-    } catch (error) {
-        console.error('Get projects error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// GET /api/jira/issues
+/**
+ * GET /api/jira/issues
+ */
 router.get('/issues', async (req, res) => {
     try {
-        const { projectKey, status, assignee, maxResults, startAt, jql } = req.query;
-        const result = await jiraService.getIssues(projectKey, {
-            status,
-            assignee,
-            maxResults: parseInt(maxResults) || 50,
-            startAt: parseInt(startAt) || 0,
-            jql
-        });
-        res.json({ success: true, ...result });
-    } catch (error) {
-        console.error('Get issues error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// GET /api/jira/issues/:issueKey
-router.get('/issues/:issueKey', async (req, res) => {
-    try {
-        const issue = await jiraService.getIssue(req.params.issueKey);
-        res.json({ success: true, issue });
-    } catch (error) {
-        console.error('Get issue error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// POST /api/jira/issues
-router.post('/issues', async (req, res) => {
-    try {
-        const issue = await jiraService.createIssue(req.body);
-        res.json({ success: true, issue });
-    } catch (error) {
-        console.error('Create issue error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// PUT /api/jira/issues/:issueKey
-router.put('/issues/:issueKey', async (req, res) => {
-    try {
-        const result = await jiraService.updateIssue(req.params.issueKey, req.body);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        console.error('Update issue error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// DELETE /api/jira/issues/:issueKey
-router.delete('/issues/:issueKey', async (req, res) => {
-    try {
-        await jiraService.deleteIssue(req.params.issueKey);
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Delete issue error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// GET /api/jira/issues/:issueKey/transitions
-router.get('/issues/:issueKey/transitions', async (req, res) => {
-    try {
-        const transitions = await jiraService.getTransitions(req.params.issueKey);
-        res.json({ success: true, transitions });
-    } catch (error) {
-        console.error('Get transitions error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// POST /api/jira/issues/:issueKey/transitions
-router.post('/issues/:issueKey/transitions', async (req, res) => {
-    try {
-        const { transitionId, comment } = req.body;
-        const result = await jiraService.transitionIssue(req.params.issueKey, transitionId, comment);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        console.error('Transition issue error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// GET /api/jira/issues/:issueKey/comments
-router.get('/issues/:issueKey/comments', async (req, res) => {
-    try {
-        const comments = await jiraService.getComments(req.params.issueKey);
-        res.json({ success: true, comments });
-    } catch (error) {
-        console.error('Get comments error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// POST /api/jira/issues/:issueKey/comments
-router.post('/issues/:issueKey/comments', async (req, res) => {
-    try {
-        const { body } = req.body;
-        const comment = await jiraService.addComment(req.params.issueKey, body);
-        res.json({ success: true, comment });
-    } catch (error) {
-        console.error('Add comment error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// POST /api/jira/search
-router.post('/search', async (req, res) => {
-    try {
-        const { jql, maxResults, startAt, fields } = req.body;
-        const result = await jiraService.search(jql, { maxResults, startAt, fields });
-        res.json({ success: true, ...result });
-    } catch (error) {
-        console.error('Search error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// POST /api/jira/sync
-router.post('/sync', async (req, res) => {
-    try {
-        const { projectKey } = req.body;
-        if (!projectKey) {
-            return res.json({ success: false, error: 'Project key is required' });
+        if (!jiraService.isConnected()) {
+            return res.status(400).json({ success: false, error: 'Not connected to JIRA' });
         }
 
-        // Get all local tickets
-        const tickets = TicketsDB.getAll();
-
-        // Sync with JIRA
-        const result = await jiraService.syncWithTickets(tickets, projectKey);
-
-        // Update local tickets with JIRA keys
-        tickets.forEach(ticket => {
-            if (ticket.jiraKey) {
-                TicketsDB.update(ticket.id, { jiraKey: ticket.jiraKey });
-            }
-        });
-
-        res.json({ success: true, results: result });
+        const issues = await jiraService.getIssues(req.query);
+        res.json({ success: true, issues });
     } catch (error) {
-        console.error('Sync error:', error);
-        res.json({ success: false, error: error.message });
+        console.error('JIRA get issues error:', error);
+        res.status(500).json({ success: false, error: 'Failed to get issues' });
+    }
+});
+
+/**
+ * GET /api/jira/issues/:key
+ */
+router.get('/issues/:key', async (req, res) => {
+    try {
+        if (!jiraService.isConnected()) {
+            return res.status(400).json({ success: false, error: 'Not connected to JIRA' });
+        }
+
+        const issue = await jiraService.getIssue(req.params.key);
+        if (!issue) {
+            return res.status(404).json({ success: false, error: 'Issue not found' });
+        }
+        res.json({ success: true, issue });
+    } catch (error) {
+        console.error('JIRA get issue error:', error);
+        res.status(500).json({ success: false, error: 'Failed to get issue' });
+    }
+});
+
+/**
+ * POST /api/jira/issues
+ */
+router.post('/issues', async (req, res) => {
+    try {
+        if (!jiraService.isConnected()) {
+            return res.status(400).json({ success: false, error: 'Not connected to JIRA' });
+        }
+
+        const { summary, description, issueType } = req.body;
+        if (!summary) {
+            return res.status(400).json({ success: false, error: 'Summary is required' });
+        }
+
+        const issue = await jiraService.createIssue({ summary, description, issueType });
+        res.status(201).json({ success: true, issue });
+    } catch (error) {
+        console.error('JIRA create issue error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create issue' });
+    }
+});
+
+/**
+ * POST /api/jira/sync/:ticketId
+ */
+router.post('/sync/:ticketId', async (req, res) => {
+    try {
+        if (!jiraService.isConnected()) {
+            return res.status(400).json({ success: false, error: 'Not connected to JIRA' });
+        }
+
+        const result = await jiraService.syncTicket(req.params.ticketId);
+        res.json({ success: true, result });
+    } catch (error) {
+        console.error('JIRA sync error:', error);
+        res.status(500).json({ success: false, error: 'Failed to sync ticket' });
     }
 });
 

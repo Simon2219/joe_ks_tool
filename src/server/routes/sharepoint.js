@@ -1,147 +1,132 @@
 /**
- * SharePoint Routes
- * API endpoints for Microsoft SharePoint integration
+ * SharePoint Routes - IntegrationSystem
+ * Handles SharePoint integration operations
  */
 
 const express = require('express');
 const router = express.Router();
 
+const { IntegrationSystem } = require('../database');
 const sharepointService = require('../services/sharepointService');
+const encryptionService = require('../services/encryptionService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 
-// All SharePoint routes require authentication and integration permission
 router.use(authenticate);
-router.use(requirePermission('integration_sharepoint'));
+router.use(requirePermission('integration_access'));
 
-// POST /api/sharepoint/connect
-router.post('/connect', async (req, res) => {
+/**
+ * Gets and decrypts SharePoint credentials
+ */
+function getCredentials() {
+    const stored = IntegrationSystem.getCredentials('sharepoint');
+    if (!stored) return null;
+
     try {
-        const result = await sharepointService.connect(req.body);
-        res.json({ success: true, ...result });
+        let data = stored.credentials;
+        if (stored.encrypted && encryptionService.isEnabled()) {
+            data = encryptionService.decrypt(data);
+        }
+        return JSON.parse(data);
     } catch (error) {
-        console.error('SharePoint connect error:', error);
-        res.json({ success: false, error: error.message });
+        console.error('Failed to parse SharePoint credentials:', error);
+        return null;
+    }
+}
+
+/**
+ * GET /api/sharepoint/status
+ */
+router.get('/status', (req, res) => {
+    try {
+        const credentials = getCredentials();
+        const stored = IntegrationSystem.getCredentials('sharepoint');
+        
+        res.json({
+            success: true,
+            status: {
+                configured: !!credentials,
+                connected: stored?.is_connected || false
+            }
+        });
+    } catch (error) {
+        console.error('SharePoint status error:', error);
+        res.status(500).json({ success: false, error: 'Failed to get status' });
     }
 });
 
-// POST /api/sharepoint/disconnect
+/**
+ * POST /api/sharepoint/connect
+ */
+router.post('/connect', async (req, res) => {
+    try {
+        const credentials = getCredentials();
+        if (!credentials) {
+            return res.status(400).json({ success: false, error: 'SharePoint not configured' });
+        }
+
+        const connected = await sharepointService.connect(credentials);
+        if (connected) {
+            IntegrationSystem.setConnected('sharepoint', true);
+            res.json({ success: true });
+        } else {
+            res.status(500).json({ success: false, error: 'Failed to connect to SharePoint' });
+        }
+    } catch (error) {
+        console.error('SharePoint connect error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/sharepoint/disconnect
+ */
 router.post('/disconnect', (req, res) => {
     try {
         sharepointService.disconnect();
+        IntegrationSystem.setConnected('sharepoint', false);
         res.json({ success: true });
     } catch (error) {
-        res.json({ success: false, error: error.message });
+        console.error('SharePoint disconnect error:', error);
+        res.status(500).json({ success: false, error: 'Failed to disconnect' });
     }
 });
 
-// GET /api/sharepoint/status
-router.get('/status', (req, res) => {
-    res.json({ success: true, ...sharepointService.getStatus() });
-});
-
-// GET /api/sharepoint/lists
-router.get('/lists', async (req, res) => {
+/**
+ * GET /api/sharepoint/files
+ */
+router.get('/files', async (req, res) => {
     try {
-        const lists = await sharepointService.getLists();
-        res.json({ success: true, lists });
+        if (!sharepointService.isConnected()) {
+            return res.status(400).json({ success: false, error: 'Not connected to SharePoint' });
+        }
+
+        const files = await sharepointService.getFiles(req.query.path || '/');
+        res.json({ success: true, files });
     } catch (error) {
-        console.error('Get lists error:', error);
-        res.json({ success: false, error: error.message });
+        console.error('SharePoint get files error:', error);
+        res.status(500).json({ success: false, error: 'Failed to get files' });
     }
 });
 
-// GET /api/sharepoint/lists/:listTitle/items
-router.get('/lists/:listTitle/items', async (req, res) => {
+/**
+ * POST /api/sharepoint/upload
+ */
+router.post('/upload', async (req, res) => {
     try {
-        const { listTitle } = req.params;
-        const options = {
-            top: parseInt(req.query.top) || 100,
-            skip: parseInt(req.query.skip) || 0,
-            filter: req.query.filter || '',
-            select: req.query.select || '*',
-            orderBy: req.query.orderBy || ''
-        };
-        const items = await sharepointService.getListItems(listTitle, options);
-        res.json({ success: true, items });
-    } catch (error) {
-        console.error('Get list items error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
+        if (!sharepointService.isConnected()) {
+            return res.status(400).json({ success: false, error: 'Not connected to SharePoint' });
+        }
 
-// POST /api/sharepoint/lists/:listTitle/items
-router.post('/lists/:listTitle/items', async (req, res) => {
-    try {
-        const { listTitle } = req.params;
-        const item = await sharepointService.createListItem(listTitle, req.body);
-        res.json({ success: true, item });
-    } catch (error) {
-        console.error('Create list item error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
+        const { fileName, content, path } = req.body;
+        if (!fileName || !content) {
+            return res.status(400).json({ success: false, error: 'Filename and content required' });
+        }
 
-// PUT /api/sharepoint/lists/:listTitle/items/:itemId
-router.put('/lists/:listTitle/items/:itemId', async (req, res) => {
-    try {
-        const { listTitle, itemId } = req.params;
-        const result = await sharepointService.updateListItem(listTitle, parseInt(itemId), req.body);
-        res.json({ success: true, ...result });
+        const result = await sharepointService.uploadFile(fileName, content, path || '/');
+        res.json({ success: true, file: result });
     } catch (error) {
-        console.error('Update list item error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// DELETE /api/sharepoint/lists/:listTitle/items/:itemId
-router.delete('/lists/:listTitle/items/:itemId', async (req, res) => {
-    try {
-        const { listTitle, itemId } = req.params;
-        await sharepointService.deleteListItem(listTitle, parseInt(itemId));
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Delete list item error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// POST /api/sharepoint/documents/upload
-router.post('/documents/upload', async (req, res) => {
-    try {
-        const { libraryName, fileName, fileContent } = req.body;
-        const fileBuffer = Buffer.from(fileContent, 'base64');
-        const result = await sharepointService.uploadDocument(libraryName, fileName, fileBuffer);
-        res.json({ success: true, ...result });
-    } catch (error) {
-        console.error('Upload document error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// GET /api/sharepoint/documents/download
-router.get('/documents/download', async (req, res) => {
-    try {
-        const { serverRelativeUrl } = req.query;
-        const fileBuffer = await sharepointService.downloadDocument(serverRelativeUrl);
-        res.json({ 
-            success: true, 
-            fileContent: fileBuffer.toString('base64') 
-        });
-    } catch (error) {
-        console.error('Download document error:', error);
-        res.json({ success: false, error: error.message });
-    }
-});
-
-// POST /api/sharepoint/search
-router.post('/search', async (req, res) => {
-    try {
-        const { queryText, rowLimit, startRow, selectProperties } = req.body;
-        const results = await sharepointService.search(queryText, { rowLimit, startRow, selectProperties });
-        res.json({ success: true, results });
-    } catch (error) {
-        console.error('Search error:', error);
-        res.json({ success: false, error: error.message });
+        console.error('SharePoint upload error:', error);
+        res.status(500).json({ success: false, error: 'Failed to upload file' });
     }
 });
 
