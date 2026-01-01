@@ -118,7 +118,7 @@ const JwtService = {
     },
 
     /**
-     * Gets user data for token payload
+     * Gets user data for token payload (camelCase format for frontend)
      */
     getUserForToken(userId) {
         const user = UserSystem.getById(userId);
@@ -127,10 +127,21 @@ const JwtService = {
         const role = RoleSystem.getById(user.role_id);
         const permissions = role ? role.permissions : [];
 
-        const { password, ...safeUser } = user;
-
         return {
-            ...safeUser,
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            roleId: user.role_id,
+            roleName: user.role_name || (role ? role.name : ''),
+            department: user.department || '',
+            phone: user.phone || '',
+            isActive: !!user.is_active,
+            isAdmin: !!user.is_admin || (role ? !!role.is_admin : false),
+            createdAt: user.created_at,
+            updatedAt: user.updated_at,
+            lastLogin: user.last_login,
             role: role ? {
                 id: role.id,
                 name: role.name,

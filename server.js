@@ -25,6 +25,7 @@ const roleRoutes = require('./src/server/routes/roles');
 const settingsRoutes = require('./src/server/routes/settings');
 const sharepointRoutes = require('./src/server/routes/sharepoint');
 const jiraRoutes = require('./src/server/routes/jira');
+const adminRoutes = require('./src/server/routes/admin');
 
 const app = express();
 const PORT = Config.getPort();
@@ -81,6 +82,7 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/sharepoint', sharepointRoutes);
 app.use('/api/jira', jiraRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Config endpoint (for frontend)
 app.get('/api/config', (req, res) => {
