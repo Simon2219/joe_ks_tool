@@ -41,9 +41,7 @@ function createWindow() {
     // Show window when ready
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        if (isDev) {
-            mainWindow.webContents.openDevTools();
-        }
+        // DevTools can be opened manually with Ctrl+Shift+I
     });
 
     // Handle window close - minimize to tray instead
