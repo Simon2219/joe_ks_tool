@@ -3,11 +3,12 @@
  * Main entry point for the application
  */
 
-require('dotenv').config();
-
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+
+// Load centralized configuration
+const Config = require('./config/Config');
 
 // Import services
 const encryptionService = require('./src/server/services/encryptionService');
@@ -26,14 +27,16 @@ const sharepointRoutes = require('./src/server/routes/sharepoint');
 const jiraRoutes = require('./src/server/routes/jira');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Config.getPort();
 
 // Trust proxy (for rate limiting behind reverse proxy)
-app.set('trust proxy', 1);
+if (Config.get('server.trustProxy')) {
+    app.set('trust proxy', 1);
+}
 
 // CORS configuration
 const corsOptions = {
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: Config.get('server.corsOrigin', '*'),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -53,13 +56,13 @@ app.use((req, res, next) => {
     next();
 });
 
-// Request logging (development)
-if (process.env.NODE_ENV !== 'production') {
+// Request logging
+if (Config.get('logging.logRequests') && Config.isDevelopment()) {
     app.use((req, res, next) => {
         const start = Date.now();
         res.on('finish', () => {
             const duration = Date.now() - start;
-            if (!req.url.includes('/api/')) return; // Only log API requests
+            if (!req.url.includes('/api/')) return;
             console.log(`${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
         });
         next();
@@ -79,12 +82,24 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/sharepoint', sharepointRoutes);
 app.use('/api/jira', jiraRoutes);
 
+// Config endpoint (for frontend)
+app.get('/api/config', (req, res) => {
+    res.json({
+        success: true,
+        config: {
+            app: Config.app,
+            tickets: { slaDurations: Config.get('tickets.slaDurations') },
+            quality: { passingScore: Config.get('quality.passingScore') }
+        }
+    });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
-        version: require('./package.json').version
+        version: Config.get('app.version')
     });
 });
 
@@ -95,35 +110,23 @@ app.get('*', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Server error:', err);
+    if (Config.get('logging.logErrors')) {
+        console.error('Server error:', err);
+    }
     
-    // Don't leak error details in production
-    const message = process.env.NODE_ENV === 'production' 
-        ? 'Internal server error' 
-        : err.message;
-    
-    res.status(err.status || 500).json({ 
-        success: false, 
-        error: message 
-    });
+    const message = Config.isProduction() ? 'Internal server error' : err.message;
+    res.status(err.status || 500).json({ success: false, error: message });
 });
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
-    res.status(404).json({ 
-        success: false, 
-        error: 'Endpoint not found' 
-    });
+    res.status(404).json({ success: false, error: 'Endpoint not found' });
 });
 
 // Graceful shutdown handler
 function gracefulShutdown(signal) {
     console.log(`\n${signal} received. Shutting down gracefully...`);
-    
-    // Close database connection
     shutdownDatabase();
-    
-    // Exit process
     process.exit(0);
 }
 
@@ -135,7 +138,7 @@ async function startServer() {
     try {
         console.log('');
         console.log('============================================');
-        console.log('   Customer Support Tool - Starting...');
+        console.log(`   ${Config.get('app.name')} - Starting...`);
         console.log('============================================');
         console.log('');
 
@@ -149,7 +152,7 @@ async function startServer() {
         const server = app.listen(PORT, () => {
             console.log('');
             console.log('============================================');
-            console.log('   Customer Support Tool is running!');
+            console.log(`   ${Config.get('app.name')} is running!`);
             console.log('============================================');
             console.log('');
             console.log(`   Open in your browser:`);
@@ -164,7 +167,6 @@ async function startServer() {
             console.log('');
         });
 
-        // Handle server errors
         server.on('error', (error) => {
             if (error.code === 'EADDRINUSE') {
                 console.error(`Port ${PORT} is already in use`);

@@ -1,14 +1,16 @@
 # Customer Support Tool - Setup Guide
 
-This guide will help you set up and run the Customer Support Tool on your system.
+Complete setup guide for installing, configuring, and running the Customer Support Tool.
 
 ## Prerequisites
 
 - **Node.js** version 18 or higher ([Download](https://nodejs.org/))
 - **npm** (comes with Node.js)
-- **Windows 10/11** (for desktop app build)
+- **Windows 10/11**, macOS, or Linux
 
-## Quick Start (Development)
+---
+
+## Quick Start
 
 ### 1. Install Dependencies
 
@@ -18,7 +20,7 @@ npm install
 
 ### 2. Start the Application
 
-**Option A: Web Server Only (Browser Access)**
+**Option A: Web Server (Browser Access)**
 ```bash
 npm start
 ```
@@ -41,46 +43,139 @@ Default credentials:
 
 ## Configuration
 
-### Environment Variables
+All configuration is managed through JSON files in the `config/` directory.
 
-Create a `.env` file in the project root (copy from `.env.example`):
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `config/default.json` | Default settings (do not modify) |
+| `config/local.json` | Your overrides (gitignored) |
+
+### Creating Your Configuration
 
 ```bash
-cp .env.example .env
+cp config/local.json.example config/local.json
 ```
 
-Available settings:
+Then edit `config/local.json` with your settings.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3000` | Server port |
-| `NODE_ENV` | `development` | Environment mode |
-| `JWT_SECRET` | auto-generated | Secret for JWT tokens |
-| `ENCRYPTION_DISABLED` | `false` | Disable credential encryption |
-| `ENCRYPTION_KEY` | auto-generated | Custom encryption key (64 hex chars) |
+### Available Settings
 
-### Generating Secrets
+#### Server Settings
+```json
+{
+  "server": {
+    "port": 3000,
+    "host": "localhost",
+    "corsOrigin": "*",
+    "trustProxy": true
+  }
+}
+```
+
+#### Security Settings
+```json
+{
+  "security": {
+    "encryptionEnabled": true,
+    "jwtAccessTokenExpiry": "15m",
+    "jwtRefreshTokenExpiryDays": 7,
+    "bcryptRounds": 10,
+    "rateLimitMaxRequests": 100,
+    "rateLimitWindowMs": 60000,
+    "loginRateLimitMaxAttempts": 5,
+    "loginRateLimitWindowMs": 60000
+  }
+}
+```
+
+| Setting | Description |
+|---------|-------------|
+| `encryptionEnabled` | Enable/disable AES-256 encryption for credentials |
+| `jwtAccessTokenExpiry` | Access token lifetime (e.g., "15m", "1h") |
+| `jwtRefreshTokenExpiryDays` | Refresh token lifetime in days |
+| `bcryptRounds` | Password hashing strength (10-12 recommended) |
+| `rateLimitMaxRequests` | Max API requests per window |
+| `loginRateLimitMaxAttempts` | Max login attempts before lockout |
+
+#### Ticket Settings
+```json
+{
+  "tickets": {
+    "defaultPriority": "medium",
+    "defaultStatus": "new",
+    "slaEnabled": true,
+    "slaDurations": {
+      "critical": 2,
+      "high": 8,
+      "medium": 24,
+      "low": 72
+    }
+  }
+}
+```
+
+SLA durations are in **hours**.
+
+#### Quality Settings
+```json
+{
+  "quality": {
+    "passingScore": 80,
+    "defaultWeight": 25
+  }
+}
+```
+
+#### Application Settings
+```json
+{
+  "app": {
+    "name": "Customer Support Tool",
+    "companyName": "Your Company Name",
+    "timezone": "UTC"
+  }
+}
+```
+
+### Environment Variables
+
+For sensitive values (like JWT secrets), use environment variables:
+
+```bash
+# .env file
+JWT_SECRET=your-secret-key-here
+PORT=3000
+```
 
 Generate a secure JWT secret:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
+### Runtime Configuration
+
+Administrators can also modify some settings through the UI:
+1. Go to **SettingsSystem**
+2. Click **System Configuration**
+3. Modify settings and save
+
 ---
 
 ## Building the Desktop App
 
-### Windows Installer
+### Windows
 
 ```bash
 npm run build:win
 ```
 
-This creates:
-- `dist/Customer Support Tool-1.0.0-x64.exe` - NSIS Installer
-- `dist/Customer Support Tool-1.0.0-portable.exe` - Portable version
+Creates:
+- `dist/Customer Support Tool-1.0.0-x64.exe` (Installer)
+- `dist/Customer Support Tool-1.0.0-portable.exe` (Portable)
 
-### Mac (requires macOS)
+### macOS
 
 ```bash
 npm run build:mac
@@ -101,18 +196,16 @@ All data is stored in the `data/` directory:
 | File | Description |
 |------|-------------|
 | `customer-support.db` | SQLite database |
-| `.encryption-key` | Encryption key (if auto-generated) |
+| `.encryption-key` | Encryption key (auto-generated) |
 
 ### Backup
 
-To backup your data:
 ```bash
 cp -r data/ backup/
 ```
 
 ### Reset Database
 
-To reset to fresh state:
 ```bash
 rm -rf data/
 npm start
@@ -120,41 +213,45 @@ npm start
 
 ---
 
-## Security
+## Security Features
 
 ### Encryption
 
-By default, integration credentials (SharePoint, JIRA) are encrypted at rest using AES-256-GCM.
+Integration credentials are encrypted at rest using AES-256-GCM.
 
-- Encryption key is auto-generated on first run
-- Stored in `data/.encryption-key`
-- **IMPORTANT:** Back up this key! If lost, you'll need to re-enter all integration credentials.
-
-To disable encryption (for testing only):
-```bash
-ENCRYPTION_DISABLED=true npm start
+**To disable encryption** (testing only):
+```json
+// config/local.json
+{
+  "security": {
+    "encryptionEnabled": false
+  }
+}
 ```
 
-### JWT Tokens
+### JWT Authentication
 
-- Access tokens expire in 15 minutes
-- Refresh tokens expire in 7 days
-- Tokens are automatically refreshed
+- Access tokens: Short-lived (default 15 minutes)
+- Refresh tokens: Long-lived (default 7 days)
+- Automatic token refresh
+
+### Rate Limiting
+
+- General API: 100 requests/minute
+- Login: 5 attempts/minute
 
 ### Permissions
 
-The system uses role-based access control (RBAC):
-
 | Role | Description |
 |------|-------------|
-| **Administrator** | Full access to all features |
-| **Supervisor** | Team management, ticket oversight |
-| **QA Analyst** | Quality evaluations |
-| **Support Agent** | Ticket handling only |
+| Administrator | Full access |
+| Supervisor | Team management |
+| QA Analyst | Quality evaluations |
+| Support Agent | Ticket handling |
 
 ---
 
-## API Endpoints
+## API Reference
 
 ### Authentication
 
@@ -170,7 +267,7 @@ The system uses role-based access control (RBAC):
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/users` | List all users |
+| GET | `/api/users` | List users |
 | POST | `/api/users` | Create user |
 | PUT | `/api/users/:id` | Update user |
 | DELETE | `/api/users/:id` | Delete user |
@@ -189,17 +286,17 @@ The system uses role-based access control (RBAC):
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/quality` | List evaluations |
-| POST | `/api/quality` | Create evaluation |
+| GET | `/api/quality/reports` | List reports |
+| POST | `/api/quality/reports` | Create report |
 | GET | `/api/quality/categories` | List categories |
 
-### Roles
+### Configuration
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/roles` | List roles |
-| POST | `/api/roles` | Create role |
-| GET | `/api/roles/permissions` | All permissions |
+| GET | `/api/settings/config` | Get system config |
+| PUT | `/api/settings/config` | Update config |
+| POST | `/api/settings/config/reload` | Reload config |
 
 ---
 
@@ -207,109 +304,83 @@ The system uses role-based access control (RBAC):
 
 ### SharePoint
 
-1. Go to **Settings** → **Integrations**
-2. Enter SharePoint credentials:
+1. Go to **IntegrationSystem**
+2. Enter credentials:
    - Site URL
-   - Tenant ID (Azure AD)
-   - Client ID (App Registration)
+   - Tenant ID
+   - Client ID
    - Client Secret
 
 ### JIRA
 
-1. Go to **Settings** → **Integrations**
-2. Enter JIRA credentials:
-   - Base URL (e.g., `https://company.atlassian.net`)
+1. Go to **IntegrationSystem**
+2. Enter credentials:
+   - Base URL
    - Email
-   - API Token ([Generate here](https://id.atlassian.com/manage-profile/security/api-tokens))
+   - API Token ([Generate](https://id.atlassian.com/manage-profile/security/api-tokens))
 
 ---
 
 ## Troubleshooting
 
-### "Port 3000 is already in use"
+### Port Already in Use
 
-Change the port:
-```bash
-PORT=3001 npm start
+Change the port in `config/local.json`:
+```json
+{
+  "server": {
+    "port": 3001
+  }
+}
 ```
 
-### "Module not found" errors
+### Module Not Found
 
-Reinstall dependencies:
 ```bash
 rm -rf node_modules
 npm install
 ```
 
-### SQLite errors on Windows
+### SQLite Errors (Windows)
 
-Install build tools:
 ```bash
 npm install --global windows-build-tools
 ```
 
-### Electron app won't start
+### Configuration Not Loading
 
-Make sure the server can start first:
-```bash
-npm start
-```
-
-If that works, try rebuilding Electron deps:
-```bash
-npm run postinstall
-```
+1. Check JSON syntax in config files
+2. Restart the server
+3. Check console for errors
 
 ---
 
-## Development
-
-### Project Structure
+## Project Structure
 
 ```
 customer-support-tool/
-├── electron/           # Electron main process
-│   ├── main.js         # Main entry point
-│   └── preload.js      # Preload script
+├── config/
+│   ├── Config.js           # Configuration loader
+│   ├── default.json        # Default settings
+│   ├── local.json          # Your overrides (gitignored)
+│   └── local.json.example  # Example overrides
+├── electron/
+│   ├── main.js             # Electron main process
+│   └── preload.js          # Preload script
 ├── src/
-│   ├── server/         # Backend (Express)
-│   │   ├── database/   # SQLite models
-│   │   ├── middleware/ # Auth middleware
-│   │   ├── routes/     # API routes
-│   │   └── services/   # Business logic
-│   └── renderer/       # Frontend
-│       ├── js/         # JavaScript
-│       ├── styles/     # CSS
-│       └── index.html  # Main page
-├── data/               # Database (gitignored)
-├── server.js           # Server entry point
+│   ├── server/
+│   │   ├── database/
+│   │   │   ├── Database.js # All database operations
+│   │   │   └── index.js
+│   │   ├── middleware/
+│   │   │   └── auth.js     # Authentication
+│   │   ├── routes/         # API routes
+│   │   └── services/       # Business logic
+│   └── renderer/           # Frontend
+├── data/                   # Database (auto-created)
+├── server.js               # Server entry point
 └── package.json
 ```
-
-### Running in Development
-
-```bash
-# Terminal 1: Start server with auto-reload
-npm run dev
-
-# Terminal 2: Start Electron (if needed)
-npm run electron
-```
-
-### Adding New Permissions
-
-1. Add to `src/server/database/seed.js` in `DEFAULT_PERMISSIONS`
-2. Add to `src/renderer/js/utils/permissions.js` in `getPermissionName()`
-3. Use in routes with `requirePermission('your_permission')`
-
----
-
-## Support
-
-For issues or questions:
-- Check the [Troubleshooting](#troubleshooting) section
-- Review the console for error messages
-- Check `data/` directory exists and is writable
 
 ---
 

@@ -1,19 +1,19 @@
 /**
  * Encryption Service
- * Handles encryption/decryption of sensitive data (integration credentials)
- * Uses AES-256-GCM for authenticated encryption
+ * Handles AES-256-GCM encryption for sensitive data
+ * Configuration controlled via config/default.json or config/local.json
  */
 
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const Config = require('../../../config/Config');
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 const KEY_LENGTH = 32;
 
-// Path to store auto-generated encryption key
 const DATA_DIR = path.join(__dirname, '../../../data');
 const KEY_FILE = path.join(DATA_DIR, '.encryption-key');
 
@@ -24,181 +24,129 @@ class EncryptionService {
     }
 
     /**
-     * Initializes the encryption service
-     * - If ENCRYPTION_KEY env var is set, use it
-     * - If .encryption-key file exists, use it
-     * - Otherwise, generate a new key and save it
-     * - If ENCRYPTION_DISABLED is set, skip encryption
+     * Initialize the encryption service based on configuration
      */
     initialize() {
-        // Check if encryption is explicitly disabled
-        if (process.env.ENCRYPTION_DISABLED === 'true') {
-            console.log('Encryption: DISABLED (ENCRYPTION_DISABLED=true)');
+        // Check config setting
+        if (!Config.isEncryptionEnabled()) {
+            console.log('Encryption: DISABLED (config: security.encryptionEnabled = false)');
             this.enabled = false;
             return;
         }
 
-        try {
-            // Priority 1: Environment variable
-            if (process.env.ENCRYPTION_KEY) {
-                const keyBuffer = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
-                if (keyBuffer.length !== KEY_LENGTH) {
-                    throw new Error('ENCRYPTION_KEY must be 32 bytes (64 hex characters)');
-                }
-                this.key = keyBuffer;
-                this.enabled = true;
-                console.log('Encryption: ENABLED (using ENCRYPTION_KEY from environment)');
-                return;
-            }
+        // Ensure data directory exists
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
 
-            // Priority 2: Key file
-            if (fs.existsSync(KEY_FILE)) {
+        // Try to load existing key or generate new one
+        if (fs.existsSync(KEY_FILE)) {
+            try {
                 const keyHex = fs.readFileSync(KEY_FILE, 'utf8').trim();
                 this.key = Buffer.from(keyHex, 'hex');
+                
+                if (this.key.length !== KEY_LENGTH) {
+                    throw new Error('Invalid key length');
+                }
+                
                 this.enabled = true;
-                console.log('Encryption: ENABLED (using stored key)');
-                return;
+                console.log('Encryption: ENABLED (key loaded from file)');
+            } catch (error) {
+                console.error('Encryption: Failed to load key:', error.message);
+                this.generateNewKey();
             }
+        } else {
+            this.generateNewKey();
+        }
+    }
 
-            // Priority 3: Generate new key
-            this.key = crypto.randomBytes(KEY_LENGTH);
-            
-            // Ensure data directory exists
-            if (!fs.existsSync(DATA_DIR)) {
-                fs.mkdirSync(DATA_DIR, { recursive: true });
-            }
-
-            // Save the key
+    /**
+     * Generate and save a new encryption key
+     */
+    generateNewKey() {
+        this.key = crypto.randomBytes(KEY_LENGTH);
+        
+        try {
             fs.writeFileSync(KEY_FILE, this.key.toString('hex'), { mode: 0o600 });
             this.enabled = true;
-            console.log('Encryption: ENABLED (new key generated and saved)');
+            console.log('Encryption: ENABLED (new key generated)');
             console.log(`  Key file: ${KEY_FILE}`);
-
         } catch (error) {
-            console.error('Encryption initialization failed:', error.message);
-            console.log('Encryption: DISABLED (initialization failed)');
+            console.error('Encryption: Failed to save key:', error.message);
             this.enabled = false;
         }
     }
 
     /**
-     * Checks if encryption is enabled
+     * Check if encryption is enabled
      */
     isEnabled() {
         return this.enabled;
     }
 
     /**
-     * Encrypts a string or object
-     * Returns base64 encoded string with format: iv:authTag:ciphertext
+     * Encrypt a string
+     * @param {string} plaintext - Text to encrypt
+     * @returns {string} - Encrypted data as base64 string
      */
-    encrypt(data) {
-        if (!this.enabled) {
-            // Return data as-is if encryption is disabled
-            return typeof data === 'string' ? data : JSON.stringify(data);
+    encrypt(plaintext) {
+        if (!this.enabled || !this.key) {
+            throw new Error('Encryption not enabled');
         }
 
-        const text = typeof data === 'string' ? data : JSON.stringify(data);
-        
-        // Generate random IV
         const iv = crypto.randomBytes(IV_LENGTH);
-        
-        // Create cipher
         const cipher = crypto.createCipheriv(ALGORITHM, this.key, iv);
         
-        // Encrypt
-        let encrypted = cipher.update(text, 'utf8', 'base64');
+        let encrypted = cipher.update(plaintext, 'utf8', 'base64');
         encrypted += cipher.final('base64');
         
-        // Get auth tag
         const authTag = cipher.getAuthTag();
         
-        // Combine iv:authTag:ciphertext
+        // Format: iv:authTag:encrypted (all base64)
         return `${iv.toString('base64')}:${authTag.toString('base64')}:${encrypted}`;
     }
 
     /**
-     * Decrypts an encrypted string
-     * Expects format: iv:authTag:ciphertext (base64 encoded)
+     * Decrypt a string
+     * @param {string} encryptedData - Encrypted data from encrypt()
+     * @returns {string} - Original plaintext
      */
     decrypt(encryptedData) {
-        if (!this.enabled) {
-            // Try to parse as JSON, otherwise return as-is
-            try {
-                return JSON.parse(encryptedData);
-            } catch {
-                return encryptedData;
-            }
+        if (!this.enabled || !this.key) {
+            throw new Error('Encryption not enabled');
         }
 
-        try {
-            // Split the encrypted data
-            const parts = encryptedData.split(':');
-            if (parts.length !== 3) {
-                // Not encrypted data, return as-is
-                try {
-                    return JSON.parse(encryptedData);
-                } catch {
-                    return encryptedData;
-                }
-            }
-
-            const iv = Buffer.from(parts[0], 'base64');
-            const authTag = Buffer.from(parts[1], 'base64');
-            const encrypted = parts[2];
-
-            // Create decipher
-            const decipher = crypto.createDecipheriv(ALGORITHM, this.key, iv);
-            decipher.setAuthTag(authTag);
-
-            // Decrypt
-            let decrypted = decipher.update(encrypted, 'base64', 'utf8');
-            decrypted += decipher.final('utf8');
-
-            // Try to parse as JSON
-            try {
-                return JSON.parse(decrypted);
-            } catch {
-                return decrypted;
-            }
-
-        } catch (error) {
-            console.error('Decryption failed:', error.message);
-            throw new Error('Failed to decrypt data');
+        const parts = encryptedData.split(':');
+        if (parts.length !== 3) {
+            throw new Error('Invalid encrypted data format');
         }
+
+        const iv = Buffer.from(parts[0], 'base64');
+        const authTag = Buffer.from(parts[1], 'base64');
+        const encrypted = parts[2];
+
+        const decipher = crypto.createDecipheriv(ALGORITHM, this.key, iv);
+        decipher.setAuthTag(authTag);
+
+        let decrypted = decipher.update(encrypted, 'base64', 'utf8');
+        decrypted += decipher.final('utf8');
+
+        return decrypted;
     }
 
     /**
-     * Re-encrypts data (useful when rotating keys)
+     * Encrypt an object (serializes to JSON first)
      */
-    reEncrypt(encryptedData, oldKey) {
-        // Decrypt with old key
-        const tempKey = this.key;
-        this.key = oldKey;
-        const decrypted = this.decrypt(encryptedData);
-        
-        // Re-encrypt with new key
-        this.key = tempKey;
-        return this.encrypt(decrypted);
+    encryptObject(obj) {
+        return this.encrypt(JSON.stringify(obj));
     }
 
     /**
-     * Generates a new encryption key (for key rotation)
+     * Decrypt to an object
      */
-    static generateKey() {
-        return crypto.randomBytes(KEY_LENGTH).toString('hex');
-    }
-
-    /**
-     * Gets the current key (hex encoded) - for backup purposes
-     */
-    getKeyHex() {
-        if (!this.enabled || !this.key) return null;
-        return this.key.toString('hex');
+    decryptObject(encryptedData) {
+        return JSON.parse(this.decrypt(encryptedData));
     }
 }
 
-// Export singleton instance
-const encryptionService = new EncryptionService();
-
-module.exports = encryptionService;
+module.exports = new EncryptionService();

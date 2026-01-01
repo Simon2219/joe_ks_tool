@@ -1,27 +1,37 @@
 /**
  * JWT Service
  * Handles JWT token generation and verification
+ * Configuration controlled via config/default.json or config/local.json
  */
 
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const Config = require('../../../config/Config');
 const { UserSystem, RoleSystem, TokenSystem } = require('../database');
 
-// Token configuration
-const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-function getJwtSecret() {
-    if (process.env.JWT_SECRET) {
-        return process.env.JWT_SECRET;
-    }
-    console.warn('WARNING: JWT_SECRET not set. Using development secret.');
-    return 'dev-secret-change-in-production-' + require('os').hostname();
-}
-
-const JWT_SECRET = getJwtSecret();
-
 const JwtService = {
+    /**
+     * Get JWT secret from config
+     */
+    getSecret() {
+        return Config.getJwtSecret();
+    },
+
+    /**
+     * Get access token expiry from config
+     */
+    getAccessExpiry() {
+        return Config.get('security.jwtAccessTokenExpiry', '15m');
+    },
+
+    /**
+     * Get refresh token expiry in milliseconds
+     */
+    getRefreshExpiryMs() {
+        const days = Config.get('security.jwtRefreshTokenExpiryDays', 7);
+        return days * 24 * 60 * 60 * 1000;
+    },
+
     /**
      * Generates access and refresh tokens for a user
      */
@@ -33,19 +43,30 @@ const JwtService = {
                 roleId: user.role_id,
                 isAdmin: !!user.is_admin
             },
-            JWT_SECRET,
-            { expiresIn: ACCESS_TOKEN_EXPIRY }
+            this.getSecret(),
+            { expiresIn: this.getAccessExpiry() }
         );
 
         const refreshToken = crypto.randomBytes(64).toString('hex');
-        const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY).toISOString();
+        const expiresAt = new Date(Date.now() + this.getRefreshExpiryMs()).toISOString();
 
         TokenSystem.create(user.id, refreshToken, expiresAt);
+
+        // Parse expiry for response
+        const expiryMatch = this.getAccessExpiry().match(/(\d+)([mhd])/);
+        let expiresIn = 900; // default 15 minutes
+        if (expiryMatch) {
+            const num = parseInt(expiryMatch[1]);
+            const unit = expiryMatch[2];
+            if (unit === 'm') expiresIn = num * 60;
+            else if (unit === 'h') expiresIn = num * 3600;
+            else if (unit === 'd') expiresIn = num * 86400;
+        }
 
         return {
             accessToken,
             refreshToken,
-            expiresIn: 15 * 60,
+            expiresIn,
             tokenType: 'Bearer'
         };
     },
@@ -55,7 +76,7 @@ const JwtService = {
      */
     verifyAccessToken(token) {
         try {
-            return jwt.verify(token, JWT_SECRET);
+            return jwt.verify(token, this.getSecret());
         } catch (error) {
             return null;
         }

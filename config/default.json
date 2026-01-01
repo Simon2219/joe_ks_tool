@@ -1,0 +1,73 @@
+{
+  "server": {
+    "port": 3000,
+    "host": "localhost",
+    "corsOrigin": "*",
+    "trustProxy": true
+  },
+  
+  "security": {
+    "encryptionEnabled": true,
+    "jwtSecret": "",
+    "jwtAccessTokenExpiry": "15m",
+    "jwtRefreshTokenExpiryDays": 7,
+    "bcryptRounds": 10,
+    "rateLimitMaxRequests": 100,
+    "rateLimitWindowMs": 60000,
+    "loginRateLimitMaxAttempts": 5,
+    "loginRateLimitWindowMs": 60000
+  },
+  
+  "database": {
+    "path": "data/customer-support.db",
+    "enableWAL": true,
+    "enableForeignKeys": true
+  },
+  
+  "users": {
+    "defaultRole": "agent",
+    "minPasswordLength": 8,
+    "sessionTimeoutMinutes": 30
+  },
+  
+  "tickets": {
+    "defaultPriority": "medium",
+    "defaultStatus": "new",
+    "slaEnabled": true,
+    "slaDurations": {
+      "critical": 2,
+      "high": 8,
+      "medium": 24,
+      "low": 72
+    }
+  },
+  
+  "quality": {
+    "passingScore": 80,
+    "defaultWeight": 25
+  },
+  
+  "integrations": {
+    "sharepoint": {
+      "enabled": false,
+      "timeout": 30000
+    },
+    "jira": {
+      "enabled": false,
+      "timeout": 30000
+    }
+  },
+  
+  "logging": {
+    "level": "info",
+    "logRequests": true,
+    "logErrors": true
+  },
+  
+  "app": {
+    "name": "Customer Support Tool",
+    "version": "1.0.0",
+    "companyName": "Customer Support Agency",
+    "timezone": "UTC"
+  }
+}

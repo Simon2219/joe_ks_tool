@@ -6,6 +6,9 @@ node_modules/
 .env.local
 .env.*.local
 
+# Local config overrides
+config/local.json
+
 # Database and data
 data/
 *.db
