@@ -6,6 +6,7 @@
 const Database = require('./Database');
 
 async function initializeDatabase() {
+    await Database.initDb();
     Database.initSchema();
     await Database.seedData();
     console.log('Database initialization complete');
