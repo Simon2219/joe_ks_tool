@@ -1,223 +1,278 @@
 /**
  * User Management Routes
+ * CRUD operations for users
  */
 
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 
-const { UsersDB, RolesDB } = require('../database/dbService');
+const { UserModel, RoleModel } = require('../database');
 const { authenticate, requirePermission, hasPermission } = require('../middleware/auth');
 
-// Validation helper
+/**
+ * Validates email format
+ */
 function isValidEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// Sanitize user for response
+/**
+ * Sanitizes user for response (removes password, formats data)
+ */
 function sanitizeUser(user) {
     if (!user) return null;
     const { password, ...safeUser } = user;
-    const role = RolesDB.getById(user.roleId);
     return {
-        ...safeUser,
-        roleName: role ? role.name : 'Unknown',
-        isAdmin: role ? role.isAdmin : false
+        id: safeUser.id,
+        username: safeUser.username,
+        email: safeUser.email,
+        firstName: safeUser.first_name,
+        lastName: safeUser.last_name,
+        roleId: safeUser.role_id,
+        roleName: safeUser.role_name || 'Unknown',
+        isAdmin: !!safeUser.is_admin,
+        department: safeUser.department,
+        phone: safeUser.phone,
+        hireDate: safeUser.hire_date,
+        isActive: !!safeUser.is_active,
+        createdAt: safeUser.created_at,
+        updatedAt: safeUser.updated_at,
+        lastLogin: safeUser.last_login
     };
 }
 
-// GET /api/users
+/**
+ * GET /api/users
+ * Returns all users
+ */
 router.get('/', authenticate, requirePermission('user_view'), (req, res) => {
     try {
-        const users = UsersDB.getAll().map(sanitizeUser);
+        const users = UserModel.getAll().map(sanitizeUser);
         res.json({ success: true, users });
     } catch (error) {
         console.error('Get users error:', error);
-        res.json({ success: false, error: 'Failed to retrieve users' });
+        res.status(500).json({ success: false, error: 'Failed to retrieve users' });
     }
 });
 
-// GET /api/users/statistics
+/**
+ * GET /api/users/statistics
+ * Returns user statistics
+ */
 router.get('/statistics', authenticate, requirePermission('user_view'), (req, res) => {
     try {
-        const users = UsersDB.getAll();
-        const roles = RolesDB.getAll();
+        const users = UserModel.getAll();
+        const roles = RoleModel.getAll();
 
         const roleStats = roles.map(role => ({
             roleId: role.id,
             roleName: role.name,
-            count: users.filter(u => u.roleId === role.id).length
+            count: users.filter(u => u.role_id === role.id).length
         }));
 
         res.json({
             success: true,
             statistics: {
                 total: users.length,
-                active: users.filter(u => u.isActive).length,
-                inactive: users.filter(u => !u.isActive).length,
+                active: users.filter(u => u.is_active).length,
+                inactive: users.filter(u => !u.is_active).length,
                 byRole: roleStats
             }
         });
     } catch (error) {
         console.error('Get statistics error:', error);
-        res.json({ success: false, error: 'Failed to get statistics' });
+        res.status(500).json({ success: false, error: 'Failed to get statistics' });
     }
 });
 
-// GET /api/users/:id
+/**
+ * GET /api/users/:id
+ * Returns a specific user
+ */
 router.get('/:id', authenticate, requirePermission('user_view'), (req, res) => {
     try {
-        const user = UsersDB.getById(req.params.id);
+        const user = UserModel.getById(req.params.id);
         if (!user) {
-            return res.json({ success: false, error: 'User not found' });
+            return res.status(404).json({ success: false, error: 'User not found' });
         }
         res.json({ success: true, user: sanitizeUser(user) });
     } catch (error) {
         console.error('Get user error:', error);
-        res.json({ success: false, error: 'Failed to retrieve user' });
+        res.status(500).json({ success: false, error: 'Failed to retrieve user' });
     }
 });
 
-// POST /api/users
+/**
+ * POST /api/users
+ * Creates a new user
+ */
 router.post('/', authenticate, requirePermission('user_create'), async (req, res) => {
     try {
         const userData = req.body;
 
         // Validation
         if (!userData.username || userData.username.length < 3) {
-            return res.json({ success: false, error: 'Username must be at least 3 characters' });
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Username must be at least 3 characters' 
+            });
         }
         if (!isValidEmail(userData.email)) {
-            return res.json({ success: false, error: 'Valid email is required' });
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Valid email is required' 
+            });
         }
         if (!userData.password || userData.password.length < 8) {
-            return res.json({ success: false, error: 'Password must be at least 8 characters' });
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Password must be at least 8 characters' 
+            });
         }
         if (!userData.firstName || !userData.lastName) {
-            return res.json({ success: false, error: 'First and last name are required' });
+            return res.status(400).json({ 
+                success: false, 
+                error: 'First and last name are required' 
+            });
         }
 
         // Check duplicates
-        if (UsersDB.getByUsername(userData.username.toLowerCase())) {
-            return res.json({ success: false, error: 'Username already exists' });
+        if (UserModel.getByUsername(userData.username)) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Username already exists' 
+            });
         }
-        if (UsersDB.getByEmail(userData.email.toLowerCase())) {
-            return res.json({ success: false, error: 'Email already exists' });
+        if (UserModel.getByEmail(userData.email)) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Email already exists' 
+            });
         }
 
-        const hashedPassword = await bcrypt.hash(userData.password, 10);
+        // Check if role exists
+        if (userData.roleId) {
+            const role = RoleModel.getById(userData.roleId);
+            if (!role) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Invalid role' 
+                });
+            }
+        }
 
-        const newUser = {
-            id: uuidv4(),
-            username: userData.username.toLowerCase(),
-            email: userData.email.toLowerCase(),
-            password: hashedPassword,
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            roleId: userData.roleId || 'agent',
-            department: userData.department || '',
-            phone: userData.phone || '',
-            hireDate: userData.hireDate || null,
-            isActive: userData.isActive !== false,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            lastLogin: null
-        };
-
-        UsersDB.create(newUser);
-        res.json({ success: true, user: sanitizeUser(newUser) });
+        const newUser = await UserModel.create(userData);
+        res.status(201).json({ success: true, user: sanitizeUser(newUser) });
     } catch (error) {
         console.error('Create user error:', error);
-        res.json({ success: false, error: 'Failed to create user' });
+        res.status(500).json({ success: false, error: 'Failed to create user' });
     }
 });
 
-// PUT /api/users/:id
+/**
+ * PUT /api/users/:id
+ * Updates a user
+ */
 router.put('/:id', authenticate, requirePermission('user_edit'), async (req, res) => {
     try {
         const { id } = req.params;
         const userData = req.body;
 
-        const existingUser = UsersDB.getById(id);
+        const existingUser = UserModel.getById(id);
         if (!existingUser) {
-            return res.json({ success: false, error: 'User not found' });
+            return res.status(404).json({ success: false, error: 'User not found' });
         }
 
         // Check for duplicate username/email
-        if (userData.username && userData.username !== existingUser.username) {
-            if (UsersDB.getByUsername(userData.username.toLowerCase())) {
-                return res.json({ success: false, error: 'Username already exists' });
+        if (userData.username && userData.username.toLowerCase() !== existingUser.username.toLowerCase()) {
+            if (UserModel.getByUsername(userData.username)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Username already exists' 
+                });
             }
         }
-        if (userData.email && userData.email !== existingUser.email) {
-            if (UsersDB.getByEmail(userData.email.toLowerCase())) {
-                return res.json({ success: false, error: 'Email already exists' });
+        if (userData.email && userData.email.toLowerCase() !== existingUser.email.toLowerCase()) {
+            if (UserModel.getByEmail(userData.email)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Email already exists' 
+                });
             }
         }
 
-        const updates = {
-            username: userData.username?.toLowerCase() || existingUser.username,
-            email: userData.email?.toLowerCase() || existingUser.email,
-            firstName: userData.firstName || existingUser.firstName,
-            lastName: userData.lastName || existingUser.lastName,
-            roleId: userData.roleId || existingUser.roleId,
-            department: userData.department ?? existingUser.department,
-            phone: userData.phone ?? existingUser.phone,
-            hireDate: userData.hireDate ?? existingUser.hireDate,
-            isActive: userData.isActive ?? existingUser.isActive
-        };
-
-        if (userData.password && userData.password.length >= 8) {
-            updates.password = await bcrypt.hash(userData.password, 10);
+        // Validate password if provided
+        if (userData.password && userData.password.length < 8) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Password must be at least 8 characters' 
+            });
         }
 
-        const updatedUser = UsersDB.update(id, updates);
+        const updatedUser = await UserModel.update(id, userData);
         res.json({ success: true, user: sanitizeUser(updatedUser) });
     } catch (error) {
         console.error('Update user error:', error);
-        res.json({ success: false, error: 'Failed to update user' });
+        res.status(500).json({ success: false, error: 'Failed to update user' });
     }
 });
 
-// DELETE /api/users/:id
+/**
+ * DELETE /api/users/:id
+ * Deletes a user
+ */
 router.delete('/:id', authenticate, requirePermission('user_delete'), (req, res) => {
     try {
         const { id } = req.params;
 
+        // Can't delete yourself
         if (req.user.id === id) {
-            return res.json({ success: false, error: 'Cannot delete your own account' });
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Cannot delete your own account' 
+            });
         }
 
-        const user = UsersDB.getById(id);
+        const user = UserModel.getById(id);
         if (!user) {
-            return res.json({ success: false, error: 'User not found' });
+            return res.status(404).json({ success: false, error: 'User not found' });
         }
 
-        const role = RolesDB.getById(user.roleId);
-        if (role && role.isAdmin) {
-            const adminUsers = UsersDB.getByRole('admin');
+        // Can't delete last admin
+        const role = RoleModel.getById(user.role_id);
+        if (role && role.is_admin) {
+            const adminUsers = UserModel.getByRole('admin');
             if (adminUsers.length <= 1) {
-                return res.json({ success: false, error: 'Cannot delete the last administrator' });
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Cannot delete the last administrator' 
+                });
             }
         }
 
-        UsersDB.delete(id);
+        UserModel.delete(id);
         res.json({ success: true });
     } catch (error) {
         console.error('Delete user error:', error);
-        res.json({ success: false, error: 'Failed to delete user' });
+        res.status(500).json({ success: false, error: 'Failed to delete user' });
     }
 });
 
-// GET /api/users/export/:format
+/**
+ * GET /api/users/export/:format
+ * Exports users to CSV or JSON
+ */
 router.get('/export/:format', authenticate, requirePermission('user_export'), (req, res) => {
     try {
         const { format } = req.params;
-        const users = UsersDB.getAll().map(sanitizeUser);
+        const users = UserModel.getAll().map(sanitizeUser);
 
         if (format === 'json') {
-            res.json({ success: true, data: JSON.stringify(users, null, 2), format: 'json' });
+            res.json({ 
+                success: true, 
+                data: JSON.stringify(users, null, 2), 
+                format: 'json' 
+            });
         } else if (format === 'csv') {
             const headers = ['ID', 'Username', 'Email', 'First Name', 'Last Name', 'Role', 'Department', 'Active'];
             const rows = users.map(u => [
@@ -227,11 +282,11 @@ router.get('/export/:format', authenticate, requirePermission('user_export'), (r
             const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
             res.json({ success: true, data: csv, format: 'csv' });
         } else {
-            res.json({ success: false, error: 'Invalid export format' });
+            res.status(400).json({ success: false, error: 'Invalid export format' });
         }
     } catch (error) {
         console.error('Export users error:', error);
-        res.json({ success: false, error: 'Failed to export users' });
+        res.status(500).json({ success: false, error: 'Failed to export users' });
     }
 });
 

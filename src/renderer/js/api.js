@@ -1,38 +1,98 @@
 /**
  * API Client
- * Handles all HTTP requests to the backend
+ * Handles all HTTP requests to the backend with JWT authentication
  */
 
 const API = {
     baseUrl: '/api',
-    token: null,
+    accessToken: null,
+    refreshToken: null,
+    isRefreshing: false,
+    refreshQueue: [],
 
     /**
-     * Sets the authentication token
+     * Initializes the API client with stored tokens
      */
-    setToken(token) {
-        this.token = token;
-        if (token) {
-            localStorage.setItem('authToken', token);
+    init() {
+        this.accessToken = localStorage.getItem('accessToken');
+        this.refreshToken = localStorage.getItem('refreshToken');
+    },
+
+    /**
+     * Stores authentication tokens
+     */
+    setTokens(accessToken, refreshToken) {
+        this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
+        
+        if (accessToken) {
+            localStorage.setItem('accessToken', accessToken);
         } else {
-            localStorage.removeItem('authToken');
+            localStorage.removeItem('accessToken');
+        }
+        
+        if (refreshToken) {
+            localStorage.setItem('refreshToken', refreshToken);
+        } else {
+            localStorage.removeItem('refreshToken');
         }
     },
 
     /**
-     * Gets the stored token
+     * Clears all tokens
      */
-    getToken() {
-        if (!this.token) {
-            this.token = localStorage.getItem('authToken');
-        }
-        return this.token;
+    clearTokens() {
+        this.accessToken = null;
+        this.refreshToken = null;
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
     },
 
     /**
-     * Makes an API request
+     * Gets stored access token
      */
-    async request(method, endpoint, data = null) {
+    getAccessToken() {
+        if (!this.accessToken) {
+            this.accessToken = localStorage.getItem('accessToken');
+        }
+        return this.accessToken;
+    },
+
+    /**
+     * Refreshes the access token
+     */
+    async refreshAccessToken() {
+        if (!this.refreshToken) {
+            this.refreshToken = localStorage.getItem('refreshToken');
+        }
+        
+        if (!this.refreshToken) {
+            throw new Error('No refresh token available');
+        }
+
+        const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ refreshToken: this.refreshToken })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            this.setTokens(result.accessToken, result.refreshToken);
+            return result.accessToken;
+        } else {
+            this.clearTokens();
+            throw new Error(result.error || 'Token refresh failed');
+        }
+    },
+
+    /**
+     * Makes an API request with automatic token refresh
+     */
+    async request(method, endpoint, data = null, retryCount = 0) {
         const url = `${this.baseUrl}${endpoint}`;
         const options = {
             method,
@@ -41,7 +101,7 @@ const API = {
             }
         };
 
-        const token = this.getToken();
+        const token = this.getAccessToken();
         if (token) {
             options.headers['Authorization'] = `Bearer ${token}`;
         }
@@ -53,10 +113,36 @@ const API = {
         try {
             const response = await fetch(url, options);
             const result = await response.json();
+
+            // Handle token expiration
+            if (response.status === 401 && result.code === 'INVALID_TOKEN' && retryCount === 0) {
+                // Try to refresh the token
+                try {
+                    await this.refreshAccessToken();
+                    // Retry the original request
+                    return this.request(method, endpoint, data, 1);
+                } catch (refreshError) {
+                    // Refresh failed, redirect to login
+                    this.handleAuthError();
+                    return result;
+                }
+            }
+
             return result;
         } catch (error) {
             console.error('API request failed:', error);
             return { success: false, error: 'Network error' };
+        }
+    },
+
+    /**
+     * Handles authentication errors
+     */
+    handleAuthError() {
+        this.clearTokens();
+        // Trigger logout in the app
+        if (window.App && window.App.handleLogout) {
+            window.App.showLoginScreen();
         }
     },
 
@@ -67,17 +153,39 @@ const API = {
     delete(endpoint) { return this.request('DELETE', endpoint); }
 };
 
+// Initialize on load
+API.init();
+
 /**
- * API Interface matching the Electron API structure
- * This allows the same frontend code to work with both Electron and Express
+ * API Interface for the application
  */
 window.electronAPI = {
     auth: {
-        login: (credentials) => API.post('/auth/login', credentials),
-        logout: () => API.post('/auth/logout'),
+        login: async (credentials) => {
+            const result = await API.post('/auth/login', credentials);
+            if (result.success) {
+                API.setTokens(result.accessToken, result.refreshToken);
+            }
+            return result;
+        },
+        logout: async () => {
+            const refreshToken = API.refreshToken || localStorage.getItem('refreshToken');
+            const result = await API.post('/auth/logout', { refreshToken });
+            API.clearTokens();
+            return result;
+        },
+        logoutAll: () => API.post('/auth/logout-all'),
         getCurrentUser: () => API.get('/auth/me'),
         changePassword: (data) => API.post('/auth/change-password', data),
-        validateSession: () => API.get('/auth/validate')
+        validateSession: async () => {
+            const token = API.getAccessToken();
+            if (!token) {
+                return { valid: false };
+            }
+            const result = await API.get('/auth/validate');
+            return result.valid ? result : { valid: false };
+        },
+        getSessions: () => API.get('/auth/sessions')
     },
 
     users: {
@@ -107,8 +215,7 @@ window.electronAPI = {
         getComments: (ticketId) => API.get(`/tickets/${ticketId}/comments`),
         getHistory: (ticketId) => API.get(`/tickets/${ticketId}/history`),
         getStatistics: () => API.get('/tickets/statistics'),
-        getByUser: (userId) => API.get(`/tickets?assignedTo=${userId}`),
-        exportTickets: (filters, format) => API.get(`/tickets/export/${format}`)
+        getByUser: (userId) => API.get(`/tickets?assignedTo=${userId}`)
     },
 
     quality: {
@@ -123,8 +230,9 @@ window.electronAPI = {
         getByAgent: (agentId) => API.get(`/quality?agentId=${agentId}`),
         getCategories: () => API.get('/quality/categories'),
         createCategory: (categoryData) => API.post('/quality/categories', categoryData),
-        getStatistics: () => API.get('/quality/statistics'),
-        exportReports: (filters, format) => API.get(`/quality/export/${format}`)
+        updateCategory: (id, categoryData) => API.put(`/quality/categories/${id}`, categoryData),
+        deleteCategory: (id) => API.delete(`/quality/categories/${id}`),
+        getStatistics: () => API.get('/quality/statistics')
     },
 
     roles: {
@@ -139,11 +247,16 @@ window.electronAPI = {
     settings: {
         get: (key) => API.get(`/settings/${key}`),
         set: (key, value) => API.put(`/settings/${key}`, { value }),
-        getAll: () => API.get('/settings')
+        getAll: () => API.get('/settings'),
+        setMany: (settings) => API.put('/settings', settings),
+        getIntegrationStatus: () => API.get('/settings/integrations/status'),
+        saveSharePointCredentials: (credentials) => API.post('/settings/integrations/sharepoint', credentials),
+        saveJiraCredentials: (credentials) => API.post('/settings/integrations/jira', credentials),
+        deleteIntegration: (type) => API.delete(`/settings/integrations/${type}`)
     },
 
     sharepoint: {
-        connect: (config) => API.post('/sharepoint/connect', config),
+        connect: (config) => API.post('/sharepoint/connect', config || {}),
         disconnect: () => API.post('/sharepoint/disconnect'),
         getStatus: () => API.get('/sharepoint/status'),
         getLists: () => API.get('/sharepoint/lists'),
@@ -160,7 +273,7 @@ window.electronAPI = {
     },
 
     jira: {
-        connect: (config) => API.post('/jira/connect', config),
+        connect: (config) => API.post('/jira/connect', config || {}),
         disconnect: () => API.post('/jira/disconnect'),
         getStatus: () => API.get('/jira/status'),
         getProjects: () => API.get('/jira/projects'),
@@ -181,23 +294,5 @@ window.electronAPI = {
     }
 };
 
-// Store token when login succeeds
-const originalLogin = window.electronAPI.auth.login;
-window.electronAPI.auth.login = async (credentials) => {
-    const result = await originalLogin(credentials);
-    if (result.success && result.token) {
-        API.setToken(result.token);
-    }
-    return result;
-};
-
-// Clear token on logout
-const originalLogout = window.electronAPI.auth.logout;
-window.electronAPI.auth.logout = async () => {
-    const result = await originalLogout();
-    API.setToken(null);
-    return result;
-};
-
-// Export API for direct use if needed
+// Export API for direct use
 window.API = API;

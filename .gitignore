@@ -1,2 +1,50 @@
+# Dependencies
 node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Database and data
 data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Encryption keys (VERY IMPORTANT - never commit these)
+.encryption-key
+
+# Build output
+dist/
+out/
+build/icons/*.png
+build/icons/*.ico
+build/icons/*.icns
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test coverage
+coverage/
+
+# Electron builder cache
+.electron-builder-cache/

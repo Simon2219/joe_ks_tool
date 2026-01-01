@@ -1,11 +1,19 @@
 /**
  * Customer Support Tool - Express Server
- * A web-based application server that replaces Electron
+ * Main entry point for the application
  */
+
+require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+
+// Import services
+const encryptionService = require('./src/server/services/encryptionService');
+
+// Import database
+const { initializeDatabase, shutdown: shutdownDatabase } = require('./src/server/database');
 
 // Import API routes
 const authRoutes = require('./src/server/routes/auth');
@@ -17,16 +25,46 @@ const settingsRoutes = require('./src/server/routes/settings');
 const sharepointRoutes = require('./src/server/routes/sharepoint');
 const jiraRoutes = require('./src/server/routes/jira');
 
-// Import database initialization
-const { initializeDatabase } = require('./src/server/database/dbInit');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Trust proxy (for rate limiting behind reverse proxy)
+app.set('trust proxy', 1);
+
+// CORS configuration
+const corsOptions = {
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+});
+
+// Request logging (development)
+if (process.env.NODE_ENV !== 'production') {
+    app.use((req, res, next) => {
+        const start = Date.now();
+        res.on('finish', () => {
+            const duration = Date.now() - start;
+            if (!req.url.includes('/api/')) return; // Only log API requests
+            console.log(`${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+        });
+        next();
+    });
+}
 
 // Serve static files from the renderer directory
 app.use(express.static(path.join(__dirname, 'src/renderer')));
@@ -41,7 +79,16 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/sharepoint', sharepointRoutes);
 app.use('/api/jira', jiraRoutes);
 
-// Serve the main HTML file for all other routes
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        version: require('./package.json').version
+    });
+});
+
+// Serve the main HTML file for all other routes (SPA support)
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'src/renderer/index.html'));
 });
@@ -49,18 +96,57 @@ app.get('*', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Server error:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    
+    // Don't leak error details in production
+    const message = process.env.NODE_ENV === 'production' 
+        ? 'Internal server error' 
+        : err.message;
+    
+    res.status(err.status || 500).json({ 
+        success: false, 
+        error: message 
+    });
 });
+
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+    res.status(404).json({ 
+        success: false, 
+        error: 'Endpoint not found' 
+    });
+});
+
+// Graceful shutdown handler
+function gracefulShutdown(signal) {
+    console.log(`\n${signal} received. Shutting down gracefully...`);
+    
+    // Close database connection
+    shutdownDatabase();
+    
+    // Exit process
+    process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Initialize and start server
 async function startServer() {
     try {
+        console.log('');
+        console.log('============================================');
+        console.log('   Customer Support Tool - Starting...');
+        console.log('============================================');
+        console.log('');
+
+        // Initialize encryption service
+        encryptionService.initialize();
+
         // Initialize database
         await initializeDatabase();
-        console.log('Database initialized');
 
         // Start the server
-        app.listen(PORT, () => {
+        const server = app.listen(PORT, () => {
             console.log('');
             console.log('============================================');
             console.log('   Customer Support Tool is running!');
@@ -77,10 +163,24 @@ async function startServer() {
             console.log('============================================');
             console.log('');
         });
+
+        // Handle server errors
+        server.on('error', (error) => {
+            if (error.code === 'EADDRINUSE') {
+                console.error(`Port ${PORT} is already in use`);
+                process.exit(1);
+            }
+            throw error;
+        });
+
     } catch (error) {
         console.error('Failed to start server:', error);
         process.exit(1);
     }
 }
 
+// Start the server
 startServer();
+
+// Export for testing
+module.exports = app;

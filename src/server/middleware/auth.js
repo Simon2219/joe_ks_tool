@@ -1,128 +1,111 @@
 /**
  * Authentication Middleware
- * Handles session validation for API requests
+ * Handles JWT-based authentication and authorization
  */
 
-const { SessionsDB, UsersDB, RolesDB } = require('../database/dbService');
-
-// In-memory session store (for simplicity)
-const sessions = new Map();
-
-/**
- * Creates a new session
- */
-function createSession(user) {
-    const token = require('uuid').v4();
-    const session = {
-        token,
-        userId: user.id,
-        user: sanitizeUser(user),
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-    };
-    sessions.set(token, session);
-    return session;
-}
-
-/**
- * Gets a session by token
- */
-function getSession(token) {
-    const session = sessions.get(token);
-    if (!session) return null;
-    if (new Date() > session.expiresAt) {
-        sessions.delete(token);
-        return null;
-    }
-    return session;
-}
-
-/**
- * Deletes a session
- */
-function deleteSession(token) {
-    sessions.delete(token);
-}
-
-/**
- * Sanitizes user data (removes password)
- */
-function sanitizeUser(user) {
-    const { password, ...safeUser } = user;
-    const role = RolesDB.getById(user.roleId);
-    return {
-        ...safeUser,
-        role: role ? {
-            id: role.id,
-            name: role.name,
-            isAdmin: role.isAdmin,
-            permissions: role.permissions
-        } : null
-    };
-}
+const JwtService = require('../services/jwtService');
+const { UserModel, RoleModel } = require('../database');
 
 /**
  * Authentication middleware
+ * Verifies JWT access token and attaches user to request
  */
 function authenticate(req, res, next) {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ success: false, error: 'No token provided' });
+        return res.status(401).json({ 
+            success: false, 
+            error: 'No token provided',
+            code: 'NO_TOKEN'
+        });
     }
 
     const token = authHeader.substring(7);
-    const session = getSession(token);
+    const payload = JwtService.verifyAccessToken(token);
 
-    if (!session) {
-        return res.status(401).json({ success: false, error: 'Invalid or expired token' });
+    if (!payload) {
+        return res.status(401).json({ 
+            success: false, 
+            error: 'Invalid or expired token',
+            code: 'INVALID_TOKEN'
+        });
     }
 
-    // Refresh user data
-    const user = UsersDB.getById(session.userId);
-    if (!user || !user.isActive) {
-        deleteSession(token);
-        return res.status(401).json({ success: false, error: 'User not found or inactive' });
+    // Get fresh user data
+    const user = JwtService.getUserForToken(payload.userId);
+    if (!user) {
+        return res.status(401).json({ 
+            success: false, 
+            error: 'User not found',
+            code: 'USER_NOT_FOUND'
+        });
     }
 
-    session.user = sanitizeUser(user);
-    req.session = session;
-    req.user = session.user;
+    if (!user.is_active) {
+        return res.status(401).json({ 
+            success: false, 
+            error: 'User account is deactivated',
+            code: 'USER_INACTIVE'
+        });
+    }
+
+    // Attach user to request
+    req.user = user;
+    req.tokenPayload = payload;
     next();
 }
 
 /**
- * Optional authentication (doesn't fail if no token)
+ * Optional authentication middleware
+ * Attaches user if token is valid, but doesn't fail if not
  */
 function optionalAuth(req, res, next) {
     const authHeader = req.headers.authorization;
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
-        const session = getSession(token);
-        if (session) {
-            req.session = session;
-            req.user = session.user;
+        const payload = JwtService.verifyAccessToken(token);
+        
+        if (payload) {
+            const user = JwtService.getUserForToken(payload.userId);
+            if (user && user.is_active) {
+                req.user = user;
+                req.tokenPayload = payload;
+            }
         }
     }
+    
     next();
 }
 
 /**
  * Permission check middleware factory
+ * @param {string} permission - Required permission
  */
 function requirePermission(permission) {
     return (req, res, next) => {
         if (!req.user) {
-            return res.status(401).json({ success: false, error: 'Authentication required' });
+            return res.status(401).json({ 
+                success: false, 
+                error: 'Authentication required',
+                code: 'AUTH_REQUIRED'
+            });
         }
 
+        // Admins have all permissions
         if (req.user.role?.isAdmin) {
             return next();
         }
 
+        // Check if user has the required permission
         if (!req.user.role?.permissions?.includes(permission)) {
-            return res.status(403).json({ success: false, error: 'Permission denied' });
+            return res.status(403).json({ 
+                success: false, 
+                error: 'Permission denied',
+                code: 'PERMISSION_DENIED',
+                required: permission
+            });
         }
 
         next();
@@ -130,7 +113,32 @@ function requirePermission(permission) {
 }
 
 /**
- * Check if user has permission
+ * Require admin access middleware
+ */
+function requireAdmin(req, res, next) {
+    if (!req.user) {
+        return res.status(401).json({ 
+            success: false, 
+            error: 'Authentication required',
+            code: 'AUTH_REQUIRED'
+        });
+    }
+
+    if (!req.user.role?.isAdmin) {
+        return res.status(403).json({ 
+            success: false, 
+            error: 'Admin access required',
+            code: 'ADMIN_REQUIRED'
+        });
+    }
+
+    next();
+}
+
+/**
+ * Checks if user has a specific permission
+ * @param {object} user - User object with role
+ * @param {string} permission - Permission to check
  */
 function hasPermission(user, permission) {
     if (!user || !user.role) return false;
@@ -138,13 +146,80 @@ function hasPermission(user, permission) {
     return user.role.permissions?.includes(permission) || false;
 }
 
+/**
+ * Checks if user can access a specific resource
+ * Used for row-level security (e.g., can only view own tickets)
+ */
+function canAccessResource(user, resource, resourceUserId) {
+    if (!user || !user.role) return false;
+    if (user.role.isAdmin) return true;
+    
+    // Check for "view all" permission
+    const viewAllPermissions = {
+        ticket: 'ticket_view_all',
+        quality: 'quality_view_all'
+    };
+    
+    if (viewAllPermissions[resource] && hasPermission(user, viewAllPermissions[resource])) {
+        return true;
+    }
+    
+    // Otherwise, user can only access their own resources
+    return user.id === resourceUserId;
+}
+
+/**
+ * Rate limiting state (simple in-memory implementation)
+ */
+const rateLimitState = new Map();
+
+/**
+ * Simple rate limiting middleware
+ * @param {number} maxRequests - Max requests per window
+ * @param {number} windowMs - Time window in milliseconds
+ */
+function rateLimit(maxRequests = 100, windowMs = 60000) {
+    return (req, res, next) => {
+        const key = req.ip || req.connection.remoteAddress || 'unknown';
+        const now = Date.now();
+        
+        let state = rateLimitState.get(key);
+        
+        if (!state || now > state.resetTime) {
+            state = {
+                count: 1,
+                resetTime: now + windowMs
+            };
+            rateLimitState.set(key, state);
+        } else {
+            state.count++;
+        }
+        
+        if (state.count > maxRequests) {
+            return res.status(429).json({
+                success: false,
+                error: 'Too many requests',
+                code: 'RATE_LIMITED',
+                retryAfter: Math.ceil((state.resetTime - now) / 1000)
+            });
+        }
+        
+        next();
+    };
+}
+
+/**
+ * Login rate limiting (stricter)
+ */
+const loginRateLimit = rateLimit(5, 60000); // 5 attempts per minute
+
 module.exports = {
-    createSession,
-    getSession,
-    deleteSession,
-    sanitizeUser,
     authenticate,
     optionalAuth,
     requirePermission,
-    hasPermission
+    requireAdmin,
+    hasPermission,
+    canAccessResource,
+    rateLimit,
+    loginRateLimit
 };
