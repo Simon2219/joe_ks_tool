@@ -107,12 +107,13 @@ const UsersView = {
      */
     getFilteredUsers() {
         return this.users.filter(user => {
-            if (this.filters.role && user.roleId !== this.filters.role) {
+            if (this.filters.role && user.roleId !== this.filters.role && user.role_id !== this.filters.role) {
                 return false;
             }
             if (this.filters.status) {
                 const isActive = this.filters.status === 'active';
-                if (user.isActive !== isActive) return false;
+                const userActive = user.isActive !== undefined ? user.isActive : !!user.is_active;
+                if (userActive !== isActive) return false;
             }
             return true;
         });
@@ -152,11 +153,15 @@ const UsersView = {
      * Renders a single user row
      */
     renderUserRow(user) {
-        const initials = Helpers.getInitials(user.firstName, user.lastName);
-        const fullName = `${user.firstName} ${user.lastName}`;
-        const statusClass = user.isActive ? 'badge-success' : 'badge-secondary';
-        const statusText = user.isActive ? 'Active' : 'Inactive';
-        const lastLogin = user.lastLogin ? Helpers.timeAgo(user.lastLogin) : 'Never';
+        const firstName = user.firstName || user.first_name || '';
+        const lastName = user.lastName || user.last_name || '';
+        const initials = Helpers.getInitials(firstName, lastName);
+        const fullName = `${firstName} ${lastName}`;
+        const isActive = user.isActive !== undefined ? user.isActive : !!user.is_active;
+        const statusClass = isActive ? 'badge-success' : 'badge-secondary';
+        const statusText = isActive ? 'Active' : 'Inactive';
+        const lastLogin = (user.lastLogin || user.last_login) ? Helpers.timeAgo(user.lastLogin || user.last_login) : 'Never';
+        const roleName = user.roleName || user.role_name || '';
 
         const canEdit = Permissions.canEdit('user');
         const canDelete = Permissions.canDelete('user');
@@ -173,7 +178,7 @@ const UsersView = {
                     </div>
                 </td>
                 <td>${Helpers.escapeHtml(user.email)}</td>
-                <td>${Helpers.escapeHtml(user.roleName)}</td>
+                <td>${Helpers.escapeHtml(roleName)}</td>
                 <td>${Helpers.escapeHtml(user.department || '-')}</td>
                 <td><span class="badge ${statusClass}">${statusText}</span></td>
                 <td>${lastLogin}</td>
@@ -334,7 +339,19 @@ const UsersView = {
     async editUser(userId) {
         const user = this.users.find(u => u.id === userId);
         if (user) {
-            await this.showUserForm(user);
+            // Ensure consistent field names for the form
+            const formData = {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                firstName: user.firstName || user.first_name,
+                lastName: user.lastName || user.last_name,
+                roleId: user.roleId || user.role_id,
+                department: user.department || '',
+                phone: user.phone || '',
+                isActive: user.isActive !== undefined ? user.isActive : !!user.is_active
+            };
+            await this.showUserForm(formData);
         }
     },
 

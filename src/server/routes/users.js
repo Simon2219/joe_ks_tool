@@ -163,11 +163,22 @@ router.get('/stats', requirePermission('user_view'), (req, res) => {
 });
 
 function sanitizeUser(user) {
-    const { password, ...safe } = user;
+    const { password, ...rest } = user;
     return {
-        ...safe,
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        roleId: user.role_id,
+        roleName: user.role_name || '',
+        department: user.department || '',
+        phone: user.phone || '',
         isActive: !!user.is_active,
-        isAdmin: !!user.is_admin
+        isAdmin: !!user.is_admin,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at,
+        lastLogin: user.last_login
     };
 }
 

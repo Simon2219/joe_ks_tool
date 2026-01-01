@@ -1,11 +1,12 @@
 {
-  "_comment": "Copy this file to local.json and modify as needed. local.json is gitignored.",
+  "_README": "Copy this file to local.json and customize. local.json is gitignored.",
   
   "server": {
     "port": 3000
   },
   
   "security": {
+    "jwtSecret": "CHANGE-THIS-TO-A-RANDOM-STRING-AT-LEAST-32-CHARACTERS-LONG",
     "encryptionEnabled": true,
     "jwtAccessTokenExpiry": "15m",
     "jwtRefreshTokenExpiryDays": 7
