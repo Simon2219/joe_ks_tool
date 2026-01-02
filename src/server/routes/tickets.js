@@ -33,6 +33,7 @@ router.get('/', requirePermission('ticket_view'), (req, res) => {
 
 /**
  * GET /api/tickets/stats
+ * GET /api/tickets/statistics
  */
 router.get('/stats', requirePermission('ticket_view'), (req, res) => {
     try {
@@ -40,6 +41,15 @@ router.get('/stats', requirePermission('ticket_view'), (req, res) => {
     } catch (error) {
         console.error('Get ticket stats error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch stats' });
+    }
+});
+
+router.get('/statistics', requirePermission('ticket_view'), (req, res) => {
+    try {
+        res.json({ success: true, statistics: TicketSystem.getStatistics() });
+    } catch (error) {
+        console.error('Get ticket stats error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch statistics' });
     }
 });
 

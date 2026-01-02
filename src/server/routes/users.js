@@ -95,12 +95,12 @@ router.put('/:id', requirePermission('user_edit'), async (req, res) => {
         }
 
         // Check username/email uniqueness
-        if (req.body.username && req.body.username !== existing.username) {
+        if (req.body.username && req.body.username.toLowerCase() !== existing.username.toLowerCase()) {
             if (UserSystem.getByUsername(req.body.username)) {
                 return res.status(400).json({ success: false, error: 'Username already exists' });
             }
         }
-        if (req.body.email && req.body.email !== existing.email) {
+        if (req.body.email && req.body.email.toLowerCase() !== existing.email.toLowerCase()) {
             if (UserSystem.getByEmail(req.body.email)) {
                 return res.status(400).json({ success: false, error: 'Email already exists' });
             }
