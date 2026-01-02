@@ -42,7 +42,7 @@ function authenticate(req, res, next) {
         });
     }
 
-    if (!user.is_active) {
+    if (!user.isActive) {
         return res.status(401).json({ 
             success: false, 
             error: 'User account is deactivated',
@@ -67,7 +67,7 @@ function optionalAuth(req, res, next) {
         
         if (payload) {
             const user = JwtService.getUserForToken(payload.userId);
-            if (user && user.is_active) {
+            if (user && user.isActive) {
                 req.user = user;
                 req.tokenPayload = payload;
             }

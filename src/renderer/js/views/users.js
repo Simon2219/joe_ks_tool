@@ -290,16 +290,23 @@ const UsersView = {
             submitText: isEdit ? 'Save Changes' : 'Create User',
             size: 'lg',
             validate: (data) => {
-                if (!data.username || data.username.length < 3) {
+                // Skip username validation for edit (it's readonly)
+                if (!isEdit && (!data.username || data.username.length < 3)) {
                     return 'Username must be at least 3 characters';
                 }
-                if (!Helpers.isValidEmail(data.email)) {
+                if (!data.email || !Helpers.isValidEmail(data.email)) {
                     return 'Please enter a valid email address';
+                }
+                if (!data.firstName || data.firstName.trim().length === 0) {
+                    return 'First name is required';
+                }
+                if (!data.lastName || data.lastName.trim().length === 0) {
+                    return 'Last name is required';
                 }
                 if (!isEdit && (!data.password || data.password.length < 8)) {
                     return 'Password must be at least 8 characters';
                 }
-                if (data.password && data.password.length > 0 && data.password.length < 8) {
+                if (isEdit && data.password && data.password.length > 0 && data.password.length < 8) {
                     return 'Password must be at least 8 characters';
                 }
                 return null;
@@ -308,7 +315,16 @@ const UsersView = {
 
         if (result) {
             if (isEdit) {
-                await this.updateUser(user.id, result);
+                // For edit, ensure we keep the username and include original data
+                const updateData = {
+                    ...result,
+                    username: user.username  // Preserve username since it's readonly
+                };
+                // Remove empty password (means don't change it)
+                if (!updateData.password || updateData.password.trim() === '') {
+                    delete updateData.password;
+                }
+                await this.updateUser(user.id, updateData);
             } else {
                 await this.createUser(result);
             }
