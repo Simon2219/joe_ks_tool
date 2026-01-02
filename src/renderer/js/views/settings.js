@@ -28,6 +28,38 @@ const SettingsView = {
         document.getElementById('save-settings-btn')?.addEventListener('click', () => {
             this.saveSettings();
         });
+
+        // Database viewer button
+        document.getElementById('db-view-btn')?.addEventListener('click', () => {
+            this.viewDatabaseTable();
+        });
+    },
+
+    /**
+     * Views database table content
+     */
+    async viewDatabaseTable() {
+        const tableSelect = document.getElementById('db-table-select');
+        const outputEl = document.getElementById('db-viewer-output');
+        const tableName = tableSelect?.value;
+
+        if (!tableName) {
+            outputEl.textContent = 'Please select a table';
+            return;
+        }
+
+        try {
+            outputEl.textContent = 'Loading...';
+            const result = await API.get(`/admin/database/query?sql=SELECT * FROM ${tableName} LIMIT 100`);
+            
+            if (result.success) {
+                outputEl.textContent = JSON.stringify(result.results, null, 2);
+            } else {
+                outputEl.textContent = 'Error: ' + (result.error || 'Unknown error');
+            }
+        } catch (error) {
+            outputEl.textContent = 'Error: ' + error.message;
+        }
     },
 
     /**

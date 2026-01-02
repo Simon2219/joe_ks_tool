@@ -174,7 +174,7 @@ const Modal = {
                 size = 'default'
             } = options;
 
-            // Build form HTML
+            // Build form HTML with submit button inside the form
             let formHtml = '<form id="modal-form" class="modal-form">';
             
             for (const field of fields) {
@@ -201,8 +201,8 @@ const Modal = {
             const submitBtn = document.createElement('button');
             submitBtn.className = 'btn btn-primary';
             submitBtn.textContent = submitText;
-            submitBtn.type = 'submit';
-            submitBtn.form = 'modal-form';
+            submitBtn.type = 'button'; // Changed to button, we'll handle click manually
+            submitBtn.id = 'modal-submit-btn';
 
             footer.appendChild(cancelBtn);
             footer.appendChild(submitBtn);
@@ -215,11 +215,16 @@ const Modal = {
                 onClose: () => resolve(null)
             });
 
-            // Handle form submission
+            // Get form element
             const form = document.getElementById('modal-form');
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
+            if (!form) {
+                console.error('[Modal] Form element not found');
+                resolve(null);
+                return;
+            }
+
+            // Function to handle form submission
+            const handleSubmit = async () => {
                 const formData = Helpers.getFormData(form);
                 
                 // Process checkboxes (unchecked ones aren't included in FormData)
@@ -240,8 +245,30 @@ const Modal = {
                     }
                 }
 
+                // IMPORTANT: Clear onCloseCallback BEFORE closing to prevent double-resolve
+                this.onCloseCallback = null;
                 this.close();
                 resolve(formData);
+            };
+
+            // Handle form submit event
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                handleSubmit();
+            });
+            
+            // Handle submit button click
+            submitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleSubmit();
+            });
+            
+            // Also handle Enter key in form
+            form.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    handleSubmit();
+                }
             });
         });
     },

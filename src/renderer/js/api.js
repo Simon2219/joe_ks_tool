@@ -94,6 +94,7 @@ const API = {
      */
     async request(method, endpoint, data = null, retryCount = 0) {
         const url = `${this.baseUrl}${endpoint}`;
+        
         const options = {
             method,
             headers: {
@@ -116,13 +117,11 @@ const API = {
 
             // Handle token expiration
             if (response.status === 401 && result.code === 'INVALID_TOKEN' && retryCount === 0) {
-                // Try to refresh the token
                 try {
                     await this.refreshAccessToken();
-                    // Retry the original request
                     return this.request(method, endpoint, data, 1);
                 } catch (refreshError) {
-                    // Refresh failed, redirect to login
+                    console.error('[API] Token refresh failed:', refreshError);
                     this.handleAuthError();
                     return result;
                 }
@@ -130,7 +129,7 @@ const API = {
 
             return result;
         } catch (error) {
-            console.error('API request failed:', error);
+            console.error('[API] Request failed:', error);
             return { success: false, error: 'Network error' };
         }
     },
