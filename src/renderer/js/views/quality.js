@@ -65,7 +65,7 @@ const QualityView = {
      */
     async loadCategories() {
         try {
-            const result = await window.electronAPI.quality.getCategories();
+            const result = await window.api.quality.getCategories();
             if (result.success) {
                 this.categories = result.categories.filter(c => c.isActive);
             }
@@ -79,7 +79,7 @@ const QualityView = {
      */
     async loadAgents() {
         try {
-            const result = await window.electronAPI.users.getAll();
+            const result = await window.api.users.getAll();
             if (result.success) {
                 // Filter to get agents (users with agent role or similar)
                 this.agents = result.users.filter(u => u.isActive);
@@ -111,7 +111,7 @@ const QualityView = {
      */
     async loadReports() {
         try {
-            const result = await window.electronAPI.quality.getAll(this.filters);
+            const result = await window.api.quality.getAll(this.filters);
             if (result.success) {
                 this.reports = result.reports;
                 this.renderTable();
@@ -129,7 +129,7 @@ const QualityView = {
      */
     async loadStatistics() {
         try {
-            const result = await window.electronAPI.quality.getStatistics();
+            const result = await window.api.quality.getStatistics();
             if (result.success) {
                 const stats = result.statistics;
                 document.getElementById('quality-avg-score').textContent = `${stats.averageScore}%`;
@@ -415,7 +415,7 @@ const QualityView = {
      */
     async viewReport(reportId) {
         try {
-            const result = await window.electronAPI.quality.getById(reportId);
+            const result = await window.api.quality.getById(reportId);
             if (!result.success) {
                 Toast.error('Failed to load report');
                 return;
@@ -555,7 +555,7 @@ const QualityView = {
      */
     async createReport(reportData) {
         try {
-            const result = await window.electronAPI.quality.create(reportData);
+            const result = await window.api.quality.create(reportData);
             if (result.success) {
                 Toast.success('Quality evaluation submitted successfully');
                 Modal.close();
@@ -575,7 +575,7 @@ const QualityView = {
      */
     async editReport(reportId) {
         try {
-            const result = await window.electronAPI.quality.getById(reportId);
+            const result = await window.api.quality.getById(reportId);
             if (result.success) {
                 await this.showEvaluationForm(result.report);
             }
@@ -589,7 +589,7 @@ const QualityView = {
      */
     async updateReport(reportId, reportData) {
         try {
-            const result = await window.electronAPI.quality.update(reportId, reportData);
+            const result = await window.api.quality.update(reportId, reportData);
             if (result.success) {
                 Toast.success('Evaluation updated successfully');
                 Modal.close();
@@ -620,7 +620,7 @@ const QualityView = {
 
         if (confirmed) {
             try {
-                const result = await window.electronAPI.quality.delete(reportId);
+                const result = await window.api.quality.delete(reportId);
                 if (result.success) {
                     Toast.success('Report deleted successfully');
                     await this.loadReports();
@@ -688,7 +688,7 @@ const QualityView = {
      */
     async exportReports() {
         try {
-            const result = await window.electronAPI.quality.exportReports(this.filters, 'csv');
+            const result = await window.api.quality.exportReports(this.filters, 'csv');
             if (result.success) {
                 Helpers.downloadFile(result.data, 'quality_reports.csv', 'text/csv');
                 Toast.success('Reports exported successfully');

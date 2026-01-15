@@ -51,7 +51,7 @@ const UsersView = {
      */
     async loadRoles() {
         try {
-            const result = await window.electronAPI.roles.getAll();
+            const result = await window.api.roles.getAll();
             if (result.success) {
                 this.roles = result.roles;
                 this.populateRoleFilter();
@@ -82,7 +82,7 @@ const UsersView = {
      */
     async loadUsers() {
         try {
-            const result = await window.electronAPI.users.getAll();
+            const result = await window.api.users.getAll();
             if (result.success) {
                 this.users = result.users;
                 this.renderTable();
@@ -336,7 +336,7 @@ const UsersView = {
      */
     async createUser(userData) {
         try {
-            const result = await window.electronAPI.users.create(userData);
+            const result = await window.api.users.create(userData);
             if (result.success) {
                 Toast.success('User created successfully');
                 await this.loadUsers();
@@ -376,7 +376,7 @@ const UsersView = {
      */
     async updateUser(userId, userData) {
         try {
-            const result = await window.electronAPI.users.update(userId, userData);
+            const result = await window.api.users.update(userId, userData);
             if (result.success) {
                 Toast.success('User updated successfully');
                 await this.loadUsers();
@@ -405,7 +405,7 @@ const UsersView = {
 
         if (confirmed) {
             try {
-                const result = await window.electronAPI.users.delete(userId);
+                const result = await window.api.users.delete(userId);
                 if (result.success) {
                     Toast.success('User deleted successfully');
                     await this.loadUsers();
@@ -424,7 +424,7 @@ const UsersView = {
      */
     async exportUsers() {
         try {
-            const result = await window.electronAPI.users.exportUsers('csv');
+            const result = await window.api.users.exportUsers('csv');
             if (result.success) {
                 Helpers.downloadFile(result.data, 'users.csv', 'text/csv');
                 Toast.success('Users exported successfully');

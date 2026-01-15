@@ -30,7 +30,7 @@ const RolesView = {
      */
     async loadPermissions() {
         try {
-            const result = await window.electronAPI.roles.getPermissions();
+            const result = await window.api.roles.getPermissions();
             if (result.success) {
                 this.allPermissions = result.permissions;
             }
@@ -44,7 +44,7 @@ const RolesView = {
      */
     async loadRoles() {
         try {
-            const result = await window.electronAPI.roles.getAll();
+            const result = await window.api.roles.getAll();
             if (result.success) {
                 this.roles = result.roles;
                 this.renderRoles();
@@ -247,7 +247,7 @@ const RolesView = {
      */
     async createRole(roleData) {
         try {
-            const result = await window.electronAPI.roles.create(roleData);
+            const result = await window.api.roles.create(roleData);
             if (result.success) {
                 Toast.success('Role created successfully');
                 Modal.close();
@@ -276,7 +276,7 @@ const RolesView = {
      */
     async updateRole(roleId, roleData) {
         try {
-            const result = await window.electronAPI.roles.update(roleId, roleData);
+            const result = await window.api.roles.update(roleId, roleData);
             if (result.success) {
                 Toast.success('Role updated successfully');
                 Modal.close();
@@ -306,7 +306,7 @@ const RolesView = {
 
         if (confirmed) {
             try {
-                const result = await window.electronAPI.roles.delete(roleId);
+                const result = await window.api.roles.delete(roleId);
                 if (result.success) {
                     Toast.success('Role deleted successfully');
                     await this.loadRoles();

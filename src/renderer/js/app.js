@@ -79,7 +79,7 @@ const App = {
      */
     async checkSession() {
         try {
-            const result = await window.electronAPI.auth.validateSession();
+            const result = await window.api.auth.validateSession();
             if (result.valid && result.user) {
                 await this.onLoginSuccess(result.user);
             } else {
@@ -130,7 +130,7 @@ const App = {
             submitBtn.querySelector('.spinner').classList.remove('hidden');
             errorEl.classList.add('hidden');
 
-            const result = await window.electronAPI.auth.login({ username, password });
+            const result = await window.api.auth.login({ username, password });
 
             if (result.success) {
                 await this.onLoginSuccess(result.user);
@@ -202,7 +202,7 @@ const App = {
 
         if (confirmed) {
             try {
-                await window.electronAPI.auth.logout();
+                await window.api.auth.logout();
                 this.isAuthenticated = false;
                 Permissions.clearUser();
                 this.showLoginScreen();

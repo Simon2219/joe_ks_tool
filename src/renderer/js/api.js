@@ -157,8 +157,9 @@ API.init();
 
 /**
  * API Interface for the application
+ * HTTP client for backend communication (separate from Electron IPC)
  */
-window.electronAPI = {
+window.api = {
     auth: {
         login: async (credentials) => {
             const result = await API.post('/auth/login', credentials);

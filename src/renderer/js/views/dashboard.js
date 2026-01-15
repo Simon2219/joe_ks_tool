@@ -27,7 +27,7 @@ const DashboardView = {
      */
     async loadUserStats() {
         try {
-            const result = await window.electronAPI.users.getStatistics();
+            const result = await window.api.users.getStatistics();
             if (result.success) {
                 document.getElementById('stat-total-users').textContent = 
                     Helpers.formatNumber(result.statistics.total);
@@ -44,7 +44,7 @@ const DashboardView = {
      */
     async loadTicketStats() {
         try {
-            const result = await window.electronAPI.tickets.getStatistics();
+            const result = await window.api.tickets.getStatistics();
             if (result.success) {
                 document.getElementById('stat-open-tickets').textContent = 
                     Helpers.formatNumber(result.statistics.openTickets);
@@ -61,7 +61,7 @@ const DashboardView = {
      */
     async loadQualityStats() {
         try {
-            const result = await window.electronAPI.quality.getStatistics();
+            const result = await window.api.quality.getStatistics();
             if (result.success) {
                 document.getElementById('stat-avg-score').textContent = 
                     `${result.statistics.averageScore}%`;
