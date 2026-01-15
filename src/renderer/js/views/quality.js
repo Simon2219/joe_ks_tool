@@ -238,8 +238,8 @@ const QualityView = {
         const isEdit = !!report;
         const title = isEdit ? 'Edit Evaluation' : 'New Quality Evaluation';
 
-        // Build evaluation form content
-        let formContent = `
+        // Build evaluation form content as HTML string
+        const formHtml = `
             <form id="evaluation-form" class="evaluation-form">
                 <div class="form-row">
                     <div class="form-group">
@@ -317,6 +317,11 @@ const QualityView = {
             </form>
         `;
 
+        // Convert HTML string to DOM node
+        const template = document.createElement('template');
+        template.innerHTML = formHtml.trim();
+        const content = template.content.firstElementChild || template.content;
+
         // Footer buttons
         const footer = document.createElement('div');
         footer.style.display = 'flex';
@@ -356,9 +361,9 @@ const QualityView = {
 
         Modal.open({
             title,
-            content: formContent,
+            content,
             footer,
-            size
+            size: 'lg'
         });
     },
 
@@ -417,11 +422,28 @@ const QualityView = {
             }
 
             const report = result.report;
-            const content = this.buildReportDetailView(report);
+            const contentHtml = this.buildReportDetailView(report);
+
+            // Convert HTML string to DOM node
+            const template = document.createElement('template');
+            template.innerHTML = contentHtml.trim();
+            const content = template.content.firstElementChild || template.content;
+
+            // Footer with close button
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.justifyContent = 'flex-end';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.textContent = 'Close';
+            closeBtn.addEventListener('click', () => Modal.close());
+            footer.appendChild(closeBtn);
 
             Modal.open({
                 title: `Quality Report ${report.reportNumber}`,
                 content,
+                footer,
                 size: 'lg'
             });
         } catch (error) {
@@ -617,7 +639,7 @@ const QualityView = {
      * Shows categories manager
      */
     async showCategoriesManager() {
-        const content = `
+        const contentHtml = `
             <div class="categories-manager">
                 <div id="categories-list">
                     ${this.categories.map(category => `
@@ -637,9 +659,26 @@ const QualityView = {
             </div>
         `;
 
+        // Convert HTML string to DOM node
+        const template = document.createElement('template');
+        template.innerHTML = contentHtml.trim();
+        const content = template.content.firstElementChild || template.content;
+
+        // Footer with close button
+        const footer = document.createElement('div');
+        footer.style.display = 'flex';
+        footer.style.justifyContent = 'flex-end';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn btn-secondary';
+        closeBtn.textContent = 'Close';
+        closeBtn.addEventListener('click', () => Modal.close());
+        footer.appendChild(closeBtn);
+
         Modal.open({
             title: 'Manage Quality Categories',
             content,
+            footer,
             size: 'lg'
         });
     },

@@ -318,11 +318,28 @@ const TicketsView = {
             const comments = commentsResult.success ? commentsResult.comments : [];
             const history = historyResult.success ? historyResult.history : [];
 
-            const content = this.buildTicketDetailView(ticket, comments, history);
+            const contentHtml = this.buildTicketDetailView(ticket, comments, history);
+
+            // Convert HTML string to DOM node
+            const template = document.createElement('template');
+            template.innerHTML = contentHtml.trim();
+            const content = template.content.firstElementChild || template.content;
+
+            // Footer with close button
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.justifyContent = 'flex-end';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.textContent = 'Close';
+            closeBtn.addEventListener('click', () => Modal.close());
+            footer.appendChild(closeBtn);
 
             Modal.open({
                 title: `Ticket ${ticket.ticketNumber}`,
                 content,
+                footer,
                 size: 'lg'
             });
 

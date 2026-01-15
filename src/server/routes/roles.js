@@ -12,12 +12,30 @@ const { authenticate, requirePermission, requireAdmin } = require('../middleware
 router.use(authenticate);
 
 /**
+ * Formats a role for API response
+ */
+function formatRole(role) {
+    if (!role) return null;
+    return {
+        id: role.id,
+        name: role.name,
+        description: role.description,
+        isAdmin: !!role.is_admin,
+        isSystem: !!role.is_system,
+        permissions: role.permissions || [],
+        userCount: role.userCount || 0,
+        createdAt: role.created_at,
+        updatedAt: role.updated_at
+    };
+}
+
+/**
  * GET /api/roles
  */
 router.get('/', requirePermission('role_view'), (req, res) => {
     try {
         const roles = RoleSystem.getAll();
-        res.json({ success: true, roles });
+        res.json({ success: true, roles: roles.map(formatRole) });
     } catch (error) {
         console.error('Get roles error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch roles' });
@@ -54,7 +72,7 @@ router.get('/:id', requirePermission('role_view'), (req, res) => {
         if (!role) {
             return res.status(404).json({ success: false, error: 'Role not found' });
         }
-        res.json({ success: true, role });
+        res.json({ success: true, role: formatRole(role) });
     } catch (error) {
         console.error('Get role error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch role' });
@@ -79,7 +97,7 @@ router.post('/', requireAdmin, (req, res) => {
         }
 
         const role = RoleSystem.create({ name, description, isAdmin, permissions });
-        res.status(201).json({ success: true, role });
+        res.status(201).json({ success: true, role: formatRole(role) });
     } catch (error) {
         console.error('Create role error:', error);
         res.status(500).json({ success: false, error: 'Failed to create role' });
@@ -105,7 +123,7 @@ router.put('/:id', requireAdmin, (req, res) => {
         }
 
         const updated = RoleSystem.update(req.params.id, req.body);
-        res.json({ success: true, role: updated });
+        res.json({ success: true, role: formatRole(updated) });
     } catch (error) {
         console.error('Update role error:', error);
         res.status(500).json({ success: false, error: 'Failed to update role' });

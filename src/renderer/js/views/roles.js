@@ -142,7 +142,7 @@ const RolesView = {
         // Group permissions by module
         const grouped = Permissions.getPermissionsByModule(this.allPermissions.map(p => p.id));
 
-        let formContent = `
+        const formHtml = `
             <form id="role-form">
                 <div class="form-group">
                     <label for="role-name">Role Name *</label>
@@ -185,6 +185,11 @@ const RolesView = {
                 `).join('')}
             </form>
         `;
+
+        // Convert HTML string to DOM node
+        const template = document.createElement('template');
+        template.innerHTML = formHtml.trim();
+        const content = template.content.firstElementChild || template.content;
 
         // Footer buttons
         const footer = document.createElement('div');
@@ -231,7 +236,7 @@ const RolesView = {
 
         Modal.open({
             title,
-            content: formContent,
+            content,
             footer,
             size: 'lg'
         });

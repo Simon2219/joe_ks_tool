@@ -12,6 +12,58 @@ const { authenticate, requirePermission, hasPermission, canAccessResource } = re
 router.use(authenticate);
 
 /**
+ * Formats a quality report for API response (snake_case to camelCase)
+ */
+function formatReport(report) {
+    if (!report) return null;
+    return {
+        id: report.id,
+        reportNumber: report.report_number,
+        agentId: report.agent_id,
+        agentName: report.agent_name,
+        evaluatorId: report.evaluator_id,
+        evaluatorName: report.evaluator_name,
+        evaluationType: report.evaluation_type,
+        evaluationDate: report.evaluation_date,
+        overallScore: report.overall_score,
+        passed: report.passed,
+        strengths: report.strengths,
+        areasForImprovement: report.improvements,
+        coachingNotes: report.coaching_notes,
+        categoryScores: report.categoryScores?.map(cs => ({
+            categoryId: cs.category_id,
+            categoryName: cs.category_name,
+            weight: cs.weight,
+            score: cs.score,
+            maxScore: cs.max_score
+        })) || [],
+        createdAt: report.created_at,
+        updatedAt: report.updated_at
+    };
+}
+
+/**
+ * Formats a quality category for API response
+ */
+function formatCategory(category) {
+    if (!category) return null;
+    return {
+        id: category.id,
+        name: category.name,
+        description: category.description,
+        weight: category.weight,
+        isActive: category.is_active,
+        criteria: category.criteria?.map(c => ({
+            id: c.id,
+            name: c.name,
+            maxScore: c.max_score
+        })) || [],
+        createdAt: category.created_at,
+        updatedAt: category.updated_at
+    };
+}
+
+/**
  * GET /api/quality/reports
  */
 router.get('/reports', requirePermission('quality_view'), (req, res) => {
@@ -24,7 +76,7 @@ router.get('/reports', requirePermission('quality_view'), (req, res) => {
             reports = QualitySystem.getByAgent(req.user.id);
         }
         
-        res.json({ success: true, reports });
+        res.json({ success: true, reports: reports.map(formatReport) });
     } catch (error) {
         console.error('Get reports error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch reports' });
@@ -45,7 +97,7 @@ router.get('/reports/:id', requirePermission('quality_view'), (req, res) => {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
-        res.json({ success: true, report });
+        res.json({ success: true, report: formatReport(report) });
     } catch (error) {
         console.error('Get report error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch report' });
@@ -71,7 +123,7 @@ router.post('/reports', requirePermission('quality_create'), (req, res) => {
             agentId, evaluationType, categoryScores, strengths, areasForImprovement, coachingNotes
         }, req.user.id);
 
-        res.status(201).json({ success: true, report });
+        res.status(201).json({ success: true, report: formatReport(report) });
     } catch (error) {
         console.error('Create report error:', error);
         res.status(500).json({ success: false, error: 'Failed to create report' });
@@ -94,7 +146,7 @@ router.put('/reports/:id', requirePermission('quality_edit'), (req, res) => {
         }
 
         const updated = QualitySystem.updateReport(req.params.id, req.body);
-        res.json({ success: true, report: updated });
+        res.json({ success: true, report: formatReport(updated) });
     } catch (error) {
         console.error('Update report error:', error);
         res.status(500).json({ success: false, error: 'Failed to update report' });
@@ -125,7 +177,7 @@ router.delete('/reports/:id', requirePermission('quality_delete'), (req, res) =>
 router.get('/categories', requirePermission('quality_view'), (req, res) => {
     try {
         const categories = QualitySystem.getAllCategories();
-        res.json({ success: true, categories });
+        res.json({ success: true, categories: categories.map(formatCategory) });
     } catch (error) {
         console.error('Get categories error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch categories' });
@@ -144,7 +196,7 @@ router.post('/categories', requirePermission('quality_manage'), (req, res) => {
         }
 
         const category = QualitySystem.createCategory({ name, description, weight, criteria });
-        res.status(201).json({ success: true, category });
+        res.status(201).json({ success: true, category: formatCategory(category) });
     } catch (error) {
         console.error('Create category error:', error);
         res.status(500).json({ success: false, error: 'Failed to create category' });
@@ -162,7 +214,7 @@ router.put('/categories/:id', requirePermission('quality_manage'), (req, res) =>
         }
 
         const updated = QualitySystem.updateCategory(req.params.id, req.body);
-        res.json({ success: true, category: updated });
+        res.json({ success: true, category: formatCategory(updated) });
     } catch (error) {
         console.error('Update category error:', error);
         res.status(500).json({ success: false, error: 'Failed to update category' });
@@ -192,7 +244,7 @@ router.delete('/categories/:id', requirePermission('quality_manage'), (req, res)
  */
 router.get('/stats', requirePermission('quality_view'), (req, res) => {
     try {
-        res.json({ success: true, stats: QualitySystem.getStatistics() });
+        res.json({ success: true, statistics: QualitySystem.getStatistics() });
     } catch (error) {
         console.error('Get quality stats error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch stats' });
