@@ -42,11 +42,13 @@ const IntegrationsView = {
      */
     async checkSharePointStatus() {
         try {
-            const result = await window.electronAPI.sharepoint.getStatus();
+            const result = await window.api.sharepoint.getStatus();
             const statusEl = document.getElementById('sharepoint-status');
             const connectBtn = document.getElementById('sp-connect-btn');
             
-            if (result.success && result.isConnected) {
+            const isConnected = result.success && result.status?.connected;
+            
+            if (isConnected) {
                 statusEl.textContent = 'Connected';
                 statusEl.classList.add('connected');
                 connectBtn.textContent = 'Disconnect';
@@ -73,11 +75,13 @@ const IntegrationsView = {
      */
     async checkJiraStatus() {
         try {
-            const result = await window.electronAPI.jira.getStatus();
+            const result = await window.api.jira.getStatus();
             const statusEl = document.getElementById('jira-status');
             const connectBtn = document.getElementById('jira-connect-btn');
             
-            if (result.success && result.isConnected) {
+            const isConnected = result.success && result.status?.connected;
+            
+            if (isConnected) {
                 statusEl.textContent = 'Connected';
                 statusEl.classList.add('connected');
                 connectBtn.textContent = 'Disconnect';
@@ -118,7 +122,7 @@ const IntegrationsView = {
             connectBtn.disabled = true;
             connectBtn.innerHTML = '<span class="spinner"></span> Connecting...';
 
-            const result = await window.electronAPI.sharepoint.connect({
+            const result = await window.api.sharepoint.connect({
                 siteUrl,
                 tenantId,
                 clientId,
@@ -154,7 +158,7 @@ const IntegrationsView = {
 
         if (confirmed) {
             try {
-                await window.electronAPI.sharepoint.disconnect();
+                await window.api.sharepoint.disconnect();
                 Toast.success('Disconnected from SharePoint');
                 await this.checkSharePointStatus();
             } catch (error) {
@@ -182,7 +186,7 @@ const IntegrationsView = {
             connectBtn.disabled = true;
             connectBtn.innerHTML = '<span class="spinner"></span> Connecting...';
 
-            const result = await window.electronAPI.jira.connect({
+            const result = await window.api.jira.connect({
                 baseUrl,
                 email,
                 apiToken
@@ -217,7 +221,7 @@ const IntegrationsView = {
 
         if (confirmed) {
             try {
-                await window.electronAPI.jira.disconnect();
+                await window.api.jira.disconnect();
                 Toast.success('Disconnected from JIRA');
                 await this.checkJiraStatus();
             } catch (error) {
@@ -232,7 +236,7 @@ const IntegrationsView = {
      */
     async syncWithJira(projectKey) {
         try {
-            const result = await window.electronAPI.jira.syncWithTickets(projectKey);
+            const result = await window.api.jira.syncWithTickets(projectKey);
             if (result.success) {
                 Toast.success(`Synced ${result.results.synced} tickets (${result.results.created} created, ${result.results.updated} updated)`);
             } else {

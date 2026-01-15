@@ -157,8 +157,9 @@ API.init();
 
 /**
  * API Interface for the application
+ * HTTP client for backend communication (separate from Electron IPC)
  */
-window.electronAPI = {
+window.api = {
     auth: {
         login: async (credentials) => {
             const result = await API.post('/auth/login', credentials);
@@ -195,7 +196,7 @@ window.electronAPI = {
         delete: (id) => API.delete(`/users/${id}`),
         search: (query) => API.get(`/users?search=${encodeURIComponent(query)}`),
         getByRole: (roleId) => API.get(`/users?roleId=${roleId}`),
-        getStatistics: () => API.get('/users/statistics'),
+        getStatistics: () => API.get('/users/stats'),
         exportUsers: (format) => API.get(`/users/export/${format}`)
     },
 
@@ -220,18 +221,18 @@ window.electronAPI = {
     quality: {
         getAll: (filters = {}) => {
             const params = new URLSearchParams(filters).toString();
-            return API.get(`/quality${params ? '?' + params : ''}`);
+            return API.get(`/quality/reports${params ? '?' + params : ''}`);
         },
-        getById: (id) => API.get(`/quality/${id}`),
-        create: (reportData) => API.post('/quality', reportData),
-        update: (id, reportData) => API.put(`/quality/${id}`, reportData),
-        delete: (id) => API.delete(`/quality/${id}`),
-        getByAgent: (agentId) => API.get(`/quality?agentId=${agentId}`),
+        getById: (id) => API.get(`/quality/reports/${id}`),
+        create: (reportData) => API.post('/quality/reports', reportData),
+        update: (id, reportData) => API.put(`/quality/reports/${id}`, reportData),
+        delete: (id) => API.delete(`/quality/reports/${id}`),
+        getByAgent: (agentId) => API.get(`/quality/reports?agentId=${agentId}`),
         getCategories: () => API.get('/quality/categories'),
         createCategory: (categoryData) => API.post('/quality/categories', categoryData),
         updateCategory: (id, categoryData) => API.put(`/quality/categories/${id}`, categoryData),
         deleteCategory: (id) => API.delete(`/quality/categories/${id}`),
-        getStatistics: () => API.get('/quality/statistics')
+        getStatistics: () => API.get('/quality/stats')
     },
 
     roles: {

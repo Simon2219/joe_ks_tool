@@ -27,6 +27,30 @@ router.get('/', requirePermission('user_view'), (req, res) => {
 });
 
 /**
+ * GET /api/users/stats - User statistics
+ * Note: This must come BEFORE /:id route
+ */
+router.get('/stats', requirePermission('user_view'), (req, res) => {
+    try {
+        const users = UserSystem.getAll();
+        const total = users.length;
+        const active = users.filter(u => u.is_active).length;
+        
+        res.json({
+            success: true,
+            statistics: {
+                total,
+                active,
+                inactive: total - active
+            }
+        });
+    } catch (error) {
+        console.error('Get user stats error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch stats' });
+    }
+});
+
+/**
  * GET /api/users/:id
  */
 router.get('/:id', requirePermission('user_view'), (req, res) => {
@@ -141,24 +165,6 @@ router.delete('/:id', requireAdmin, (req, res) => {
     } catch (error) {
         console.error('Delete user error:', error);
         res.status(500).json({ success: false, error: 'Failed to delete user' });
-    }
-});
-
-/**
- * GET /api/users/stats
- */
-router.get('/stats', requirePermission('user_view'), (req, res) => {
-    try {
-        res.json({
-            success: true,
-            stats: {
-                totalUsers: UserSystem.count(),
-                activeUsers: UserSystem.countActive()
-            }
-        });
-    } catch (error) {
-        console.error('Get user stats error:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch stats' });
     }
 });
 

@@ -67,7 +67,7 @@ const SettingsView = {
      */
     async loadSettings() {
         try {
-            const result = await window.electronAPI.settings.getAll();
+            const result = await window.api.settings.getAll();
             if (result.success) {
                 this.settings = result.settings;
                 this.populateSystemSettings();
@@ -133,7 +133,7 @@ const SettingsView = {
         }
 
         try {
-            const result = await window.electronAPI.auth.changePassword({
+            const result = await window.api.auth.changePassword({
                 currentPassword,
                 newPassword
             });
@@ -163,11 +163,11 @@ const SettingsView = {
             const passingScore = parseInt(document.getElementById('settings-passing-score').value);
 
             // Update general settings
-            await window.electronAPI.settings.set('general.companyName', companyName);
-            await window.electronAPI.settings.set('general.timezone', timezone);
+            await window.api.settings.set('general.companyName', companyName);
+            await window.api.settings.set('general.timezone', timezone);
 
             // Update quality settings
-            await window.electronAPI.settings.set('quality.passingScore', passingScore);
+            await window.api.settings.set('quality.passingScore', passingScore);
 
             Toast.success('Settings saved successfully');
         } catch (error) {

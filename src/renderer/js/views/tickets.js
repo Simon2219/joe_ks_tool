@@ -57,7 +57,7 @@ const TicketsView = {
      */
     async loadUsers() {
         try {
-            const result = await window.electronAPI.users.getAll();
+            const result = await window.api.users.getAll();
             if (result.success) {
                 this.users = result.users.filter(u => u.isActive);
                 this.populateAssigneeFilter();
@@ -88,7 +88,7 @@ const TicketsView = {
      */
     async loadTickets() {
         try {
-            const result = await window.electronAPI.tickets.getAll(this.filters);
+            const result = await window.api.tickets.getAll(this.filters);
             if (result.success) {
                 this.tickets = result.tickets;
                 this.renderTable();
@@ -305,9 +305,9 @@ const TicketsView = {
      */
     async viewTicket(ticketId) {
         try {
-            const ticketResult = await window.electronAPI.tickets.getById(ticketId);
-            const commentsResult = await window.electronAPI.tickets.getComments(ticketId);
-            const historyResult = await window.electronAPI.tickets.getHistory(ticketId);
+            const ticketResult = await window.api.tickets.getById(ticketId);
+            const commentsResult = await window.api.tickets.getComments(ticketId);
+            const historyResult = await window.api.tickets.getHistory(ticketId);
 
             if (!ticketResult.success) {
                 Toast.error('Failed to load ticket');
@@ -318,11 +318,28 @@ const TicketsView = {
             const comments = commentsResult.success ? commentsResult.comments : [];
             const history = historyResult.success ? historyResult.history : [];
 
-            const content = this.buildTicketDetailView(ticket, comments, history);
+            const contentHtml = this.buildTicketDetailView(ticket, comments, history);
+
+            // Convert HTML string to DOM node
+            const template = document.createElement('template');
+            template.innerHTML = contentHtml.trim();
+            const content = template.content.firstElementChild || template.content;
+
+            // Footer with close button
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.justifyContent = 'flex-end';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.textContent = 'Close';
+            closeBtn.addEventListener('click', () => Modal.close());
+            footer.appendChild(closeBtn);
 
             Modal.open({
                 title: `Ticket ${ticket.ticketNumber}`,
                 content,
+                footer,
                 size: 'lg'
             });
 
@@ -470,7 +487,7 @@ const TicketsView = {
      */
     async createTicket(ticketData) {
         try {
-            const result = await window.electronAPI.tickets.create(ticketData);
+            const result = await window.api.tickets.create(ticketData);
             if (result.success) {
                 Toast.success(`Ticket ${result.ticket.ticketNumber} created successfully`);
                 await this.loadTickets();
@@ -498,7 +515,7 @@ const TicketsView = {
      */
     async updateTicket(ticketId, ticketData) {
         try {
-            const result = await window.electronAPI.tickets.update(ticketId, ticketData);
+            const result = await window.api.tickets.update(ticketId, ticketData);
             if (result.success) {
                 Toast.success('Ticket updated successfully');
                 await this.loadTickets();
@@ -516,7 +533,7 @@ const TicketsView = {
      */
     async changeStatus(ticketId, status) {
         try {
-            const result = await window.electronAPI.tickets.changeStatus(ticketId, status);
+            const result = await window.api.tickets.changeStatus(ticketId, status);
             if (result.success) {
                 Toast.success('Status updated');
                 await this.loadTickets();
@@ -534,7 +551,7 @@ const TicketsView = {
      */
     async addComment(ticketId, comment) {
         try {
-            const result = await window.electronAPI.tickets.addComment(ticketId, comment);
+            const result = await window.api.tickets.addComment(ticketId, comment);
             if (result.success) {
                 Toast.success('Comment added');
             } else {
@@ -562,7 +579,7 @@ const TicketsView = {
 
         if (confirmed) {
             try {
-                const result = await window.electronAPI.tickets.delete(ticketId);
+                const result = await window.api.tickets.delete(ticketId);
                 if (result.success) {
                     Toast.success('Ticket deleted successfully');
                     await this.loadTickets();
@@ -581,7 +598,7 @@ const TicketsView = {
      */
     async exportTickets() {
         try {
-            const result = await window.electronAPI.tickets.exportTickets(this.filters, 'csv');
+            const result = await window.api.tickets.exportTickets(this.filters, 'csv');
             if (result.success) {
                 Helpers.downloadFile(result.data, 'tickets.csv', 'text/csv');
                 Toast.success('Tickets exported successfully');
