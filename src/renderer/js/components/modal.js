@@ -1,6 +1,6 @@
 /**
  * Modal Component
- * Handles modal dialogs for forms and confirmations
+ * Handles Modal dialogs for forms and confirmations
  */
 
 const Modal = {
@@ -13,10 +13,12 @@ const Modal = {
     isOpen: false,
     onCloseCallback: null,
 
+
     /**
-     * Initializes the modal component
+     * Modal Component Initialization
      */
-    init() {
+    init() 
+    {
         this.overlay = document.getElementById('modal-overlay');
         this.modal = document.getElementById('modal');
         this.titleEl = document.getElementById('modal-title');
@@ -24,58 +26,66 @@ const Modal = {
         this.footerEl = document.getElementById('modal-footer');
         this.closeBtn = document.getElementById('modal-close');
 
-        // Event listeners
-        this.closeBtn.addEventListener('click', () => this.close());
-        this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
-                this.close();
-            }
-        });
 
-        // Escape key to close
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.isOpen) {
+        // Event Listener - Close Button
+        this.closeBtn.addEventListener('click', () => this.close());
+
+
+        // Event Listener -> Click outside of Modal Window
+        /* this.overlay.addEventListener('click', (e) => 
+        {
+            const modal = this.overlay.querySelector('#modal');
+            if (!modal.contains(e.target)) {
+              debug.log('outside click -> close');
+              this.close();
+            }
+
+        }); */
+
+
+        // Event Listener - Escape
+        document.addEventListener('keydown', (e) => 
+        {
+            if (e.key === 'Escape' && this.isOpen) 
+            {
                 this.close();
             }
         });
     },
 
+
+    
     /**
      * Opens the modal with content
      */
-    open(options = {}) {
-        const {
+    open(options = {})
+    {
+        const 
+        {
             title = 'Modal',
-            content = '',
-            footer = '',
+            content = null,   // DOM Node or null
+            footer  = null,   // DOM Node or null
             size = 'default', // 'sm', 'default', 'lg'
             onClose = null
         } = options;
 
+
+        if(!content) throw new TypeError('Modal needs useable Content to be provided')
+        if(!footer) throw new TypeError('Modal needs useable Footer to be provided')
+
+
         this.titleEl.textContent = title;
         
-        // Set content (can be HTML string or element)
-        if (typeof content === 'string') {
-            this.contentEl.innerHTML = content;
-        } else {
-            this.contentEl.innerHTML = '';
-            this.contentEl.appendChild(content);
-        }
 
-        // Set footer
-        if (typeof footer === 'string') {
-            this.footerEl.innerHTML = footer;
-        } else if (footer) {
-            this.footerEl.innerHTML = '';
-            this.footerEl.appendChild(footer);
-        } else {
-            this.footerEl.innerHTML = '';
-        }
+        SetContainerContent(this.contentEl, content)
+        SetContainerContent(this.footerEl, footer)
 
-        // Set size class
-        this.modal.className = 'modal';
+        
+        this.modal.classList.remove('modal-sm', 'modal-lg');
         if (size === 'sm') this.modal.classList.add('modal-sm');
-        if (size === 'lg') this.modal.classList.add('modal-lg');
+        else if (size === 'lg') this.modal.classList.add('modal-lg');
+        // default -> no extra class
+
 
         // Store callback
         this.onCloseCallback = onClose;
@@ -85,36 +95,45 @@ const Modal = {
         this.isOpen = true;
 
         // Focus first input
-        setTimeout(() => {
+        setTimeout(() => 
+        {
             const firstInput = this.contentEl.querySelector('input, select, textarea');
             if (firstInput) firstInput.focus();
         }, 100);
     },
 
+
+
     /**
      * Closes the modal
      */
-    close() {
+    close() 
+    {
         this.overlay.classList.add('hidden');
         this.isOpen = false;
 
-        if (this.onCloseCallback) {
+        if (this.onCloseCallback)
+        {
             this.onCloseCallback();
             this.onCloseCallback = null;
         }
 
         // Clear content after animation
-        setTimeout(() => {
+        setTimeout(() => 
+        {
             this.contentEl.innerHTML = '';
             this.footerEl.innerHTML = '';
         }, 250);
     },
 
-    /**
-     * Shows a confirmation dialog
-     */
-    confirm(options = {}) {
+
+
+    confirm(options = {}) 
+    {
         return new Promise((resolve) => {
+            let settled = false;
+            const done = (val) => { if (settled) return; settled = true; resolve(val); };
+    
             const {
                 title = 'Confirm',
                 message = 'Are you sure?',
@@ -122,48 +141,53 @@ const Modal = {
                 cancelText = 'Cancel',
                 confirmClass = 'btn-danger'
             } = options;
-
-            const content = `<p style="margin-bottom: var(--spacing-md);">${Helpers.escapeHtml(message)}</p>`;
-            
+    
+            // Content as DOM node (no HTML parsing)
+            const p = document.createElement('p');
+            p.style.marginBottom = 'var(--spacing-md)';
+            p.textContent = String(message); // safe text
+    
+            // Footer as DOM node
             const footer = document.createElement('div');
             footer.style.display = 'flex';
             footer.style.gap = 'var(--spacing-sm)';
             footer.style.justifyContent = 'flex-end';
-
+    
             const cancelBtn = document.createElement('button');
             cancelBtn.className = 'btn btn-secondary';
+            cancelBtn.type = 'button';
             cancelBtn.textContent = cancelText;
             cancelBtn.addEventListener('click', () => {
                 this.close();
-                resolve(false);
+                done(false);
             });
-
+    
             const confirmBtn = document.createElement('button');
             confirmBtn.className = `btn ${confirmClass}`;
+            confirmBtn.type = 'button';
             confirmBtn.textContent = confirmText;
             confirmBtn.addEventListener('click', () => {
                 this.close();
-                resolve(true);
+                done(true);
             });
-
-            footer.appendChild(cancelBtn);
-            footer.appendChild(confirmBtn);
-
+    
+            footer.append(cancelBtn, confirmBtn);
+    
             this.open({
                 title,
-                content,
+                content: p,
                 footer,
                 size: 'sm',
-                onClose: () => resolve(false)
+                onClose: () => done(false)
             });
         });
     },
-
-    /**
-     * Shows a form modal
-     */
+    
     form(options = {}) {
         return new Promise((resolve) => {
+            let settled = false;
+            const done = (val) => { if (settled) return; settled = true; resolve(val); };
+    
             const {
                 title = 'Form',
                 fields = [],
@@ -173,70 +197,75 @@ const Modal = {
                 validate = null,
                 size = 'default'
             } = options;
-
-            // Build form HTML with submit button inside the form
+    
+            // Build form HTML (you already have buildFieldHtml)
             let formHtml = '<form id="modal-form" class="modal-form">';
-            
             for (const field of fields) {
                 formHtml += this.buildFieldHtml(field, data);
             }
-            
             formHtml += '</form>';
-
-            // Footer buttons
+    
+            // Convert HTML -> DOM Node ONCE here (caller still doesn't pass markup)
+            const tpl = document.createElement('template');
+            tpl.innerHTML = formHtml.trim();
+            const formEl = tpl.content.firstElementChild; // the <form>
+    
+            if (!formEl) {
+                console.error('[Modal] Failed to build form DOM');
+                done(null);
+                return;
+            }
+    
+            // Footer buttons (DOM)
             const footer = document.createElement('div');
             footer.style.display = 'flex';
             footer.style.gap = 'var(--spacing-sm)';
             footer.style.justifyContent = 'flex-end';
-
+    
             const cancelBtn = document.createElement('button');
             cancelBtn.className = 'btn btn-secondary';
-            cancelBtn.textContent = cancelText;
             cancelBtn.type = 'button';
+            cancelBtn.textContent = cancelText;
             cancelBtn.addEventListener('click', () => {
                 this.close();
-                resolve(null);
+                done(null);
             });
-
+    
             const submitBtn = document.createElement('button');
             submitBtn.className = 'btn btn-primary';
-            submitBtn.textContent = submitText;
-            submitBtn.type = 'button'; // Changed to button, we'll handle click manually
+            submitBtn.type = 'button';
             submitBtn.id = 'modal-submit-btn';
-
-            footer.appendChild(cancelBtn);
-            footer.appendChild(submitBtn);
-
+            submitBtn.textContent = submitText;
+    
+            footer.append(cancelBtn, submitBtn);
+    
             this.open({
                 title,
-                content: formHtml,
+                content: formEl,   // <-- DOM node now
                 footer,
                 size,
-                onClose: () => resolve(null)
+                onClose: () => done(null)
             });
-
-            // Get form element
+    
+            // After open(), the form is now in the DOM
             const form = document.getElementById('modal-form');
             if (!form) {
                 console.error('[Modal] Form element not found');
-                resolve(null);
+                done(null);
                 return;
             }
-
-            // Function to handle form submission
+    
             const handleSubmit = async () => {
                 const formData = Helpers.getFormData(form);
-                
-                // Process checkboxes (unchecked ones aren't included in FormData)
+    
+                // Normalize checkboxes
                 for (const field of fields) {
-                    if (field.type === 'checkbox' && formData[field.name] === undefined) {
-                        formData[field.name] = false;
-                    } else if (field.type === 'checkbox') {
-                        formData[field.name] = formData[field.name] === 'on' || formData[field.name] === true;
+                    if (field.type === 'checkbox') {
+                        if (formData[field.name] === undefined) formData[field.name] = false;
+                        else formData[field.name] = (formData[field.name] === 'on' || formData[field.name] === true);
                     }
                 }
-
-                // Validate if function provided
+    
                 if (validate) {
                     const error = validate(formData);
                     if (error) {
@@ -244,26 +273,21 @@ const Modal = {
                         return;
                     }
                 }
-
-                // IMPORTANT: Clear onCloseCallback BEFORE closing to prevent double-resolve
-                this.onCloseCallback = null;
+    
                 this.close();
-                resolve(formData);
+                done(formData);
             };
-
-            // Handle form submit event
+    
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
                 handleSubmit();
             });
-            
-            // Handle submit button click
+    
             submitBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 handleSubmit();
             });
-            
-            // Also handle Enter key in form
+    
             form.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
                     e.preventDefault();
@@ -272,6 +296,40 @@ const Modal = {
             });
         });
     },
+    
+    alert(title, message) {
+        return new Promise((resolve) => {
+            let settled = false;
+            const done = () => { if (settled) return; settled = true; resolve(); };
+    
+            // Content as DOM node (no HTML parsing)
+            const p = document.createElement('p');
+            p.textContent = String(message);
+    
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.justifyContent = 'flex-end';
+    
+            const okBtn = document.createElement('button');
+            okBtn.className = 'btn btn-primary';
+            okBtn.type = 'button';
+            okBtn.textContent = 'OK';
+            okBtn.addEventListener('click', () => {
+                this.close();
+                done();
+            });
+    
+            footer.appendChild(okBtn);
+    
+            this.open({
+                title,
+                content: p,
+                footer,
+                size: 'sm',
+                onClose: () => done()
+            });
+        });
+    },    
 
     /**
      * Builds HTML for a form field
@@ -410,37 +468,24 @@ const Modal = {
         return html;
     },
 
-    /**
-     * Shows an alert dialog
-     */
-    alert(title, message) {
-        return new Promise((resolve) => {
-            const content = `<p>${Helpers.escapeHtml(message)}</p>`;
-            
-            const footer = document.createElement('div');
-            footer.style.display = 'flex';
-            footer.style.justifyContent = 'flex-end';
-
-            const okBtn = document.createElement('button');
-            okBtn.className = 'btn btn-primary';
-            okBtn.textContent = 'OK';
-            okBtn.addEventListener('click', () => {
-                this.close();
-                resolve();
-            });
-
-            footer.appendChild(okBtn);
-
-            this.open({
-                title,
-                content,
-                footer,
-                size: 'sm',
-                onClose: () => resolve()
-            });
-        });
-    }
+ 
 };
+
+
+
+function SetContainerContent(container, content)
+{
+    container.replaceChildren();
+
+    if (!(typeof content === 'object' && typeof content.nodeType === 'number'))
+    {
+        throw new TypeError('Modal content must be a DOM Node (Element/Fragment/Text) or null.');
+    }
+
+    container.append(content);
+}
+
+
 
 // Export for use in other modules
 window.Modal = Modal;

@@ -358,7 +358,7 @@ const QualityView = {
             title,
             content: formContent,
             footer,
-            size: 'lg'
+            size
         });
     },
 
