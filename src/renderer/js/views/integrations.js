@@ -46,7 +46,9 @@ const IntegrationsView = {
             const statusEl = document.getElementById('sharepoint-status');
             const connectBtn = document.getElementById('sp-connect-btn');
             
-            if (result.success && result.isConnected) {
+            const isConnected = result.success && result.status?.connected;
+            
+            if (isConnected) {
                 statusEl.textContent = 'Connected';
                 statusEl.classList.add('connected');
                 connectBtn.textContent = 'Disconnect';
@@ -77,7 +79,9 @@ const IntegrationsView = {
             const statusEl = document.getElementById('jira-status');
             const connectBtn = document.getElementById('jira-connect-btn');
             
-            if (result.success && result.isConnected) {
+            const isConnected = result.success && result.status?.connected;
+            
+            if (isConnected) {
                 statusEl.textContent = 'Connected';
                 statusEl.classList.add('connected');
                 connectBtn.textContent = 'Disconnect';
