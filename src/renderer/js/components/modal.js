@@ -144,13 +144,13 @@ const Modal = {
     
             // Content as DOM node (no HTML parsing)
             const p = document.createElement('p');
-            p.style.marginBottom = 'var(--spacing-md)';
+            p.style.marginBottom = 'var(--space-md)';
             p.textContent = String(message); // safe text
     
             // Footer as DOM node
             const footer = document.createElement('div');
             footer.style.display = 'flex';
-            footer.style.gap = 'var(--spacing-sm)';
+            footer.style.gap = 'var(--space-sm)';
             footer.style.justifyContent = 'flex-end';
     
             const cancelBtn = document.createElement('button');
@@ -219,7 +219,7 @@ const Modal = {
             // Footer buttons (DOM)
             const footer = document.createElement('div');
             footer.style.display = 'flex';
-            footer.style.gap = 'var(--spacing-sm)';
+            footer.style.gap = 'var(--space-sm)';
             footer.style.justifyContent = 'flex-end';
     
             const cancelBtn = document.createElement('button');

@@ -478,7 +478,7 @@ const KCQuestionsView = {
                                 </div>
                             `).join('')}
                         </div>
-                        <button type="button" id="add-mc-option" class="btn btn-sm btn-secondary" style="margin-top: var(--spacing-sm);">+ Antwort hinzufügen</button>
+                        <button type="button" id="add-mc-option" class="btn btn-sm btn-secondary" style="margin-top: var(--space-sm);">+ Antwort hinzufügen</button>
                     </div>
                 </div>
                 
@@ -500,8 +500,8 @@ const KCQuestionsView = {
                                 </div>
                             `).join('')}
                         </div>
-                        <button type="button" id="add-trigger-word" class="btn btn-sm btn-secondary" style="margin-top: var(--spacing-sm);">+ Schlüsselwort hinzufügen</button>
-                        <small class="form-hint" style="display: block; margin-top: var(--spacing-xs); color: var(--text-muted);">
+                        <button type="button" id="add-trigger-word" class="btn btn-sm btn-secondary" style="margin-top: var(--space-sm);">+ Schlüsselwort hinzufügen</button>
+                        <small class="form-hint" style="display: block; margin-top: var(--space-xs); color: var(--text-muted);">
                             Wörter oder Phrasen, die in der Antwort enthalten sein sollten
                         </small>
                     </div>
@@ -515,7 +515,7 @@ const KCQuestionsView = {
 
         const footer = document.createElement('div');
         footer.style.display = 'flex';
-        footer.style.gap = 'var(--spacing-sm)';
+        footer.style.gap = 'var(--space-sm)';
         footer.style.justifyContent = 'flex-end';
 
         const cancelBtn = document.createElement('button');

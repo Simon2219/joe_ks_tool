@@ -374,7 +374,7 @@ const KCResultsView = {
 
         const footer = document.createElement('div');
         footer.style.display = 'flex';
-        footer.style.gap = 'var(--spacing-sm)';
+        footer.style.gap = 'var(--space-sm)';
         footer.style.justifyContent = 'flex-end';
 
         const cancelBtn = document.createElement('button');

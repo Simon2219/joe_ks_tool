@@ -264,7 +264,7 @@ const QualityView = {
                     </div>
                 </div>
                 
-                <h4 style="margin: var(--spacing-lg) 0 var(--spacing-md);">Category Scores</h4>
+                <h4 style="margin: var(--space-lg) 0 var(--space-md);">Category Scores</h4>
                 ${this.categories.map(category => {
                     const existingScore = report?.categoryScores?.find(cs => cs.categoryId === category.id);
                     return `
@@ -297,7 +297,7 @@ const QualityView = {
                     `;
                 }).join('')}
                 
-                <div class="form-group" style="margin-top: var(--spacing-lg);">
+                <div class="form-group" style="margin-top: var(--space-lg);">
                     <label for="strengths">Strengths</label>
                     <textarea id="strengths" name="strengths" class="form-textarea" rows="3" 
                         placeholder="What did the agent do well?">${report?.strengths || ''}</textarea>
@@ -325,7 +325,7 @@ const QualityView = {
         // Footer buttons
         const footer = document.createElement('div');
         footer.style.display = 'flex';
-        footer.style.gap = 'var(--spacing-sm)';
+        footer.style.gap = 'var(--space-sm)';
         footer.style.justifyContent = 'flex-end';
 
         const cancelBtn = document.createElement('button');
@@ -468,8 +468,8 @@ const QualityView = {
                                 const category = this.categories.find(c => c.id === cs.categoryId);
                                 const percentage = cs.maxScore > 0 ? Math.round((cs.score / cs.maxScore) * 100) : 0;
                                 return `
-                                    <div style="margin-bottom: var(--spacing-md);">
-                                        <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-xs);">
+                                    <div style="margin-bottom: var(--space-md);">
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-xs);">
                                             <strong>${category?.name || 'Unknown Category'}</strong>
                                             <span>${cs.score}/${cs.maxScore} (${percentage}%)</span>
                                         </div>
@@ -515,7 +515,7 @@ const QualityView = {
                         <div class="ticket-section-header">Summary</div>
                         <div class="ticket-section-body" style="text-align: center;">
                             <div style="font-size: 3rem; font-weight: 700;" class="${scoreClass}">${report.overallScore}%</div>
-                            <div style="margin-top: var(--spacing-sm);">
+                            <div style="margin-top: var(--space-sm);">
                                 ${report.passed ? 
                                     '<span class="badge badge-success" style="font-size: 1rem; padding: 0.5rem 1rem;">PASSED</span>' : 
                                     '<span class="badge badge-danger" style="font-size: 1rem; padding: 0.5rem 1rem;">FAILED</span>'
