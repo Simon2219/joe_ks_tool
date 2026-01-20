@@ -739,6 +739,63 @@ img, svg {
     flex-wrap: wrap;
 }
 
+/* Inline filters - for compact filter rows */
+.view-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+}
+
+.view-filters-inline {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.view-filters-inline .form-select,
+.view-filters-inline .form-input {
+    min-width: 120px;
+    max-width: 160px;
+}
+
+.form-select-sm,
+.form-input-sm {
+    height: 36px;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-caption);
+}
+
+/* KC Results specific header */
+.kc-results-header {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.kc-results-header .view-actions-row {
+    gap: var(--space-lg);
+}
+
+@media (max-width: 1200px) {
+    .view-actions-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .view-filters-inline {
+        width: 100%;
+    }
+    
+    .view-filters-inline .form-select,
+    .view-filters-inline .form-input {
+        flex: 1;
+        min-width: 100px;
+    }
+}
+
 /* ============================================
    SCROLLBAR
    ============================================ */

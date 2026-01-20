@@ -5,7 +5,8 @@
 
 const KCTestsView = {
     tests: [],
-    categories: [],
+    testCategories: [],
+    questionCategories: [],
     questions: [],
     filters: {
         categoryId: ''
@@ -20,7 +21,8 @@ const KCTestsView = {
             this.bindEvents();
             this.eventsBound = true;
         }
-        await this.loadCategories();
+        await this.loadTestCategories();
+        await this.loadQuestionCategories();
         await this.loadQuestions();
         await this.loadTests();
         this.renderTestList();
@@ -30,6 +32,11 @@ const KCTestsView = {
      * Binds event handlers
      */
     bindEvents() {
+        // Add test category button
+        document.getElementById('add-kc-test-category-btn')?.addEventListener('click', () => {
+            this.showTestCategoryForm();
+        });
+
         // Add test button
         document.getElementById('add-kc-test-btn')?.addEventListener('click', () => {
             this.showTestForm();
@@ -43,17 +50,31 @@ const KCTestsView = {
     },
 
     /**
-     * Loads all categories
+     * Loads all test categories
      */
-    async loadCategories() {
+    async loadTestCategories() {
         try {
-            const result = await window.api.knowledgeCheck.getCategories();
+            const result = await window.api.knowledgeCheck.getTestCategories();
             if (result.success) {
-                this.categories = result.categories;
+                this.testCategories = result.categories;
                 this.populateCategoryFilter();
             }
         } catch (error) {
-            console.error('Failed to load KC categories:', error);
+            console.error('Failed to load KC test categories:', error);
+        }
+    },
+
+    /**
+     * Loads all question categories (for grouping questions in test form)
+     */
+    async loadQuestionCategories() {
+        try {
+            const result = await window.api.knowledgeCheck.getCategories();
+            if (result.success) {
+                this.questionCategories = result.categories;
+            }
+        } catch (error) {
+            console.error('Failed to load KC question categories:', error);
         }
     },
 
@@ -94,7 +115,7 @@ const KCTestsView = {
         if (!select) return;
 
         select.innerHTML = '<option value="">Alle Kategorien</option>';
-        this.categories.forEach(cat => {
+        this.testCategories.forEach(cat => {
             const option = document.createElement('option');
             option.value = cat.id;
             option.textContent = cat.name;
@@ -115,11 +136,11 @@ const KCTestsView = {
             filteredTests = this.tests.filter(t => t.categoryId === this.filters.categoryId);
         }
 
-        if (filteredTests.length === 0) {
+        if (filteredTests.length === 0 && this.testCategories.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
                     <h3>Keine Tests vorhanden</h3>
-                    <p>Erstellen Sie einen Test, um Fragen zu gruppieren.</p>
+                    <p>Erstellen Sie eine Kategorie und Tests, um Fragen zu gruppieren.</p>
                 </div>
             `;
             return;
@@ -129,26 +150,22 @@ const KCTestsView = {
         const grouped = this.groupTestsByCategory(filteredTests);
         let html = '';
 
-        for (const [categoryId, tests] of Object.entries(grouped)) {
-            const category = this.categories.find(c => c.id === categoryId);
-            html += `
-                <div class="kc-category" data-category-id="${categoryId}">
-                    <div class="kc-category-header">
-                        <button class="kc-category-toggle btn-icon" title="Ein-/Ausklappen">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </button>
-                        <div class="kc-category-info">
-                            <h3>${category ? Helpers.escapeHtml(category.name) : 'Unkategorisiert'}</h3>
-                            <span class="kc-category-meta">${tests.length} Tests</span>
-                        </div>
-                    </div>
-                    <div class="kc-category-content">
-                        ${tests.map(t => this.renderTestItem(t)).join('')}
-                    </div>
-                </div>
-            `;
+        // Render test categories with their tests
+        for (const category of this.testCategories) {
+            if (this.filters.categoryId && this.filters.categoryId !== category.id) continue;
+            
+            const categoryTests = grouped[category.id] || [];
+            html += this.renderTestCategory(category, categoryTests);
+        }
+
+        // Render uncategorized tests
+        const uncategorized = grouped['uncategorized'] || [];
+        if (uncategorized.length > 0 && !this.filters.categoryId) {
+            html += this.renderTestCategory({
+                id: 'uncategorized',
+                name: 'Unkategorisiert',
+                description: 'Tests ohne Kategorie'
+            }, uncategorized, true);
         }
 
         container.innerHTML = html;
@@ -159,7 +176,7 @@ const KCTestsView = {
      * Groups tests by category
      */
     groupTestsByCategory(tests) {
-        const groups = {};
+        const groups = { uncategorized: [] };
         
         tests.forEach(t => {
             const catId = t.categoryId || 'uncategorized';
@@ -168,6 +185,58 @@ const KCTestsView = {
         });
         
         return groups;
+    },
+
+    /**
+     * Renders a test category with its tests
+     */
+    renderTestCategory(category, tests, isUncategorized = false) {
+        const canCreateTests = Permissions.canCreate('kcTest');
+        const canDeleteCategories = Permissions.canDelete('kcTest');
+        
+        return `
+            <div class="kc-category" data-category-id="${category.id}">
+                <div class="kc-category-header">
+                    <button class="kc-category-toggle btn-icon" title="Ein-/Ausklappen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div class="kc-category-info">
+                        <h3>${Helpers.escapeHtml(category.name)}</h3>
+                        <span class="kc-category-meta">${tests.length} Tests</span>
+                    </div>
+                    <div class="kc-category-actions">
+                        ${!isUncategorized ? `
+                            ${canCreateTests ? `
+                                <button class="btn btn-sm btn-secondary kc-add-test-to-cat" data-category-id="${category.id}" title="Test hinzufügen">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </button>
+                            ` : ''}
+                            ${canDeleteCategories ? `
+                                <button class="btn-icon kc-test-category-menu" data-category-id="${category.id}" title="Mehr Optionen">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="1"></circle>
+                                        <circle cx="12" cy="5" r="1"></circle>
+                                        <circle cx="12" cy="19" r="1"></circle>
+                                    </svg>
+                                </button>
+                            ` : ''}
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="kc-category-content">
+                    ${tests.length === 0 ? `
+                        <div class="kc-empty-category">
+                            <span>Keine Tests in dieser Kategorie</span>
+                        </div>
+                    ` : tests.map(t => this.renderTestItem(t)).join('')}
+                </div>
+            </div>
+        `;
     },
 
     /**
@@ -231,6 +300,22 @@ const KCTestsView = {
             });
         });
 
+        // Add test to category
+        document.querySelectorAll('.kc-add-test-to-cat').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const categoryId = btn.dataset.categoryId;
+                this.showTestForm(null, categoryId);
+            });
+        });
+
+        // Test category menu (3 dots)
+        document.querySelectorAll('.kc-test-category-menu').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showTestCategoryMenu(btn.dataset.categoryId);
+            });
+        });
+
         // View test
         document.querySelectorAll('.kc-view-test').forEach(btn => {
             btn.addEventListener('click', () => this.viewTest(btn.dataset.id));
@@ -248,9 +333,106 @@ const KCTestsView = {
     },
 
     /**
+     * Shows the test category form
+     */
+    async showTestCategoryForm(category = null) {
+        const isEdit = !!category;
+        
+        // Check permissions
+        if (isEdit && !Permissions.canEdit('kcTest')) {
+            Toast.error('Keine Berechtigung zum Bearbeiten von Kategorien');
+            return;
+        }
+        if (!isEdit && !Permissions.canCreate('kcTest')) {
+            Toast.error('Keine Berechtigung zum Erstellen von Kategorien');
+            return;
+        }
+        
+        const title = isEdit ? 'Test-Kategorie bearbeiten' : 'Neue Test-Kategorie';
+
+        const fields = [
+            { name: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Kategoriename' },
+            { name: 'description', label: 'Beschreibung', type: 'textarea', rows: 2, placeholder: 'Beschreibung (optional)' }
+        ];
+
+        const result = await Modal.form({
+            title,
+            fields,
+            data: category || {},
+            submitText: isEdit ? 'Speichern' : 'Erstellen',
+            validate: (data) => {
+                if (!data.name || data.name.trim().length < 2) {
+                    return 'Name muss mindestens 2 Zeichen haben';
+                }
+                return null;
+            }
+        });
+
+        if (result) {
+            try {
+                let response;
+                if (isEdit) {
+                    response = await window.api.knowledgeCheck.updateTestCategory(category.id, result);
+                } else {
+                    response = await window.api.knowledgeCheck.createTestCategory(result);
+                }
+                
+                if (response && response.success) {
+                    Toast.success(isEdit ? 'Kategorie aktualisiert' : 'Kategorie erstellt');
+                    await this.loadTestCategories();
+                    await this.loadTests();
+                    this.renderTestList();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Speichern der Kategorie');
+                }
+            } catch (error) {
+                console.error('Test category save error:', error);
+                Toast.error('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'));
+            }
+        }
+    },
+
+    /**
+     * Shows the test category menu (delete option)
+     */
+    async showTestCategoryMenu(categoryId) {
+        const category = this.testCategories.find(c => c.id === categoryId);
+        if (!category) return;
+        
+        if (!Permissions.canDelete('kcTest')) {
+            Toast.error('Keine Berechtigung zum Löschen von Kategorien');
+            return;
+        }
+
+        const confirmed = await Modal.confirm({
+            title: 'Kategorie löschen',
+            message: `Möchten Sie die Kategorie "${category.name}" wirklich löschen? Die Tests werden in "Unkategorisiert" verschoben.`,
+            confirmText: 'Löschen',
+            confirmClass: 'btn-danger'
+        });
+
+        if (confirmed) {
+            try {
+                const response = await window.api.knowledgeCheck.deleteTestCategory(categoryId);
+                if (response && response.success) {
+                    Toast.success('Kategorie gelöscht');
+                    await this.loadTestCategories();
+                    await this.loadTests();
+                    this.renderTestList();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Löschen der Kategorie');
+                }
+            } catch (error) {
+                console.error('Delete test category error:', error);
+                Toast.error('Fehler beim Löschen: ' + (error.message || 'Unbekannter Fehler'));
+            }
+        }
+    },
+
+    /**
      * Shows the test form
      */
-    async showTestForm(test = null) {
+    async showTestForm(test = null, preselectedCategoryId = null) {
         const isEdit = !!test;
         
         // Check permissions
@@ -271,7 +453,7 @@ const KCTestsView = {
             selectedQuestionIds = test.questions.map(q => q.questionId);
         }
 
-        // Group questions by category for display
+        // Group questions by question category for display
         const groupedQuestions = {};
         this.questions.forEach(q => {
             const catName = q.categoryName || 'Unkategorisiert';
@@ -279,8 +461,9 @@ const KCTestsView = {
             groupedQuestions[catName].push(q);
         });
 
-        const categoryOptions = this.categories.map(c => 
-            `<option value="${c.id}" ${test?.categoryId === c.id ? 'selected' : ''}>${Helpers.escapeHtml(c.name)}</option>`
+        // Test category options (use test categories)
+        const categoryOptions = this.testCategories.map(c => 
+            `<option value="${c.id}" ${(test?.categoryId || preselectedCategoryId) === c.id ? 'selected' : ''}>${Helpers.escapeHtml(c.name)}</option>`
         ).join('');
 
         const questionCheckboxes = Object.entries(groupedQuestions).map(([catName, questions]) => `
@@ -448,6 +631,11 @@ const KCTestsView = {
 
             const test = result.test;
             
+            const typeLabels = {
+                'multiple_choice': 'Multiple Choice',
+                'open_question': 'Offene Frage'
+            };
+            
             const contentHtml = `
                 <div class="test-detail">
                     <div class="test-detail-header">
@@ -472,9 +660,26 @@ const KCTestsView = {
                         <h4>Fragen (${test.questions?.length || 0})</h4>
                         <div class="test-questions-list">
                             ${test.questions && test.questions.length > 0 ? test.questions.map((q, i) => `
-                                <div class="test-question-item">
-                                    <span class="test-question-num">${i + 1}.</span>
-                                    <span class="test-question-text">${Helpers.escapeHtml(q.title || Helpers.truncate(q.questionText, 60))}</span>
+                                <div class="test-question-item" data-question-id="${q.questionId}">
+                                    <div class="test-question-content">
+                                        <span class="test-question-num">${i + 1}.</span>
+                                        <div class="test-question-info">
+                                            ${q.title ? `<div class="test-question-title">${Helpers.escapeHtml(q.title)}</div>` : ''}
+                                            <div class="test-question-text">${Helpers.escapeHtml(Helpers.truncate(q.questionText, 80))}</div>
+                                            <div class="test-question-meta">
+                                                <span class="badge badge-secondary">${typeLabels[q.questionType] || q.questionType}</span>
+                                                <span class="badge badge-info">Gewichtung: ${q.effectiveWeighting}</span>
+                                                <span class="badge badge-outline">${q.categoryName}</span>
+                                                ${q.questionType === 'multiple_choice' && q.options ? `<span>${q.options.length} Antworten</span>` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="btn-icon kc-view-question-detail" data-id="${q.questionId}" title="Frage anzeigen">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    </button>
                                 </div>
                             `).join('') : '<p class="empty-state">Keine Fragen zugewiesen</p>'}
                         </div>
@@ -502,6 +707,14 @@ const KCTestsView = {
                 footer,
                 size: 'lg'
             });
+
+            // Bind view question detail buttons
+            document.querySelectorAll('.kc-view-question-detail').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.viewQuestionDetail(btn.dataset.id);
+                });
+            });
         } catch (error) {
             console.error('View test error:', error);
             Toast.error('Fehler beim Laden');
@@ -509,10 +722,97 @@ const KCTestsView = {
     },
 
     /**
+     * Views a question's full details
+     */
+    async viewQuestionDetail(questionId) {
+        try {
+            const result = await window.api.knowledgeCheck.getQuestionById(questionId);
+            if (!result.success) {
+                Toast.error('Frage konnte nicht geladen werden');
+                return;
+            }
+
+            const q = result.question;
+            const typeLabels = {
+                'multiple_choice': 'Multiple Choice',
+                'open_question': 'Offene Frage'
+            };
+
+            let answerSection = '';
+            if (q.questionType === 'multiple_choice' && q.options && q.options.length > 0) {
+                answerSection = `
+                    <div class="question-detail-section">
+                        <h5>Antwortmöglichkeiten</h5>
+                        <ul class="question-options-list">
+                            ${q.options.map(o => `
+                                <li class="${o.isCorrect ? 'correct' : ''}">
+                                    ${o.isCorrect ? '<span class="badge badge-success">✓</span>' : '<span class="badge badge-outline">○</span>'}
+                                    ${Helpers.escapeHtml(o.text)}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            } else if (q.questionType === 'open_question') {
+                answerSection = `
+                    <div class="question-detail-section">
+                        <h5>Erwartete Antwort</h5>
+                        ${q.exactAnswer ? `<p><strong>Exakte Antwort:</strong> ${Helpers.escapeHtml(q.exactAnswer)}</p>` : ''}
+                        ${q.triggerWords && q.triggerWords.length > 0 ? `
+                            <p><strong>Schlüsselwörter:</strong></p>
+                            <div class="trigger-words-display">
+                                ${q.triggerWords.map(tw => `<span class="badge badge-info">${Helpers.escapeHtml(tw)}</span>`).join(' ')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            const contentHtml = `
+                <div class="question-detail">
+                    <div class="question-detail-header">
+                        ${q.title ? `<h4>${Helpers.escapeHtml(q.title)}</h4>` : ''}
+                        <p class="question-detail-text">${Helpers.escapeHtml(q.questionText)}</p>
+                    </div>
+                    <div class="question-detail-meta">
+                        <span class="badge badge-secondary">${typeLabels[q.questionType] || q.questionType}</span>
+                        <span class="badge badge-info">Gewichtung: ${q.effectiveWeighting}</span>
+                        <span class="badge badge-outline">${q.categoryName}</span>
+                    </div>
+                    ${answerSection}
+                </div>
+            `;
+
+            const template = document.createElement('template');
+            template.innerHTML = contentHtml.trim();
+            const content = template.content.firstElementChild;
+
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.justifyContent = 'flex-end';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.textContent = 'Schließen';
+            closeBtn.addEventListener('click', () => Modal.close());
+            footer.appendChild(closeBtn);
+
+            Modal.open({
+                title: 'Frage Details',
+                content,
+                footer,
+                size: 'md'
+            });
+        } catch (error) {
+            console.error('View question detail error:', error);
+            Toast.error('Fehler beim Laden der Frage');
+        }
+    },
+
+    /**
      * Edits a test
      */
     async editTest(testId) {
-        // Permission check is done in showTestForm
         try {
             const result = await window.api.knowledgeCheck.getTestById(testId);
             if (result.success) {
@@ -528,7 +828,6 @@ const KCTestsView = {
      * Deletes a test
      */
     async deleteTest(testId) {
-        // Check permissions
         if (!Permissions.canDelete('kcTest')) {
             Toast.error('Keine Berechtigung zum Löschen von Tests');
             return;
@@ -565,7 +864,8 @@ const KCTestsView = {
      * Refreshes the view
      */
     async refresh() {
-        await this.loadCategories();
+        await this.loadTestCategories();
+        await this.loadQuestionCategories();
         await this.loadQuestions();
         await this.loadTests();
         this.renderTestList();

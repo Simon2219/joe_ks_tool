@@ -882,20 +882,115 @@
 .test-questions-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
+    gap: var(--space-sm);
 }
 
 .test-question-item {
     display: flex;
-    gap: var(--space-sm);
-    padding: var(--space-sm);
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-md);
     background: var(--bg-primary);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.test-question-item .test-question-content {
+    display: flex;
+    gap: var(--space-sm);
+    flex: 1;
+}
+
+.test-question-item .test-question-info {
+    flex: 1;
 }
 
 .test-question-num {
     color: var(--text-muted);
     font-weight: var(--font-medium);
+    min-width: 24px;
+}
+
+.test-question-title {
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--space-xs);
+}
+
+.test-question-text {
+    color: var(--text-secondary);
+    font-size: var(--text-body);
+    margin-bottom: var(--space-xs);
+}
+
+.test-question-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    font-size: var(--text-caption);
+}
+
+/* Question Detail View */
+.question-detail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.question-detail-header h4 {
+    margin-bottom: var(--space-sm);
+}
+
+.question-detail-text {
+    font-size: var(--text-h3);
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.question-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.question-detail-section {
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-color);
+}
+
+.question-detail-section h5 {
+    margin-bottom: var(--space-sm);
+    color: var(--text-secondary);
+}
+
+.question-options-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.question-options-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+}
+
+.question-options-list li.correct {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid var(--color-success);
+}
+
+.trigger-words-display {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
 }
 
 /* KC Test Taking */

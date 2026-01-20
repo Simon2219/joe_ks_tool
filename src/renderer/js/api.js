@@ -259,13 +259,20 @@ window.api = {
     },
 
     knowledgeCheck: {
-        // Categories
+        // Question Categories
         getCategories: () => API.get('/knowledge-check/categories'),
         getCategoryById: (id) => API.get(`/knowledge-check/categories/${id}`),
         createCategory: (data) => API.post('/knowledge-check/categories', data),
         updateCategory: (id, data) => API.put(`/knowledge-check/categories/${id}`, data),
         deleteCategory: (id) => API.delete(`/knowledge-check/categories/${id}`),
         reorderCategories: (categoryIds) => API.put('/knowledge-check/categories/reorder', { categoryIds }),
+
+        // Test Categories
+        getTestCategories: () => API.get('/knowledge-check/test-categories'),
+        getTestCategoryById: (id) => API.get(`/knowledge-check/test-categories/${id}`),
+        createTestCategory: (data) => API.post('/knowledge-check/test-categories', data),
+        updateTestCategory: (id, data) => API.put(`/knowledge-check/test-categories/${id}`, data),
+        deleteTestCategory: (id) => API.delete(`/knowledge-check/test-categories/${id}`),
 
         // Questions
         getQuestions: (filters = {}) => {

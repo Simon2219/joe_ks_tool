@@ -239,8 +239,7 @@ const KCQuestionsView = {
                     <div class="kc-question-text">${Helpers.escapeHtml(Helpers.truncate(question.questionText, 100))}</div>
                     <div class="kc-question-meta">
                         <span class="badge badge-secondary">${typeLabel}</span>
-                        ${question.weighting ? `<span class="badge badge-info">Gewichtung: ${question.weighting}</span>` : ''}
-                        ${question.options && question.options.length > 0 ? `<span>${question.options.length} Antworten</span>` : ''}
+                        ${question.weighting ? `<span class="badge badge-info">Gewichtung: ${question.weighting}</span>` : `<span class="badge badge-outline">Gewichtung: Standard</span>`}
                     </div>
                 </div>
                 <div class="kc-question-actions">
@@ -444,38 +443,48 @@ const KCQuestionsView = {
 
         const formHtml = `
             <form id="question-form" class="question-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="q-category">Kategorie</label>
-                        <select id="q-category" name="categoryId" class="form-select">
-                            <option value="">Unkategorisiert</option>
-                            ${categoryOptions}
-                        </select>
+                <!-- Static Section - Always visible -->
+                <div class="form-section">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="q-category">Kategorie</label>
+                            <select id="q-category" name="categoryId" class="form-select">
+                                <option value="">Unkategorisiert</option>
+                                ${categoryOptions}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="q-type">Fragetyp *</label>
+                            <select id="q-type" name="questionType" class="form-select" required>
+                                <option value="multiple_choice" ${question?.questionType === 'multiple_choice' || !question ? 'selected' : ''}>Multiple Choice</option>
+                                <option value="open_question" ${question?.questionType === 'open_question' ? 'selected' : ''}>Offene Frage</option>
+                            </select>
+                        </div>
                     </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;"></div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="q-weighting">Gewichtung (optional)</label>
+                            <input type="number" id="q-weighting" name="weighting" class="form-input" min="1" max="10" value="${question?.weighting || ''}" placeholder="Standard aus Kategorie">
+                        </div>
+                    </div>
+                    
                     <div class="form-group">
-                        <label for="q-type">Fragetyp *</label>
-                        <select id="q-type" name="questionType" class="form-select" required>
-                            <option value="multiple_choice" ${question?.questionType === 'multiple_choice' || !question ? 'selected' : ''}>Multiple Choice</option>
-                            <option value="open_question" ${question?.questionType === 'open_question' ? 'selected' : ''}>Offene Frage</option>
-                        </select>
+                        <label for="q-title">Titel (optional)</label>
+                        <input type="text" id="q-title" name="title" class="form-input" value="${Helpers.escapeHtml(question?.title || '')}" placeholder="Beschreibender Titel für die Frage">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="q-text">Frage *</label>
+                        <textarea id="q-text" name="questionText" class="form-textarea" rows="3" required placeholder="Die eigentliche Frage">${Helpers.escapeHtml(question?.questionText || '')}</textarea>
                     </div>
                 </div>
                 
-                <div class="form-group">
-                    <label for="q-title">Titel (optional)</label>
-                    <input type="text" id="q-title" name="title" class="form-input" value="${Helpers.escapeHtml(question?.title || '')}" placeholder="Kurzer Titel für die Frage">
-                </div>
+                <!-- Separator -->
+                <hr class="form-separator" style="margin: var(--space-md) 0; border: 0; border-top: 1px solid var(--border-color); opacity: 0.5;">
                 
-                <div class="form-group">
-                    <label for="q-text">Frage *</label>
-                    <textarea id="q-text" name="questionText" class="form-textarea" rows="3" required placeholder="Die eigentliche Frage">${Helpers.escapeHtml(question?.questionText || '')}</textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="q-weighting">Gewichtung (optional - überschreibt Kategorie)</label>
-                    <input type="number" id="q-weighting" name="weighting" class="form-input" min="1" max="10" value="${question?.weighting || ''}" placeholder="Standard aus Kategorie">
-                </div>
-                
+                <!-- Dynamic Section - Changes based on question type -->
                 <!-- Multiple Choice Options -->
                 <div id="mc-options-section" class="${question?.questionType === 'open_question' ? 'hidden' : ''}">
                     <div class="form-group">

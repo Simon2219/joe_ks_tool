@@ -6,8 +6,10 @@
 const KCResultsView = {
     results: [],
     tests: [],
+    testCategories: [],
     users: [],
     filters: {
+        categoryId: '',
         testId: '',
         userId: '',
         startDate: '',
@@ -23,6 +25,7 @@ const KCResultsView = {
             this.bindEvents();
             this.eventsBound = true;
         }
+        await this.loadTestCategories();
         await this.loadTests();
         await this.loadUsers();
         await this.loadResults();
@@ -44,6 +47,12 @@ const KCResultsView = {
         });
 
         // Filters
+        document.getElementById('filter-kc-result-category')?.addEventListener('change', (e) => {
+            this.filters.categoryId = e.target.value;
+            this.populateTestFilter(); // Re-populate tests based on category
+            this.applyFilters();
+        });
+
         document.getElementById('filter-kc-result-test')?.addEventListener('change', (e) => {
             this.filters.testId = e.target.value;
             this.applyFilters();
@@ -63,6 +72,21 @@ const KCResultsView = {
             this.filters.endDate = e.target.value;
             this.applyFilters();
         });
+    },
+
+    /**
+     * Loads all test categories for filter
+     */
+    async loadTestCategories() {
+        try {
+            const result = await window.api.knowledgeCheck.getTestCategories();
+            if (result.success) {
+                this.testCategories = result.categories;
+                this.populateCategoryFilter();
+            }
+        } catch (error) {
+            console.error('Failed to load test categories:', error);
+        }
     },
 
     /**
@@ -129,6 +153,22 @@ const KCResultsView = {
     },
 
     /**
+     * Populates the category filter dropdown
+     */
+    populateCategoryFilter() {
+        const select = document.getElementById('filter-kc-result-category');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Alle Kategorien</option>';
+        this.testCategories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = cat.name;
+            select.appendChild(option);
+        });
+    },
+
+    /**
      * Populates the test filter dropdown
      */
     populateTestFilter() {
@@ -136,7 +176,14 @@ const KCResultsView = {
         if (!select) return;
 
         select.innerHTML = '<option value="">Alle Tests</option>';
-        this.tests.forEach(test => {
+        
+        // Filter tests by category if a category is selected
+        let filteredTests = this.tests;
+        if (this.filters.categoryId) {
+            filteredTests = this.tests.filter(t => t.categoryId === this.filters.categoryId);
+        }
+        
+        filteredTests.forEach(test => {
             const option = document.createElement('option');
             option.value = test.id;
             option.textContent = `${test.testNumber} - ${test.name}`;

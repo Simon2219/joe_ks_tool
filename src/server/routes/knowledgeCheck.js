@@ -114,6 +114,89 @@ router.put('/categories/reorder', requirePermission('kc_categories_edit'), (req,
 });
 
 // ============================================
+// TEST CATEGORIES
+// ============================================
+
+/**
+ * GET /api/knowledge-check/test-categories
+ */
+router.get('/test-categories', requirePermission('kc_tests_view'), (req, res) => {
+    try {
+        const categories = KnowledgeCheckSystem.getAllTestCategories();
+        res.json({ success: true, categories });
+    } catch (error) {
+        console.error('Get KC test categories error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch test categories' });
+    }
+});
+
+/**
+ * GET /api/knowledge-check/test-categories/:id
+ */
+router.get('/test-categories/:id', requirePermission('kc_tests_view'), (req, res) => {
+    try {
+        const category = KnowledgeCheckSystem.getTestCategoryById(req.params.id);
+        if (!category) {
+            return res.status(404).json({ success: false, error: 'Test category not found' });
+        }
+        res.json({ success: true, category });
+    } catch (error) {
+        console.error('Get KC test category error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch test category' });
+    }
+});
+
+/**
+ * POST /api/knowledge-check/test-categories
+ */
+router.post('/test-categories', requirePermission('kc_tests_create'), (req, res) => {
+    try {
+        const { name, description } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ success: false, error: 'Name is required' });
+        }
+        
+        const category = KnowledgeCheckSystem.createTestCategory({ name, description });
+        res.status(201).json({ success: true, category });
+    } catch (error) {
+        console.error('Create KC test category error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create test category' });
+    }
+});
+
+/**
+ * PUT /api/knowledge-check/test-categories/:id
+ */
+router.put('/test-categories/:id', requirePermission('kc_tests_edit'), (req, res) => {
+    try {
+        const category = KnowledgeCheckSystem.getTestCategoryById(req.params.id);
+        if (!category) {
+            return res.status(404).json({ success: false, error: 'Test category not found' });
+        }
+        
+        const updated = KnowledgeCheckSystem.updateTestCategory(req.params.id, req.body);
+        res.json({ success: true, category: updated });
+    } catch (error) {
+        console.error('Update KC test category error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update test category' });
+    }
+});
+
+/**
+ * DELETE /api/knowledge-check/test-categories/:id
+ */
+router.delete('/test-categories/:id', requirePermission('kc_tests_delete'), (req, res) => {
+    try {
+        const result = KnowledgeCheckSystem.deleteTestCategory(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error('Delete KC test category error:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete test category' });
+    }
+});
+
+// ============================================
 // QUESTIONS
 // ============================================
 

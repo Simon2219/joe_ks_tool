@@ -1,31 +1,36 @@
 <section id="view-kcResults" class="view">
-    <div class="view-header">
-        <div class="view-actions">
-            <button class="btn btn-primary" id="add-kc-result-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Neuer Test
-            </button>
-            <button class="btn btn-secondary" id="export-kc-results-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Export
-            </button>
-        </div>
-        <div class="view-filters">
-            <select id="filter-kc-result-test" class="form-select">
-                <option value="">Alle Tests</option>
-            </select>
-            <select id="filter-kc-result-user" class="form-select">
-                <option value="">Alle Benutzer</option>
-            </select>
-            <input type="date" id="filter-kc-result-start" class="form-input" placeholder="Von">
-            <input type="date" id="filter-kc-result-end" class="form-input" placeholder="Bis">
+    <div class="view-header kc-results-header">
+        <div class="view-actions-row">
+            <div class="view-actions">
+                <button class="btn btn-primary" id="add-kc-result-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Neuer Test
+                </button>
+                <button class="btn btn-secondary" id="export-kc-results-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export
+                </button>
+            </div>
+            <div class="view-filters view-filters-inline">
+                <select id="filter-kc-result-category" class="form-select form-select-sm">
+                    <option value="">Alle Kategorien</option>
+                </select>
+                <select id="filter-kc-result-test" class="form-select form-select-sm">
+                    <option value="">Alle Tests</option>
+                </select>
+                <select id="filter-kc-result-user" class="form-select form-select-sm">
+                    <option value="">Alle Benutzer</option>
+                </select>
+                <input type="date" id="filter-kc-result-start" class="form-input form-input-sm" placeholder="Von">
+                <input type="date" id="filter-kc-result-end" class="form-input form-input-sm" placeholder="Bis">
+            </div>
         </div>
     </div>
     <div class="kc-results-overview" id="kc-results-overview">

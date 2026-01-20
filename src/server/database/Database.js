@@ -348,6 +348,19 @@ function initSchema() {
         )
     `);
 
+    // Test categories (separate from question categories)
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_test_categories (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    `);
+
     // Test catalog (groupings of questions)
     database.run(`
         CREATE TABLE IF NOT EXISTS kc_tests (
@@ -363,7 +376,7 @@ function initSchema() {
             archived_at TEXT DEFAULT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            FOREIGN KEY (category_id) REFERENCES kc_categories(id)
+            FOREIGN KEY (category_id) REFERENCES kc_test_categories(id)
         )
     `);
 
@@ -1422,6 +1435,89 @@ const KnowledgeCheckSystem = {
     },
 
     // ============================================
+    // TEST CATEGORIES
+    // ============================================
+    
+    getAllTestCategories() {
+        const categories = all('SELECT * FROM kc_test_categories ORDER BY sort_order, name');
+        return categories.map(c => ({
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            sortOrder: c.sort_order,
+            isActive: !!c.is_active,
+            testCount: get('SELECT COUNT(*) as count FROM kc_tests WHERE category_id = ?', [c.id])?.count || 0,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at
+        }));
+    },
+
+    getTestCategoryById(id) {
+        const category = get('SELECT * FROM kc_test_categories WHERE id = ?', [id]);
+        if (!category) return null;
+        return {
+            id: category.id,
+            name: category.name,
+            description: category.description,
+            sortOrder: category.sort_order,
+            isActive: !!category.is_active,
+            createdAt: category.created_at,
+            updatedAt: category.updated_at
+        };
+    },
+
+    createTestCategory(data) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const maxOrder = get('SELECT MAX(sort_order) as max FROM kc_test_categories')?.max || 0;
+        
+        run(`INSERT INTO kc_test_categories (id, name, description, sort_order, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.name, data.description || '', maxOrder + 1, 1, now, now]);
+        
+        saveDb();
+        return this.getTestCategoryById(id);
+    },
+
+    updateTestCategory(id, data) {
+        const now = new Date().toISOString();
+        let sql = 'UPDATE kc_test_categories SET updated_at = ?';
+        let params = [now];
+        
+        if (data.name !== undefined) { sql += ', name = ?'; params.push(data.name); }
+        if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
+        if (data.sortOrder !== undefined) { sql += ', sort_order = ?'; params.push(data.sortOrder); }
+        if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        run(sql, params);
+        
+        saveDb();
+        return this.getTestCategoryById(id);
+    },
+
+    deleteTestCategory(id) {
+        const testCount = get('SELECT COUNT(*) as count FROM kc_tests WHERE category_id = ?', [id])?.count || 0;
+        if (testCount > 0) {
+            // Move tests to uncategorized (null category)
+            run('UPDATE kc_tests SET category_id = NULL WHERE category_id = ?', [id]);
+        }
+        
+        run('DELETE FROM kc_test_categories WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    reorderTestCategories(categoryIds) {
+        categoryIds.forEach((id, index) => {
+            run('UPDATE kc_test_categories SET sort_order = ? WHERE id = ?', [index, id]);
+        });
+        saveDb();
+        return true;
+    },
+
+    // ============================================
     // QUESTIONS
     // ============================================
 
@@ -1621,7 +1717,7 @@ const KnowledgeCheckSystem = {
             SELECT t.*, c.name as category_name,
                 (SELECT COUNT(*) FROM kc_test_questions WHERE test_id = t.id) as question_count
             FROM kc_tests t 
-            LEFT JOIN kc_categories c ON t.category_id = c.id 
+            LEFT JOIN kc_test_categories c ON t.category_id = c.id 
             WHERE 1=1
         `;
         const params = [];
@@ -1668,19 +1764,52 @@ const KnowledgeCheckSystem = {
         const test = get(`
             SELECT t.*, c.name as category_name
             FROM kc_tests t 
-            LEFT JOIN kc_categories c ON t.category_id = c.id 
+            LEFT JOIN kc_test_categories c ON t.category_id = c.id 
             WHERE t.id = ?
         `, [id]);
         
         if (!test) return null;
         
         const questions = all(`
-            SELECT tq.*, q.title, q.question_text, q.question_type
+            SELECT tq.*, q.title, q.question_text, q.question_type, q.weighting, q.exact_answer, q.trigger_words,
+                   c.name as category_name, c.default_weighting as category_weighting
             FROM kc_test_questions tq
             JOIN kc_questions q ON tq.question_id = q.id
+            LEFT JOIN kc_categories c ON q.category_id = c.id
             WHERE tq.test_id = ?
             ORDER BY tq.sort_order
         `, [id]);
+        
+        // Get options for each question
+        const questionsWithOptions = questions.map(q => {
+            const options = all('SELECT * FROM kc_question_options WHERE question_id = ? ORDER BY sort_order', [q.question_id]);
+            let triggerWords = [];
+            try {
+                triggerWords = JSON.parse(q.trigger_words || '[]');
+            } catch (e) {
+                triggerWords = [];
+            }
+            
+            return {
+                id: q.id,
+                questionId: q.question_id,
+                title: q.title,
+                questionText: q.question_text,
+                questionType: q.question_type,
+                categoryName: q.category_name || 'Unkategorisiert',
+                weighting: q.weighting,
+                effectiveWeighting: q.weighting_override || q.weighting || q.category_weighting || 1,
+                exactAnswer: q.exact_answer || '',
+                triggerWords: triggerWords,
+                sortOrder: q.sort_order,
+                weightingOverride: q.weighting_override,
+                options: options.map(o => ({
+                    id: o.id,
+                    text: o.option_text,
+                    isCorrect: !!o.is_correct
+                }))
+            };
+        });
         
         return {
             id: test.id,
@@ -1692,15 +1821,7 @@ const KnowledgeCheckSystem = {
             timeLimitMinutes: test.time_limit_minutes,
             passingScore: test.passing_score,
             isActive: !!test.is_active,
-            questions: questions.map(q => ({
-                id: q.id,
-                questionId: q.question_id,
-                title: q.title,
-                questionText: q.question_text,
-                questionType: q.question_type,
-                sortOrder: q.sort_order,
-                weightingOverride: q.weighting_override
-            })),
+            questions: questionsWithOptions,
             createdAt: test.created_at,
             updatedAt: test.updated_at
         };
