@@ -18,7 +18,7 @@ router.use(authenticate);
 /**
  * GET /api/knowledge-check/categories
  */
-router.get('/categories', requirePermission('kc_view'), (req, res) => {
+router.get('/categories', requirePermission('kc_questions_view'), (req, res) => {
     try {
         const categories = KnowledgeCheckSystem.getAllCategories();
         res.json({ success: true, categories });
@@ -31,7 +31,7 @@ router.get('/categories', requirePermission('kc_view'), (req, res) => {
 /**
  * GET /api/knowledge-check/categories/:id
  */
-router.get('/categories/:id', requirePermission('kc_view'), (req, res) => {
+router.get('/categories/:id', requirePermission('kc_questions_view'), (req, res) => {
     try {
         const category = KnowledgeCheckSystem.getCategoryById(req.params.id);
         if (!category) {
@@ -47,7 +47,7 @@ router.get('/categories/:id', requirePermission('kc_view'), (req, res) => {
 /**
  * POST /api/knowledge-check/categories
  */
-router.post('/categories', requirePermission('kc_manage_questions'), (req, res) => {
+router.post('/categories', requirePermission('kc_categories_create'), (req, res) => {
     try {
         const { name, description, defaultWeighting } = req.body;
         
@@ -66,7 +66,7 @@ router.post('/categories', requirePermission('kc_manage_questions'), (req, res) 
 /**
  * PUT /api/knowledge-check/categories/:id
  */
-router.put('/categories/:id', requirePermission('kc_manage_questions'), (req, res) => {
+router.put('/categories/:id', requirePermission('kc_categories_edit'), (req, res) => {
     try {
         const category = KnowledgeCheckSystem.getCategoryById(req.params.id);
         if (!category) {
@@ -84,7 +84,7 @@ router.put('/categories/:id', requirePermission('kc_manage_questions'), (req, re
 /**
  * DELETE /api/knowledge-check/categories/:id
  */
-router.delete('/categories/:id', requirePermission('kc_manage_questions'), (req, res) => {
+router.delete('/categories/:id', requirePermission('kc_categories_delete'), (req, res) => {
     try {
         const result = KnowledgeCheckSystem.deleteCategory(req.params.id);
         res.json(result);
@@ -97,7 +97,7 @@ router.delete('/categories/:id', requirePermission('kc_manage_questions'), (req,
 /**
  * PUT /api/knowledge-check/categories/reorder
  */
-router.put('/categories/reorder', requirePermission('kc_manage_questions'), (req, res) => {
+router.put('/categories/reorder', requirePermission('kc_categories_edit'), (req, res) => {
     try {
         const { categoryIds } = req.body;
         
@@ -120,7 +120,7 @@ router.put('/categories/reorder', requirePermission('kc_manage_questions'), (req
 /**
  * GET /api/knowledge-check/questions
  */
-router.get('/questions', requirePermission('kc_view'), (req, res) => {
+router.get('/questions', requirePermission('kc_questions_view'), (req, res) => {
     try {
         const questions = KnowledgeCheckSystem.getAllQuestions(req.query);
         res.json({ success: true, questions });
@@ -133,7 +133,7 @@ router.get('/questions', requirePermission('kc_view'), (req, res) => {
 /**
  * GET /api/knowledge-check/questions/:id
  */
-router.get('/questions/:id', requirePermission('kc_view'), (req, res) => {
+router.get('/questions/:id', requirePermission('kc_questions_view'), (req, res) => {
     try {
         const question = KnowledgeCheckSystem.getQuestionById(req.params.id);
         if (!question) {
@@ -149,7 +149,7 @@ router.get('/questions/:id', requirePermission('kc_view'), (req, res) => {
 /**
  * POST /api/knowledge-check/questions
  */
-router.post('/questions', requirePermission('kc_manage_questions'), (req, res) => {
+router.post('/questions', requirePermission('kc_questions_create'), (req, res) => {
     try {
         const { questionText, questionType } = req.body;
         
@@ -168,7 +168,7 @@ router.post('/questions', requirePermission('kc_manage_questions'), (req, res) =
 /**
  * PUT /api/knowledge-check/questions/:id
  */
-router.put('/questions/:id', requirePermission('kc_manage_questions'), (req, res) => {
+router.put('/questions/:id', requirePermission('kc_questions_edit'), (req, res) => {
     try {
         const question = KnowledgeCheckSystem.getQuestionById(req.params.id);
         if (!question) {
@@ -186,7 +186,7 @@ router.put('/questions/:id', requirePermission('kc_manage_questions'), (req, res
 /**
  * DELETE /api/knowledge-check/questions/:id
  */
-router.delete('/questions/:id', requirePermission('kc_manage_questions'), (req, res) => {
+router.delete('/questions/:id', requirePermission('kc_questions_delete'), (req, res) => {
     try {
         const result = KnowledgeCheckSystem.deleteQuestion(req.params.id);
         res.json(result);
@@ -199,7 +199,7 @@ router.delete('/questions/:id', requirePermission('kc_manage_questions'), (req, 
 /**
  * PUT /api/knowledge-check/questions/:id/move
  */
-router.put('/questions/:id/move', requirePermission('kc_manage_questions'), (req, res) => {
+router.put('/questions/:id/move', requirePermission('kc_questions_edit'), (req, res) => {
     try {
         const { categoryId } = req.body;
         
@@ -218,7 +218,7 @@ router.put('/questions/:id/move', requirePermission('kc_manage_questions'), (req
 /**
  * GET /api/knowledge-check/tests
  */
-router.get('/tests', requirePermission('kc_view'), (req, res) => {
+router.get('/tests', requirePermission('kc_tests_view'), (req, res) => {
     try {
         const tests = KnowledgeCheckSystem.getAllTests(req.query);
         res.json({ success: true, tests });
@@ -231,7 +231,7 @@ router.get('/tests', requirePermission('kc_view'), (req, res) => {
 /**
  * GET /api/knowledge-check/tests/:id
  */
-router.get('/tests/:id', requirePermission('kc_view'), (req, res) => {
+router.get('/tests/:id', requirePermission('kc_tests_view'), (req, res) => {
     try {
         const test = KnowledgeCheckSystem.getTestById(req.params.id);
         if (!test) {
@@ -247,7 +247,7 @@ router.get('/tests/:id', requirePermission('kc_view'), (req, res) => {
 /**
  * POST /api/knowledge-check/tests
  */
-router.post('/tests', requirePermission('kc_manage_tests'), (req, res) => {
+router.post('/tests', requirePermission('kc_tests_create'), (req, res) => {
     try {
         const { name } = req.body;
         
@@ -266,7 +266,7 @@ router.post('/tests', requirePermission('kc_manage_tests'), (req, res) => {
 /**
  * PUT /api/knowledge-check/tests/:id
  */
-router.put('/tests/:id', requirePermission('kc_manage_tests'), (req, res) => {
+router.put('/tests/:id', requirePermission('kc_tests_edit'), (req, res) => {
     try {
         const test = KnowledgeCheckSystem.getTestById(req.params.id);
         if (!test) {
@@ -284,7 +284,7 @@ router.put('/tests/:id', requirePermission('kc_manage_tests'), (req, res) => {
 /**
  * DELETE /api/knowledge-check/tests/:id
  */
-router.delete('/tests/:id', requirePermission('kc_manage_tests'), (req, res) => {
+router.delete('/tests/:id', requirePermission('kc_tests_delete'), (req, res) => {
     try {
         const result = KnowledgeCheckSystem.deleteTest(req.params.id);
         res.json(result);
@@ -301,16 +301,9 @@ router.delete('/tests/:id', requirePermission('kc_manage_tests'), (req, res) => 
 /**
  * GET /api/knowledge-check/results
  */
-router.get('/results', requirePermission('kc_view'), (req, res) => {
+router.get('/results', requirePermission('kc_results_view'), (req, res) => {
     try {
-        let filters = { ...req.query };
-        
-        // If user doesn't have view_all permission, only show their own results
-        if (!hasPermission(req.user, 'kc_view_all')) {
-            filters.userId = req.user.id;
-        }
-        
-        const results = KnowledgeCheckSystem.getAllResults(filters);
+        const results = KnowledgeCheckSystem.getAllResults(req.query);
         res.json({ success: true, results });
     } catch (error) {
         console.error('Get KC results error:', error);
@@ -321,16 +314,11 @@ router.get('/results', requirePermission('kc_view'), (req, res) => {
 /**
  * GET /api/knowledge-check/results/:id
  */
-router.get('/results/:id', requirePermission('kc_view'), (req, res) => {
+router.get('/results/:id', requirePermission('kc_results_view'), (req, res) => {
     try {
         const result = KnowledgeCheckSystem.getResultById(req.params.id);
         if (!result) {
             return res.status(404).json({ success: false, error: 'Result not found' });
-        }
-        
-        // Check access
-        if (!hasPermission(req.user, 'kc_view_all') && result.userId !== req.user.id) {
-            return res.status(403).json({ success: false, error: 'Permission denied' });
         }
         
         res.json({ success: true, result });
@@ -343,7 +331,7 @@ router.get('/results/:id', requirePermission('kc_view'), (req, res) => {
 /**
  * POST /api/knowledge-check/results
  */
-router.post('/results', requirePermission('kc_evaluate'), (req, res) => {
+router.post('/results', requirePermission('kc_results_create'), (req, res) => {
     try {
         const { testId, userId, answers } = req.body;
         
@@ -366,7 +354,7 @@ router.post('/results', requirePermission('kc_evaluate'), (req, res) => {
 /**
  * PUT /api/knowledge-check/results/:id
  */
-router.put('/results/:id', requirePermission('kc_evaluate'), (req, res) => {
+router.put('/results/:id', requirePermission('kc_results_view'), (req, res) => {
     try {
         const result = KnowledgeCheckSystem.getResultById(req.params.id);
         if (!result) {
@@ -384,7 +372,7 @@ router.put('/results/:id', requirePermission('kc_evaluate'), (req, res) => {
 /**
  * DELETE /api/knowledge-check/results/:id
  */
-router.delete('/results/:id', requirePermission('kc_evaluate'), (req, res) => {
+router.delete('/results/:id', requirePermission('kc_results_delete'), (req, res) => {
     try {
         const result = KnowledgeCheckSystem.deleteResult(req.params.id);
         res.json(result);
@@ -414,15 +402,9 @@ router.get('/stats', requirePermission('kc_view'), (req, res) => {
 /**
  * GET /api/knowledge-check/export/results
  */
-router.get('/export/results', requirePermission('kc_view'), (req, res) => {
+router.get('/export/results', requirePermission('kc_results_view'), (req, res) => {
     try {
-        let filters = { ...req.query };
-        
-        if (!hasPermission(req.user, 'kc_view_all')) {
-            filters.userId = req.user.id;
-        }
-        
-        const results = KnowledgeCheckSystem.getAllResults(filters);
+        const results = KnowledgeCheckSystem.getAllResults(req.query);
         
         // Generate CSV
         const headers = ['Result #', 'Test', 'User', 'Evaluator', 'Score', 'Percentage', 'Passed', 'Date'];
@@ -453,7 +435,7 @@ router.get('/export/results', requirePermission('kc_view'), (req, res) => {
  * POST /api/knowledge-check/check-answer
  * Helper endpoint to check an open-ended answer
  */
-router.post('/check-answer', requirePermission('kc_evaluate'), (req, res) => {
+router.post('/check-answer', requirePermission('kc_results_create'), (req, res) => {
     try {
         const { answer, exactAnswer, triggerWords } = req.body;
         

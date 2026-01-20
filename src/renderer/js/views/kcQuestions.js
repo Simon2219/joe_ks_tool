@@ -155,6 +155,8 @@ const KCQuestionsView = {
      */
     renderCategory(category, questions, isUncategorized = false) {
         const isCollapsed = false; // Could be stored in localStorage
+        const canCreateQuestions = Permissions.canCreate('kcQuestion');
+        const canDeleteCategories = Permissions.canDelete('kcCategory');
         
         return `
             <div class="kc-category ${isCollapsed ? 'collapsed' : ''}" data-category-id="${category.id}">
@@ -170,19 +172,23 @@ const KCQuestionsView = {
                     </div>
                     <div class="kc-category-actions">
                         ${!isUncategorized ? `
-                            <button class="btn btn-sm btn-secondary kc-add-question-to-cat" data-category-id="${category.id}" title="Frage hinzufügen">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                            </button>
-                            <button class="btn-icon kc-category-menu" data-category-id="${category.id}" title="Mehr Optionen">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="1"></circle>
-                                    <circle cx="12" cy="5" r="1"></circle>
-                                    <circle cx="12" cy="19" r="1"></circle>
-                                </svg>
-                            </button>
+                            ${canCreateQuestions ? `
+                                <button class="btn btn-sm btn-secondary kc-add-question-to-cat" data-category-id="${category.id}" title="Frage hinzufügen">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </button>
+                            ` : ''}
+                            ${canDeleteCategories ? `
+                                <button class="btn-icon kc-category-menu" data-category-id="${category.id}" title="Mehr Optionen">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="1"></circle>
+                                        <circle cx="12" cy="5" r="1"></circle>
+                                        <circle cx="12" cy="19" r="1"></circle>
+                                    </svg>
+                                </button>
+                            ` : ''}
                         ` : ''}
                     </div>
                 </div>
@@ -207,18 +213,23 @@ const KCQuestionsView = {
         };
         const typeLabel = typeLabels[question.questionType] || question.questionType;
         
+        const canEdit = Permissions.canEdit('kcQuestion');
+        const canDelete = Permissions.canDelete('kcQuestion');
+        
         return `
             <div class="kc-question-item" data-question-id="${question.id}">
-                <div class="kc-question-drag-handle" title="Zum Verschieben ziehen">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="9" cy="5" r="1"></circle>
-                        <circle cx="9" cy="12" r="1"></circle>
-                        <circle cx="9" cy="19" r="1"></circle>
-                        <circle cx="15" cy="5" r="1"></circle>
-                        <circle cx="15" cy="12" r="1"></circle>
-                        <circle cx="15" cy="19" r="1"></circle>
-                    </svg>
-                </div>
+                ${canEdit ? `
+                    <div class="kc-question-drag-handle" title="Zum Verschieben ziehen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="9" cy="5" r="1"></circle>
+                            <circle cx="9" cy="12" r="1"></circle>
+                            <circle cx="9" cy="19" r="1"></circle>
+                            <circle cx="15" cy="5" r="1"></circle>
+                            <circle cx="15" cy="12" r="1"></circle>
+                            <circle cx="15" cy="19" r="1"></circle>
+                        </svg>
+                    </div>
+                ` : ''}
                 <div class="kc-question-content">
                     ${question.title ? `<div class="kc-question-title">${Helpers.escapeHtml(question.title)}</div>` : ''}
                     <div class="kc-question-text">${Helpers.escapeHtml(Helpers.truncate(question.questionText, 100))}</div>
@@ -229,28 +240,32 @@ const KCQuestionsView = {
                     </div>
                 </div>
                 <div class="kc-question-actions">
-                    <button class="btn-icon kc-edit-question" data-id="${question.id}" title="Bearbeiten">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </button>
-                    <button class="btn-icon kc-move-question" data-id="${question.id}" title="Verschieben">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="5 9 2 12 5 15"></polyline>
-                            <polyline points="9 5 12 2 15 5"></polyline>
-                            <polyline points="15 19 12 22 9 19"></polyline>
-                            <polyline points="19 9 22 12 19 15"></polyline>
-                            <line x1="2" y1="12" x2="22" y2="12"></line>
-                            <line x1="12" y1="2" x2="12" y2="22"></line>
-                        </svg>
-                    </button>
-                    <button class="btn-icon kc-delete-question" data-id="${question.id}" title="Löschen">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
+                    ${canEdit ? `
+                        <button class="btn-icon kc-edit-question" data-id="${question.id}" title="Bearbeiten">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                        <button class="btn-icon kc-move-question" data-id="${question.id}" title="Verschieben">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="5 9 2 12 5 15"></polyline>
+                                <polyline points="9 5 12 2 15 5"></polyline>
+                                <polyline points="15 19 12 22 9 19"></polyline>
+                                <polyline points="19 9 22 12 19 15"></polyline>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <line x1="12" y1="2" x2="12" y2="22"></line>
+                            </svg>
+                        </button>
+                    ` : ''}
+                    ${canDelete ? `
+                        <button class="btn-icon kc-delete-question" data-id="${question.id}" title="Löschen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -305,6 +320,17 @@ const KCQuestionsView = {
      */
     async showCategoryForm(category = null) {
         const isEdit = !!category;
+        
+        // Check permissions
+        if (isEdit && !Permissions.canEdit('kcCategory')) {
+            Toast.error('Keine Berechtigung zum Bearbeiten von Kategorien');
+            return;
+        }
+        if (!isEdit && !Permissions.canCreate('kcCategory')) {
+            Toast.error('Keine Berechtigung zum Erstellen von Kategorien');
+            return;
+        }
+        
         const title = isEdit ? 'Kategorie bearbeiten' : 'Neue Kategorie';
 
         const fields = [
@@ -351,6 +377,12 @@ const KCQuestionsView = {
     async showCategoryMenu(categoryId, buttonEl) {
         const category = this.categories.find(c => c.id === categoryId);
         if (!category) return;
+        
+        // Check if user has delete permission
+        if (!Permissions.canDelete('kcCategory')) {
+            Toast.error('Keine Berechtigung zum Löschen von Kategorien');
+            return;
+        }
 
         // Simple confirmation for delete
         const confirmed = await Modal.confirm({
@@ -379,6 +411,17 @@ const KCQuestionsView = {
      */
     async showQuestionForm(question = null, preselectedCategoryId = null) {
         const isEdit = !!question;
+        
+        // Check permissions
+        if (isEdit && !Permissions.canEdit('kcQuestion')) {
+            Toast.error('Keine Berechtigung zum Bearbeiten von Fragen');
+            return;
+        }
+        if (!isEdit && !Permissions.canCreate('kcQuestion')) {
+            Toast.error('Keine Berechtigung zum Erstellen von Fragen');
+            return;
+        }
+        
         const title = isEdit ? 'Frage bearbeiten' : 'Neue Frage';
 
         // Build form HTML manually for complex form
@@ -677,6 +720,12 @@ const KCQuestionsView = {
      * Deletes a question
      */
     async deleteQuestion(questionId) {
+        // Check permissions
+        if (!Permissions.canDelete('kcQuestion')) {
+            Toast.error('Keine Berechtigung zum Löschen von Fragen');
+            return;
+        }
+        
         const question = this.questions.find(q => q.id === questionId);
         if (!question) return;
 

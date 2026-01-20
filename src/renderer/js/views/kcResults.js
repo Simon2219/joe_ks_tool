@@ -30,7 +30,7 @@ const KCResultsView = {
      */
     bindEvents() {
         // New result button
-        document.getElementById('new-kc-result-btn')?.addEventListener('click', () => {
+        document.getElementById('add-kc-result-btn')?.addEventListener('click', () => {
             this.showNewResultForm();
         });
 
@@ -199,6 +199,7 @@ const KCResultsView = {
         const statusBadge = result.passed ?
             '<span class="badge badge-success">Bestanden</span>' :
             '<span class="badge badge-danger">Nicht bestanden</span>';
+        const canDelete = Permissions.canDelete('kcResult');
 
         return `
             <tr data-id="${result.id}">
@@ -216,12 +217,14 @@ const KCResultsView = {
                                 <circle cx="12" cy="12" r="3"></circle>
                             </svg>
                         </button>
-                        <button class="btn-icon btn-delete" data-id="${result.id}" title="Löschen">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                        </button>
+                        ${canDelete ? `
+                            <button class="btn-icon btn-delete" data-id="${result.id}" title="Löschen">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        ` : ''}
                     </div>
                 </td>
             </tr>
@@ -232,6 +235,12 @@ const KCResultsView = {
      * Shows form to create a new test result
      */
     async showNewResultForm() {
+        // Check permissions
+        if (!Permissions.canCreate('kcResult')) {
+            Toast.error('Keine Berechtigung zum Durchführen von Tests');
+            return;
+        }
+        
         if (this.tests.length === 0) {
             Toast.error('Keine Tests verfügbar. Erstellen Sie zuerst einen Test.');
             return;
@@ -563,6 +572,12 @@ const KCResultsView = {
      * Deletes a result
      */
     async deleteResult(resultId) {
+        // Check permissions
+        if (!Permissions.canDelete('kcResult')) {
+            Toast.error('Keine Berechtigung zum Löschen von Ergebnissen');
+            return;
+        }
+        
         const result = this.results.find(r => r.id === resultId);
         if (!result) return;
 

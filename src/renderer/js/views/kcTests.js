@@ -170,6 +170,9 @@ const KCTestsView = {
      * Renders a single test item
      */
     renderTestItem(test) {
+        const canEdit = Permissions.canEdit('kcTest');
+        const canDelete = Permissions.canDelete('kcTest');
+        
         return `
             <div class="kc-question-item kc-test-item" data-test-id="${test.id}">
                 <div class="kc-question-content">
@@ -191,18 +194,22 @@ const KCTestsView = {
                             <circle cx="12" cy="12" r="3"></circle>
                         </svg>
                     </button>
-                    <button class="btn-icon kc-edit-test" data-id="${test.id}" title="Bearbeiten">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </button>
-                    <button class="btn-icon kc-delete-test" data-id="${test.id}" title="Löschen">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
+                    ${canEdit ? `
+                        <button class="btn-icon kc-edit-test" data-id="${test.id}" title="Bearbeiten">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                    ` : ''}
+                    ${canDelete ? `
+                        <button class="btn-icon kc-delete-test" data-id="${test.id}" title="Löschen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -241,6 +248,17 @@ const KCTestsView = {
      */
     async showTestForm(test = null) {
         const isEdit = !!test;
+        
+        // Check permissions
+        if (isEdit && !Permissions.canEdit('kcTest')) {
+            Toast.error('Keine Berechtigung zum Bearbeiten von Tests');
+            return;
+        }
+        if (!isEdit && !Permissions.canCreate('kcTest')) {
+            Toast.error('Keine Berechtigung zum Erstellen von Tests');
+            return;
+        }
+        
         const title = isEdit ? 'Test bearbeiten' : 'Neuer Test';
 
         // Get selected question IDs if editing
@@ -485,6 +503,7 @@ const KCTestsView = {
      * Edits a test
      */
     async editTest(testId) {
+        // Permission check is done in showTestForm
         try {
             const result = await window.api.knowledgeCheck.getTestById(testId);
             if (result.success) {
@@ -500,6 +519,12 @@ const KCTestsView = {
      * Deletes a test
      */
     async deleteTest(testId) {
+        // Check permissions
+        if (!Permissions.canDelete('kcTest')) {
+            Toast.error('Keine Berechtigung zum Löschen von Tests');
+            return;
+        }
+        
         const test = this.tests.find(t => t.id === testId);
         if (!test) return;
 

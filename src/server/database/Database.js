@@ -465,12 +465,21 @@ async function seedData() {
         { id: 'quality_edit', name: 'Edit Evaluations', module: 'quality' },
         { id: 'quality_delete', name: 'Delete Evaluations', module: 'quality' },
         { id: 'quality_manage', name: 'Manage Categories', module: 'quality' },
-        { id: 'kc_view', name: 'View Knowledge Check', module: 'knowledge_check' },
-        { id: 'kc_view_all', name: 'View All Results', module: 'knowledge_check' },
-        { id: 'kc_manage_questions', name: 'Manage Questions', module: 'knowledge_check' },
-        { id: 'kc_manage_tests', name: 'Manage Tests', module: 'knowledge_check' },
-        { id: 'kc_take_tests', name: 'Take Tests', module: 'knowledge_check' },
-        { id: 'kc_evaluate', name: 'Evaluate Tests', module: 'knowledge_check' },
+        { id: 'kc_view', name: 'View Knowledge Check Tab', module: 'knowledge_check' },
+        { id: 'kc_questions_view', name: 'View Question Catalog', module: 'knowledge_check' },
+        { id: 'kc_questions_create', name: 'Create Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_edit', name: 'Edit Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_delete', name: 'Delete Questions', module: 'knowledge_check' },
+        { id: 'kc_categories_create', name: 'Create Categories', module: 'knowledge_check' },
+        { id: 'kc_categories_edit', name: 'Edit Categories', module: 'knowledge_check' },
+        { id: 'kc_categories_delete', name: 'Delete Categories', module: 'knowledge_check' },
+        { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
+        { id: 'kc_tests_create', name: 'Create Tests', module: 'knowledge_check' },
+        { id: 'kc_tests_edit', name: 'Edit Tests', module: 'knowledge_check' },
+        { id: 'kc_tests_delete', name: 'Delete Tests', module: 'knowledge_check' },
+        { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
+        { id: 'kc_results_create', name: 'Conduct Tests', module: 'knowledge_check' },
+        { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
         { id: 'role_view', name: 'View Roles', module: 'roles' },
         { id: 'role_create', name: 'Create Roles', module: 'roles' },
         { id: 'role_edit', name: 'Edit Roles', module: 'roles' },
@@ -487,14 +496,33 @@ async function seedData() {
     
     // Default roles
     const allPermIds = permissions.map(p => p.id);
+    
+    // Knowledge Check permission sets
+    const kcManagerPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit', 'kc_questions_delete', 
+                           'kc_categories_create', 'kc_categories_edit', 'kc_categories_delete',
+                           'kc_tests_view', 'kc_tests_create', 'kc_tests_edit', 'kc_tests_delete',
+                           'kc_results_view', 'kc_results_create', 'kc_results_delete'];
+    const kcEditorPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit',
+                          'kc_categories_create', 'kc_categories_edit',
+                          'kc_tests_view', 'kc_tests_create', 'kc_tests_edit',
+                          'kc_results_view', 'kc_results_create'];
+    const kcUserPerms = ['kc_view']; // Can only see the tab, not the sub-pages
+    
     const roles = [
         { id: 'admin', name: 'Administrator', description: 'Full system access', isAdmin: 1, isSystem: 1, permissions: allPermIds },
         { id: 'supervisor', name: 'Supervisor', description: 'Team management', isAdmin: 0, isSystem: 1, 
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 'quality_view', 'quality_view_all', 'quality_create', 'kc_view', 'kc_view_all', 'kc_manage_tests', 'kc_evaluate', 'role_view', 'settings_view'] },
+          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 'quality_view', 'quality_view_all', 'quality_create', ...kcEditorPerms, 'role_view', 'settings_view'] },
         { id: 'qa_analyst', name: 'QA Analyst', description: 'Quality evaluations', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage', 'kc_view', 'kc_view_all', 'kc_manage_questions', 'kc_manage_tests', 'kc_evaluate'] },
+          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage', ...kcEditorPerms] },
         { id: 'agent', name: 'Support Agent', description: 'Ticket handling', isAdmin: 0, isSystem: 1,
-          permissions: ['ticket_view', 'ticket_create', 'ticket_edit', 'quality_view', 'kc_view', 'kc_take_tests'] }
+          permissions: ['ticket_view', 'ticket_create', 'ticket_edit', 'quality_view', ...kcUserPerms] },
+        // Knowledge Check specific roles
+        { id: 'kc_manager', name: 'Knowledge Manager', description: 'Full Knowledge Check management including delete', isAdmin: 0, isSystem: 1,
+          permissions: ['user_view', ...kcManagerPerms] },
+        { id: 'kc_editor', name: 'Knowledge Editor', description: 'Create and edit Knowledge Check content', isAdmin: 0, isSystem: 1,
+          permissions: ['user_view', ...kcEditorPerms] },
+        { id: 'kc_user', name: 'Knowledge User', description: 'View Knowledge Check (no content access)', isAdmin: 0, isSystem: 1,
+          permissions: ['user_view', ...kcUserPerms] }
     ];
     
     roles.forEach(r => {

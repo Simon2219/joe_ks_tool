@@ -114,13 +114,13 @@
                             </svg>
                         </a>
                         <div class="nav-submenu">
-                            <a href="#" class="nav-item nav-subitem" data-view="kcQuestions" data-permission="kc_view">
+                            <a href="#" class="nav-item nav-subitem" data-view="kcQuestions" data-permission="kc_questions_view">
                                 <span>Fragen Katalog</span>
                             </a>
-                            <a href="#" class="nav-item nav-subitem" data-view="kcTests" data-permission="kc_view">
+                            <a href="#" class="nav-item nav-subitem" data-view="kcTests" data-permission="kc_tests_view">
                                 <span>Test Katalog</span>
                             </a>
-                            <a href="#" class="nav-item nav-subitem" data-view="kcResults" data-permission="kc_view">
+                            <a href="#" class="nav-item nav-subitem" data-view="kcResults" data-permission="kc_results_view">
                                 <span>Test Ergebnisse</span>
                             </a>
                         </div>
@@ -431,8 +431,8 @@
 
                 <!-- Knowledge Check Main View -->
                 <section id="view-knowledgeCheck" class="view">
-                    <div class="kc-tiles-container">
-                        <div class="kc-tile" data-navigate="kcQuestions">
+                    <div class="kc-tiles-container" id="kc-tiles-container">
+                        <div class="kc-tile" data-navigate="kcQuestions" data-permission="kc_questions_view">
                             <div class="kc-tile-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="10"></circle>
@@ -444,7 +444,7 @@
                             <p>Verwalten Sie Ihren Fragenkatalog mit Kategorien und verschiedenen Fragetypen</p>
                             <span class="kc-tile-stat" id="kc-stat-questions">0 Fragen</span>
                         </div>
-                        <div class="kc-tile" data-navigate="kcTests">
+                        <div class="kc-tile" data-navigate="kcTests" data-permission="kc_tests_view">
                             <div class="kc-tile-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -458,7 +458,7 @@
                             <p>Erstellen und verwalten Sie Tests aus Ihrem Fragenkatalog</p>
                             <span class="kc-tile-stat" id="kc-stat-tests">0 Tests</span>
                         </div>
-                        <div class="kc-tile" data-navigate="kcResults">
+                        <div class="kc-tile" data-navigate="kcResults" data-permission="kc_results_view">
                             <div class="kc-tile-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -468,6 +468,18 @@
                             <h3>Test Ergebnisse</h3>
                             <p>Sehen Sie alle durchgeführten Tests und deren Ergebnisse ein</p>
                             <span class="kc-tile-stat" id="kc-stat-results">0 Ergebnisse</span>
+                        </div>
+                    </div>
+                    <!-- Message for users without sub-page access -->
+                    <div class="kc-no-access-message" id="kc-no-access-message" style="display: none;">
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            <h3>Eingeschränkter Zugriff</h3>
+                            <p>Sie haben keine Berechtigung auf die Knowledge Check Module zuzugreifen. Kontaktieren Sie Ihren Administrator für erweiterte Zugriffsrechte.</p>
                         </div>
                     </div>
                 </section>
@@ -529,7 +541,7 @@
                 <section id="view-kcResults" class="view">
                     <div class="view-header">
                         <div class="view-actions">
-                            <button class="btn btn-primary" id="new-kc-result-btn">
+                            <button class="btn btn-primary" id="add-kc-result-btn">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
                                     <line x1="5" y1="12" x2="19" y2="12"></line>
