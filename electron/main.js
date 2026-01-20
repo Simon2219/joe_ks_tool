@@ -28,12 +28,16 @@ function createWindow() {
         icon: getAppIcon(),
         backgroundColor: '#1a1a2e',
         show: false, // Don't show until ready
+        autoHideMenuBar: true, // Hide the menu bar
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: true
         }
     });
+
+    // Hide the application menu completely
+    mainWindow.setMenuBarVisibility(false);
 
     // Load the app
     mainWindow.loadURL(`http://localhost:${PORT}`);
@@ -314,7 +318,7 @@ app.whenReady().then(async () => {
         // Create window and tray
         createWindow();
         createTray();
-        createMenu();
+        // Menu is hidden - don't create it (autoHideMenuBar + setMenuBarVisibility(false))
 
         // macOS: Re-create window when dock icon is clicked
         app.on('activate', () => {

@@ -130,7 +130,13 @@ const API = {
             return result;
         } catch (error) {
             console.error('[API] Request failed:', error);
-            return { success: false, error: 'Network error' };
+            // Show specific API endpoint in error message for debugging
+            return { 
+                success: false, 
+                error: `API Error: ${method} ${endpoint} failed - ${error.message || 'Connection error'}`,
+                endpoint: endpoint,
+                method: method
+            };
         }
     },
 
@@ -215,7 +221,11 @@ window.api = {
         getComments: (ticketId) => API.get(`/tickets/${ticketId}/comments`),
         getHistory: (ticketId) => API.get(`/tickets/${ticketId}/history`),
         getStatistics: () => API.get('/tickets/statistics'),
-        getByUser: (userId) => API.get(`/tickets?assignedTo=${userId}`)
+        getByUser: (userId) => API.get(`/tickets?assignedTo=${userId}`),
+        exportTickets: (filters = {}, format = 'csv') => {
+            const params = new URLSearchParams({ ...filters, format }).toString();
+            return API.get(`/tickets/export${params ? '?' + params : ''}`);
+        }
     },
 
     quality: {
@@ -232,7 +242,11 @@ window.api = {
         createCategory: (categoryData) => API.post('/quality/categories', categoryData),
         updateCategory: (id, categoryData) => API.put(`/quality/categories/${id}`, categoryData),
         deleteCategory: (id) => API.delete(`/quality/categories/${id}`),
-        getStatistics: () => API.get('/quality/stats')
+        getStatistics: () => API.get('/quality/stats'),
+        exportReports: (filters = {}, format = 'csv') => {
+            const params = new URLSearchParams({ ...filters, format }).toString();
+            return API.get(`/quality/export${params ? '?' + params : ''}`);
+        }
     },
 
     roles: {
@@ -242,6 +256,56 @@ window.api = {
         update: (id, roleData) => API.put(`/roles/${id}`, roleData),
         delete: (id) => API.delete(`/roles/${id}`),
         getPermissions: () => API.get('/roles/permissions')
+    },
+
+    knowledgeCheck: {
+        // Categories
+        getCategories: () => API.get('/knowledge-check/categories'),
+        getCategoryById: (id) => API.get(`/knowledge-check/categories/${id}`),
+        createCategory: (data) => API.post('/knowledge-check/categories', data),
+        updateCategory: (id, data) => API.put(`/knowledge-check/categories/${id}`, data),
+        deleteCategory: (id) => API.delete(`/knowledge-check/categories/${id}`),
+        reorderCategories: (categoryIds) => API.put('/knowledge-check/categories/reorder', { categoryIds }),
+
+        // Questions
+        getQuestions: (filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/knowledge-check/questions${params ? '?' + params : ''}`);
+        },
+        getQuestionById: (id) => API.get(`/knowledge-check/questions/${id}`),
+        createQuestion: (data) => API.post('/knowledge-check/questions', data),
+        updateQuestion: (id, data) => API.put(`/knowledge-check/questions/${id}`, data),
+        deleteQuestion: (id) => API.delete(`/knowledge-check/questions/${id}`),
+        moveQuestion: (id, categoryId) => API.put(`/knowledge-check/questions/${id}/move`, { categoryId }),
+
+        // Tests
+        getTests: (filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/knowledge-check/tests${params ? '?' + params : ''}`);
+        },
+        getTestById: (id) => API.get(`/knowledge-check/tests/${id}`),
+        createTest: (data) => API.post('/knowledge-check/tests', data),
+        updateTest: (id, data) => API.put(`/knowledge-check/tests/${id}`, data),
+        deleteTest: (id) => API.delete(`/knowledge-check/tests/${id}`),
+
+        // Results
+        getResults: (filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/knowledge-check/results${params ? '?' + params : ''}`);
+        },
+        getResultById: (id) => API.get(`/knowledge-check/results/${id}`),
+        createResult: (data) => API.post('/knowledge-check/results', data),
+        updateResult: (id, data) => API.put(`/knowledge-check/results/${id}`, data),
+        deleteResult: (id) => API.delete(`/knowledge-check/results/${id}`),
+
+        // Statistics & Export
+        getStatistics: () => API.get('/knowledge-check/stats'),
+        exportResults: (filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/knowledge-check/export/results${params ? '?' + params : ''}`);
+        },
+        checkAnswer: (answer, exactAnswer, triggerWords) => 
+            API.post('/knowledge-check/check-answer', { answer, exactAnswer, triggerWords })
     },
 
     settings: {

@@ -126,6 +126,13 @@ const Permissions = {
         
         // Role buttons
         this.toggleElement('add-role-btn', 'role_create');
+        
+        // Knowledge Check buttons
+        this.toggleElement('add-kc-question-btn', 'kc_questions_create');
+        this.toggleElement('add-kc-category-btn', 'kc_categories_create');
+        this.toggleElement('add-kc-test-btn', 'kc_tests_create');
+        this.toggleElement('add-kc-result-btn', 'kc_results_create');
+        this.toggleElement('export-kc-results-btn', 'kc_results_view');
     },
 
     /**
@@ -164,7 +171,11 @@ const Permissions = {
             user: 'user_create',
             ticket: 'ticket_create',
             quality: 'quality_create',
-            role: 'role_create'
+            role: 'role_create',
+            kcQuestion: 'kc_questions_create',
+            kcCategory: 'kc_categories_create',
+            kcTest: 'kc_tests_create',
+            kcResult: 'kc_results_create'
         };
         return this.hasPermission(createPermissions[entityType]);
     },
@@ -177,7 +188,10 @@ const Permissions = {
             user: 'user_edit',
             ticket: 'ticket_edit',
             quality: 'quality_edit',
-            role: 'role_edit'
+            role: 'role_edit',
+            kcQuestion: 'kc_questions_edit',
+            kcCategory: 'kc_categories_edit',
+            kcTest: 'kc_tests_edit'
         };
         return this.hasPermission(editPermissions[entityType]);
     },
@@ -190,9 +204,25 @@ const Permissions = {
             user: 'user_delete',
             ticket: 'ticket_delete',
             quality: 'quality_delete',
-            role: 'role_delete'
+            role: 'role_delete',
+            kcQuestion: 'kc_questions_delete',
+            kcCategory: 'kc_categories_delete',
+            kcTest: 'kc_tests_delete',
+            kcResult: 'kc_results_delete'
         };
         return this.hasPermission(deletePermissions[entityType]);
+    },
+
+    /**
+     * Checks if user can view entities of a type
+     */
+    canView(entityType) {
+        const viewPermissions = {
+            kcQuestion: 'kc_questions_view',
+            kcTest: 'kc_tests_view',
+            kcResult: 'kc_results_view'
+        };
+        return this.hasPermission(viewPermissions[entityType]);
     },
 
     /**
@@ -204,6 +234,25 @@ const Permissions = {
             quality: 'quality_view_all'
         };
         return this.hasPermission(viewAllPermissions[entityType]);
+    },
+
+    /**
+     * Knowledge Check specific permission helpers
+     */
+    canAccessKnowledgeCheck() {
+        return this.hasPermission('kc_view');
+    },
+
+    canAccessKCQuestions() {
+        return this.hasPermission('kc_questions_view');
+    },
+
+    canAccessKCTests() {
+        return this.hasPermission('kc_tests_view');
+    },
+
+    canAccessKCResults() {
+        return this.hasPermission('kc_results_view');
     },
 
     /**
@@ -300,7 +349,23 @@ const Permissions = {
             'settings_edit': 'Edit Settings',
             'admin_access': 'Admin Panel Access',
             'integration_sharepoint': 'SharePoint Integration',
-            'integration_jira': 'JIRA Integration'
+            'integration_jira': 'JIRA Integration',
+            // Knowledge Check permissions
+            'kc_view': 'View Knowledge Check Tab',
+            'kc_questions_view': 'View Question Catalog',
+            'kc_questions_create': 'Create Questions',
+            'kc_questions_edit': 'Edit Questions',
+            'kc_questions_delete': 'Delete Questions',
+            'kc_categories_create': 'Create Categories',
+            'kc_categories_edit': 'Edit Categories',
+            'kc_categories_delete': 'Delete Categories',
+            'kc_tests_view': 'View Test Catalog',
+            'kc_tests_create': 'Create Tests',
+            'kc_tests_edit': 'Edit Tests',
+            'kc_tests_delete': 'Delete Tests',
+            'kc_results_view': 'View Test Results',
+            'kc_results_create': 'Conduct Tests',
+            'kc_results_delete': 'Delete Test Results'
         };
         
         return permissionNames[permissionId] || permissionId;
@@ -314,6 +379,7 @@ const Permissions = {
             users: [],
             tickets: [],
             quality: [],
+            knowledgeCheck: [],
             roles: [],
             settings: [],
             integrations: [],
@@ -324,6 +390,7 @@ const Permissions = {
             if (perm.startsWith('user_')) modules.users.push(perm);
             else if (perm.startsWith('ticket_')) modules.tickets.push(perm);
             else if (perm.startsWith('quality_')) modules.quality.push(perm);
+            else if (perm.startsWith('kc_')) modules.knowledgeCheck.push(perm);
             else if (perm.startsWith('role_')) modules.roles.push(perm);
             else if (perm.startsWith('settings_')) modules.settings.push(perm);
             else if (perm.startsWith('integration_')) modules.integrations.push(perm);

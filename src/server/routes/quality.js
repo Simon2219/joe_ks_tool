@@ -251,4 +251,47 @@ router.get('/stats', requirePermission('quality_view'), (req, res) => {
     }
 });
 
+/**
+ * GET /api/quality/export
+ * Exports quality reports as CSV
+ */
+router.get('/export', requirePermission('quality_view'), (req, res) => {
+    try {
+        let reports;
+        
+        if (hasPermission(req.user, 'quality_view_all')) {
+            reports = QualitySystem.getAllReports(req.query);
+        } else {
+            reports = QualitySystem.getByAgent(req.user.id);
+        }
+        
+        const formattedReports = reports.map(formatReport);
+        
+        // Generate CSV
+        const headers = ['Report #', 'Agent', 'Evaluator', 'Type', 'Score', 'Passed', 'Date', 'Strengths', 'Areas for Improvement', 'Coaching Notes'];
+        const rows = formattedReports.map(r => [
+            r.reportNumber,
+            r.agentName,
+            r.evaluatorName,
+            r.evaluationType,
+            r.overallScore + '%',
+            r.passed ? 'Yes' : 'No',
+            new Date(r.evaluationDate).toLocaleDateString(),
+            (r.strengths || '').replace(/"/g, '""'),
+            (r.areasForImprovement || '').replace(/"/g, '""'),
+            (r.coachingNotes || '').replace(/"/g, '""')
+        ]);
+        
+        const csv = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+        
+        res.json({ success: true, data: csv });
+    } catch (error) {
+        console.error('Export quality reports error:', error);
+        res.status(500).json({ success: false, error: 'Failed to export reports' });
+    }
+});
+
 module.exports = router;

@@ -51,6 +51,39 @@ router.get('/stats', requirePermission('user_view'), (req, res) => {
 });
 
 /**
+ * GET /api/users/export/:format - Export users
+ * Note: This must come BEFORE /:id route
+ */
+router.get('/export/:format', requirePermission('user_view'), (req, res) => {
+    try {
+        const users = UserSystem.getAll().map(sanitizeUser);
+        
+        // Generate CSV
+        const headers = ['Username', 'Email', 'First Name', 'Last Name', 'Role', 'Department', 'Status', 'Last Login'];
+        const rows = users.map(u => [
+            u.username,
+            u.email,
+            u.firstName,
+            u.lastName,
+            u.roleName,
+            u.department || '',
+            u.isActive ? 'Active' : 'Inactive',
+            u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'
+        ]);
+        
+        const csv = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+        
+        res.json({ success: true, data: csv });
+    } catch (error) {
+        console.error('Export users error:', error);
+        res.status(500).json({ success: false, error: 'Failed to export users' });
+    }
+});
+
+/**
  * GET /api/users/:id
  */
 router.get('/:id', requirePermission('user_view'), (req, res) => {

@@ -39,13 +39,23 @@ const App = {
             this.handleLogout();
         });
 
-        // Navigation items
+        // Navigation items (excluding submenu parent items)
         document.querySelectorAll('.nav-item[data-view]').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
+                
+                // If it has a submenu, toggle it instead of navigating
+                if (item.classList.contains('has-submenu')) {
+                    this.toggleSubmenu(item);
+                    return;
+                }
+                
                 this.navigateTo(item.dataset.view);
             });
         });
+
+        // Initialize submenu state based on current view
+        this.initSubmenus();
 
         // Sidebar toggle
         document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
@@ -223,6 +233,15 @@ const App = {
             item.classList.toggle('active', item.dataset.view === viewName);
         });
 
+        // Update submenu parent states
+        document.querySelectorAll('.nav-item-group').forEach(group => {
+            const hasActiveChild = group.querySelector(`.nav-subitem[data-view="${viewName}"]`);
+            group.classList.toggle('child-active', !!hasActiveChild);
+            if (hasActiveChild && !group.classList.contains('expanded')) {
+                group.classList.add('expanded');
+            }
+        });
+
         // Hide all views
         document.querySelectorAll('.view').forEach(view => {
             view.classList.remove('active');
@@ -240,6 +259,10 @@ const App = {
             users: 'UserSystem',
             tickets: 'TicketSystem',
             quality: 'QualitySystem',
+            knowledgeCheck: 'Knowledge Check',
+            kcQuestions: 'Fragen Katalog',
+            kcTests: 'Test Katalog',
+            kcResults: 'Test Ergebnisse',
             roles: 'RoleSystem',
             integrations: 'IntegrationSystem',
             settings: 'SettingsSystem'
@@ -269,6 +292,18 @@ const App = {
                 case 'quality':
                     await QualityView.init();
                     break;
+                case 'knowledgeCheck':
+                    await KnowledgeCheckView.init();
+                    break;
+                case 'kcQuestions':
+                    await KCQuestionsView.init();
+                    break;
+                case 'kcTests':
+                    await KCTestsView.init();
+                    break;
+                case 'kcResults':
+                    await KCResultsView.init();
+                    break;
                 case 'roles':
                     await RolesView.init();
                     break;
@@ -294,6 +329,10 @@ const App = {
             users: UsersView,
             tickets: TicketsView,
             quality: QualityView,
+            knowledgeCheck: KnowledgeCheckView,
+            kcQuestions: KCQuestionsView,
+            kcTests: KCTestsView,
+            kcResults: KCResultsView,
             roles: RolesView,
             integrations: IntegrationsView,
             settings: SettingsView
@@ -315,29 +354,86 @@ const App = {
     },
 
     /**
+     * Initializes submenu states
+     */
+    initSubmenus() {
+        // Check if current view is a submenu item and expand parent
+        document.querySelectorAll('.nav-subitem').forEach(item => {
+            if (item.classList.contains('active')) {
+                const group = item.closest('.nav-item-group');
+                if (group) {
+                    group.classList.add('expanded', 'child-active');
+                }
+            }
+        });
+    },
+
+    /**
+     * Toggles a submenu
+     */
+    toggleSubmenu(navItem) {
+        const group = navItem.closest('.nav-item-group');
+        if (group) {
+            group.classList.toggle('expanded');
+        }
+    },
+
+    /**
+     * Opens a submenu containing a specific view
+     */
+    openSubmenuForView(viewName) {
+        const navItem = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+        if (navItem && navItem.classList.contains('nav-subitem')) {
+            const group = navItem.closest('.nav-item-group');
+            if (group) {
+                group.classList.add('expanded', 'child-active');
+            }
+        }
+    },
+
+    /**
      * Initializes sidebar resize functionality
      */
     initSidebarResize() {
         const sidebar = document.getElementById('sidebar');
         const handle = document.getElementById('sidebar-resize-handle');
         let isResizing = false;
+        let animationFrame = null;
 
-        handle?.addEventListener('mousedown', (e) => {
+        if (!handle || !sidebar) return;
+
+        const minWidth = 200;
+        const maxWidth = 400;
+
+        handle.addEventListener('mousedown', (e) => {
+            // Don't allow resize when collapsed
+            if (sidebar.classList.contains('collapsed')) return;
+            
             isResizing = true;
             document.body.style.cursor = 'ew-resize';
             document.body.style.userSelect = 'none';
+            
+            // Disable transition during resize for smooth movement
+            sidebar.style.transition = 'none';
+            
+            e.preventDefault();
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
             
-            const newWidth = e.clientX;
-            const minWidth = parseInt(getComputedStyle(sidebar).getPropertyValue('--sidebar-min-width')) || 200;
-            const maxWidth = parseInt(getComputedStyle(sidebar).getPropertyValue('--sidebar-max-width')) || 400;
-            
-            if (newWidth >= minWidth && newWidth <= maxWidth) {
-                sidebar.style.width = `${newWidth}px`;
+            // Use requestAnimationFrame for smooth updates
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
             }
+            
+            animationFrame = requestAnimationFrame(() => {
+                const newWidth = e.clientX;
+                
+                if (newWidth >= minWidth && newWidth <= maxWidth) {
+                    sidebar.style.width = `${newWidth}px`;
+                }
+            });
         });
 
         document.addEventListener('mouseup', () => {
@@ -345,6 +441,14 @@ const App = {
                 isResizing = false;
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
+                
+                // Re-enable transition after resize
+                sidebar.style.transition = '';
+                
+                if (animationFrame) {
+                    cancelAnimationFrame(animationFrame);
+                    animationFrame = null;
+                }
             }
         });
     },

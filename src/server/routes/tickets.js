@@ -103,6 +103,47 @@ router.get('/statistics', requirePermission('ticket_view'), (req, res) => {
 });
 
 /**
+ * GET /api/tickets/export - Export tickets
+ */
+router.get('/export', requirePermission('ticket_view'), (req, res) => {
+    try {
+        let tickets;
+        
+        if (hasPermission(req.user, 'ticket_view_all')) {
+            tickets = TicketSystem.getAll(req.query);
+        } else {
+            tickets = TicketSystem.getByUser(req.user.id);
+        }
+        
+        const formattedTickets = tickets.map(formatTicket);
+        
+        // Generate CSV
+        const headers = ['Ticket #', 'Title', 'Status', 'Priority', 'Category', 'Assigned To', 'Customer', 'Created', 'Due Date'];
+        const rows = formattedTickets.map(t => [
+            t.ticketNumber,
+            (t.title || '').replace(/"/g, '""'),
+            t.status,
+            t.priority,
+            t.category,
+            t.assignedToName || 'Unassigned',
+            t.customerName || '',
+            t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '',
+            t.dueDate ? new Date(t.dueDate).toLocaleDateString() : ''
+        ]);
+        
+        const csv = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+        
+        res.json({ success: true, data: csv });
+    } catch (error) {
+        console.error('Export tickets error:', error);
+        res.status(500).json({ success: false, error: 'Failed to export tickets' });
+    }
+});
+
+/**
  * GET /api/tickets/:id
  */
 router.get('/:id', requirePermission('ticket_view'), (req, res) => {
