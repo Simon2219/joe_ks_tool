@@ -431,16 +431,136 @@ function initSchema() {
     database.run('CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to)');
     database.run('CREATE INDEX IF NOT EXISTS idx_quality_reports_agent ON quality_reports(agent_id)');
     
+    // Run migrations for existing databases
+    runMigrations(database);
+    
     saveDb();
     console.log('Database schema initialized');
+}
+
+/**
+ * Run database migrations to add missing columns to existing tables
+ */
+function runMigrations(database) {
+    console.log('Running database migrations...');
+    
+    // Helper function to check if a column exists
+    function columnExists(tableName, columnName) {
+        try {
+            const result = all(`PRAGMA table_info(${tableName})`);
+            return result.some(col => col.name === columnName);
+        } catch (e) {
+            return false;
+        }
+    }
+    
+    // Migration 1: Add is_archived and archived_at to kc_questions
+    if (!columnExists('kc_questions', 'is_archived')) {
+        console.log('Adding is_archived column to kc_questions...');
+        database.run('ALTER TABLE kc_questions ADD COLUMN is_archived INTEGER DEFAULT 0');
+    }
+    if (!columnExists('kc_questions', 'archived_at')) {
+        console.log('Adding archived_at column to kc_questions...');
+        database.run('ALTER TABLE kc_questions ADD COLUMN archived_at TEXT DEFAULT NULL');
+    }
+    
+    // Migration 2: Add is_archived and archived_at to kc_tests
+    if (!columnExists('kc_tests', 'is_archived')) {
+        console.log('Adding is_archived column to kc_tests...');
+        database.run('ALTER TABLE kc_tests ADD COLUMN is_archived INTEGER DEFAULT 0');
+    }
+    if (!columnExists('kc_tests', 'archived_at')) {
+        console.log('Adding archived_at column to kc_tests...');
+        database.run('ALTER TABLE kc_tests ADD COLUMN archived_at TEXT DEFAULT NULL');
+    }
+    
+    console.log('Database migrations completed');
 }
 
 // ============================================
 // SEED DEFAULT DATA
 // ============================================
 
+/**
+ * Ensure all current permissions exist in the database (for existing installations)
+ */
+function ensurePermissions() {
+    console.log('Ensuring all permissions exist...');
+    
+    const permissions = [
+        { id: 'user_view', name: 'View Users', module: 'users' },
+        { id: 'user_create', name: 'Create Users', module: 'users' },
+        { id: 'user_edit', name: 'Edit Users', module: 'users' },
+        { id: 'user_delete', name: 'Delete Users', module: 'users' },
+        { id: 'ticket_view', name: 'View Own Tickets', module: 'tickets' },
+        { id: 'ticket_view_all', name: 'View All Tickets', module: 'tickets' },
+        { id: 'ticket_create', name: 'Create Tickets', module: 'tickets' },
+        { id: 'ticket_edit', name: 'Edit Tickets', module: 'tickets' },
+        { id: 'ticket_delete', name: 'Delete Tickets', module: 'tickets' },
+        { id: 'ticket_assign', name: 'Assign Tickets', module: 'tickets' },
+        { id: 'quality_view', name: 'View Own Evaluations', module: 'quality' },
+        { id: 'quality_view_all', name: 'View All Evaluations', module: 'quality' },
+        { id: 'quality_create', name: 'Create Evaluations', module: 'quality' },
+        { id: 'quality_edit', name: 'Edit Evaluations', module: 'quality' },
+        { id: 'quality_delete', name: 'Delete Evaluations', module: 'quality' },
+        { id: 'quality_manage', name: 'Manage Categories', module: 'quality' },
+        { id: 'kc_view', name: 'View Knowledge Check Tab', module: 'knowledge_check' },
+        { id: 'kc_questions_view', name: 'View Question Catalog', module: 'knowledge_check' },
+        { id: 'kc_questions_create', name: 'Create Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_edit', name: 'Edit Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_delete', name: 'Delete Questions', module: 'knowledge_check' },
+        { id: 'kc_categories_create', name: 'Create Categories', module: 'knowledge_check' },
+        { id: 'kc_categories_edit', name: 'Edit Categories', module: 'knowledge_check' },
+        { id: 'kc_categories_delete', name: 'Delete Categories', module: 'knowledge_check' },
+        { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
+        { id: 'kc_tests_create', name: 'Create Tests', module: 'knowledge_check' },
+        { id: 'kc_tests_edit', name: 'Edit Tests', module: 'knowledge_check' },
+        { id: 'kc_tests_delete', name: 'Delete Tests', module: 'knowledge_check' },
+        { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
+        { id: 'kc_results_create', name: 'Conduct Tests', module: 'knowledge_check' },
+        { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
+        { id: 'kc_archive_view', name: 'View Archive', module: 'knowledge_check' },
+        { id: 'kc_archive_restore', name: 'Restore from Archive', module: 'knowledge_check' },
+        { id: 'kc_archive_delete', name: 'Permanently Delete Archived', module: 'knowledge_check' },
+        { id: 'role_view', name: 'View Roles', module: 'roles' },
+        { id: 'role_create', name: 'Create Roles', module: 'roles' },
+        { id: 'role_edit', name: 'Edit Roles', module: 'roles' },
+        { id: 'role_delete', name: 'Delete Roles', module: 'roles' },
+        { id: 'settings_view', name: 'View Settings', module: 'settings' },
+        { id: 'settings_edit', name: 'Edit Settings', module: 'settings' },
+        { id: 'admin_access', name: 'Admin Access', module: 'admin' },
+        { id: 'integration_access', name: 'Integration Access', module: 'integrations' }
+    ];
+    
+    let addedCount = 0;
+    permissions.forEach(p => {
+        const exists = get('SELECT id FROM permissions WHERE id = ?', [p.id]);
+        if (!exists) {
+            run('INSERT INTO permissions (id, name, module) VALUES (?, ?, ?)', [p.id, p.name, p.module]);
+            addedCount++;
+        }
+    });
+    
+    // Grant all KC permissions to admin role if it exists
+    const adminRole = get('SELECT id FROM roles WHERE id = ? OR name = ?', ['admin', 'Administrator']);
+    if (adminRole) {
+        const kcPermIds = permissions.filter(p => p.module === 'knowledge_check').map(p => p.id);
+        kcPermIds.forEach(permId => {
+            run('INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [adminRole.id, permId]);
+        });
+    }
+    
+    if (addedCount > 0) {
+        console.log(`Added ${addedCount} new permissions`);
+        saveDb();
+    }
+}
+
 async function seedData() {
     const now = new Date().toISOString();
+    
+    // Always ensure permissions exist (for existing installations)
+    ensurePermissions();
     
     // Check if already seeded
     const existing = get('SELECT id FROM users WHERE username = ?', ['admin']);

@@ -133,6 +133,23 @@ const RolesView = {
     },
 
     /**
+     * Gets a display-friendly module name
+     */
+    getModuleDisplayName(module) {
+        const moduleNames = {
+            users: 'Users',
+            tickets: 'Tickets',
+            quality: 'Quality System',
+            knowledgeCheck: 'Knowledge Check',
+            roles: 'Roles',
+            settings: 'Settings',
+            integrations: 'Integrations',
+            admin: 'Administration'
+        };
+        return moduleNames[module] || module;
+    },
+
+    /**
      * Shows the role form modal
      */
     async showRoleForm(role = null) {
@@ -141,6 +158,9 @@ const RolesView = {
 
         // Group permissions by module
         const grouped = Permissions.getPermissionsByModule(this.allPermissions.map(p => p.id));
+
+        // Define the order of modules for display
+        const moduleOrder = ['users', 'tickets', 'quality', 'knowledgeCheck', 'roles', 'settings', 'integrations', 'admin'];
 
         const formHtml = `
             <form id="role-form">
@@ -167,9 +187,11 @@ const RolesView = {
                 
                 <h4 style="margin: var(--space-lg) 0 var(--space-md);">Permissions</h4>
                 
-                ${Object.entries(grouped).filter(([_, perms]) => perms.length > 0).map(([module, perms]) => `
+                ${moduleOrder.filter(module => grouped[module]?.length > 0).map(module => {
+                    const perms = grouped[module];
+                    return `
                     <div class="form-group" style="margin-bottom: var(--space-lg);">
-                        <strong style="text-transform: capitalize;">${module}</strong>
+                        <strong>${this.getModuleDisplayName(module)}</strong>
                         <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm);">
                             ${perms.map(permId => {
                                 const checked = role?.permissions?.includes(permId) ? 'checked' : '';
@@ -182,7 +204,7 @@ const RolesView = {
                             }).join('')}
                         </div>
                     </div>
-                `).join('')}
+                `}).join('')}
             </form>
         `;
 
