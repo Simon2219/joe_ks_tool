@@ -42,9 +42,9 @@
     flex-shrink: 0;
 }
 
-/* Primary Button - Gradient Fill */
+/* Primary Button - Solid Fill (avoids gradient-to-solid transition flicker) */
 .btn-primary {
-    background: var(--brand-gradient);
+    background: var(--brand-primary);
     color: white;
 }
 
@@ -72,7 +72,8 @@
 }
 
 .btn-danger:hover:not(:disabled) {
-    background: #dc2626;
+    background: var(--color-danger);
+    filter: brightness(0.9);
     box-shadow: var(--shadow-md);
 }
 
@@ -83,7 +84,8 @@
 }
 
 .btn-success:hover:not(:disabled) {
-    background: #059669;
+    background: var(--color-success);
+    filter: brightness(0.9);
     box-shadow: var(--shadow-md);
 }
 
@@ -397,10 +399,10 @@
 }
 
 /* Priority Badges */
-.priority-critical { background: #dc2626; color: white; }
-.priority-high { background: #ea580c; color: white; }
-.priority-medium { background: #ca8a04; color: white; }
-.priority-low { background: #16a34a; color: white; }
+.priority-critical { background: var(--color-danger); color: white; }
+.priority-high { background: var(--color-warning); color: white; }
+.priority-medium { background: var(--brand-primary); color: white; }
+.priority-low { background: var(--color-success); color: white; }
 
 /* Status Badges */
 .status-new { background: var(--color-info-bg); color: var(--color-info); }
