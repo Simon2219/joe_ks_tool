@@ -6,6 +6,7 @@
 const App = {
     currentView: 'dashboard',
     isAuthenticated: false,
+    loadedViews: new Set(),
 
     /**
      * Initializes the application
@@ -18,6 +19,9 @@ const App = {
         Modal.init();
         Toast.init();
 
+        // Preload common templates
+        this.preloadTemplates();
+
         // Check for existing session
         await this.checkSession();
 
@@ -25,6 +29,17 @@ const App = {
         this.bindEvents();
 
         console.log('Customer Support Tool initialized');
+    },
+
+    /**
+     * Preloads commonly used templates
+     */
+    async preloadTemplates() {
+        try {
+            await TemplateLoader.preload(['dashboard', 'users', 'tickets']);
+        } catch (error) {
+            console.warn('Template preload warning:', error);
+        }
     },
 
     /**
@@ -233,12 +248,59 @@ const App = {
                 await window.api.auth.logout();
                 this.isAuthenticated = false;
                 Permissions.clearUser();
+                
+                // Clear loaded views cache on logout
+                this.loadedViews.clear();
+                TemplateLoader.clearCache();
+                
+                // Clear the views container
+                const container = document.getElementById('views-container');
+                if (container) {
+                    container.innerHTML = '';
+                }
+                
                 this.showLoginScreen();
                 Toast.info('You have been logged out');
             } catch (error) {
                 console.error('Logout error:', error);
                 Toast.error('Failed to logout');
             }
+        }
+    },
+
+    /**
+     * Loads a view template if not already loaded
+     * @param {string} viewName - Name of the view to load
+     */
+    async loadViewTemplate(viewName) {
+        // If already loaded, just return
+        if (this.loadedViews.has(viewName)) {
+            return document.getElementById(`view-${viewName}`);
+        }
+
+        const container = document.getElementById('views-container');
+        
+        try {
+            const html = await TemplateLoader.load(viewName);
+            
+            // Create a temporary container to parse the HTML
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            
+            // Get the view element
+            const viewElement = temp.firstElementChild;
+            
+            // Append to container
+            container.appendChild(viewElement);
+            
+            // Mark as loaded
+            this.loadedViews.add(viewName);
+            
+            return viewElement;
+        } catch (error) {
+            console.error(`Failed to load template for ${viewName}:`, error);
+            Toast.error(`Failed to load ${viewName} view`);
+            return null;
         }
     },
 
@@ -281,6 +343,9 @@ const App = {
                 group.classList.remove('child-active');
             }
         });
+
+        // Load template if needed
+        await this.loadViewTemplate(viewName);
 
         // Hide all views
         document.querySelectorAll('.view').forEach(view => {

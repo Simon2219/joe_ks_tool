@@ -1,0 +1,44 @@
+<section id="view-kcArchive" class="view">
+    <div class="view-header">
+        <div class="view-actions">
+            <span class="archive-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; vertical-align: middle;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                Archivierte Elemente werden automatisch erstellt wenn Fragen oder Tests mit bestehenden Ergebnissen gelöscht werden
+            </span>
+        </div>
+    </div>
+    <div class="archive-stats" id="archive-stats">
+        <div class="quality-stat-card">
+            <span class="stat-value" id="archive-questions-count">0</span>
+            <span class="stat-label">Archivierte Fragen</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="archive-tests-count">0</span>
+            <span class="stat-label">Archivierte Tests</span>
+        </div>
+    </div>
+    
+    <!-- Archive Tabs -->
+    <div class="archive-tabs">
+        <button class="archive-tab active" data-tab="questions">Fragen</button>
+        <button class="archive-tab" data-tab="tests">Tests</button>
+    </div>
+    
+    <!-- Archived Questions -->
+    <div class="archive-content" id="archive-questions-content">
+        <div id="archive-questions-list" class="archive-list">
+            <!-- Archived questions will be rendered here -->
+        </div>
+    </div>
+    
+    <!-- Archived Tests -->
+    <div class="archive-content hidden" id="archive-tests-content">
+        <div id="archive-tests-list" class="archive-list">
+            <!-- Archived tests will be rendered here -->
+        </div>
+    </div>
+</section>

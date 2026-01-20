@@ -1,0 +1,56 @@
+<section id="view-integrations" class="view">
+    <div class="integrations-grid">
+        <div class="integration-card" id="sharepoint-card">
+            <div class="integration-header">
+                <div class="integration-icon sharepoint">SP</div>
+                <div class="integration-info">
+                    <h3>Microsoft SharePoint</h3>
+                    <span class="integration-status" id="sharepoint-status">Disconnected</span>
+                </div>
+            </div>
+            <div class="integration-config" id="sharepoint-config">
+                <div class="form-group">
+                    <label>Site URL</label>
+                    <input type="url" id="sp-site-url" class="form-input" placeholder="https://yourtenant.sharepoint.com/sites/yoursite">
+                </div>
+                <div class="form-group">
+                    <label>Tenant ID</label>
+                    <input type="text" id="sp-tenant-id" class="form-input" placeholder="Your Azure AD Tenant ID">
+                </div>
+                <div class="form-group">
+                    <label>Client ID</label>
+                    <input type="text" id="sp-client-id" class="form-input" placeholder="App Registration Client ID">
+                </div>
+                <div class="form-group">
+                    <label>Client Secret</label>
+                    <input type="password" id="sp-client-secret" class="form-input" placeholder="App Registration Client Secret">
+                </div>
+                <button class="btn btn-primary" id="sp-connect-btn">Connect</button>
+            </div>
+        </div>
+        <div class="integration-card" id="jira-card">
+            <div class="integration-header">
+                <div class="integration-icon jira">JI</div>
+                <div class="integration-info">
+                    <h3>Atlassian JIRA</h3>
+                    <span class="integration-status" id="jira-status">Disconnected</span>
+                </div>
+            </div>
+            <div class="integration-config" id="jira-config">
+                <div class="form-group">
+                    <label>JIRA Base URL</label>
+                    <input type="url" id="jira-base-url" class="form-input" placeholder="https://yourcompany.atlassian.net">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="jira-email" class="form-input" placeholder="your-email@company.com">
+                </div>
+                <div class="form-group">
+                    <label>API Token</label>
+                    <input type="password" id="jira-api-token" class="form-input" placeholder="Your JIRA API Token">
+                </div>
+                <button class="btn btn-primary" id="jira-connect-btn">Connect</button>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,61 @@
+<section id="view-quality" class="view">
+    <div class="view-header">
+        <div class="view-actions">
+            <button class="btn btn-primary" id="add-quality-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Evaluation
+            </button>
+            <button class="btn btn-secondary" id="manage-categories-btn">Manage Categories</button>
+            <button class="btn btn-secondary" id="export-quality-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export
+            </button>
+        </div>
+        <div class="view-filters">
+            <select id="filter-quality-agent" class="form-select">
+                <option value="">All Agents</option>
+            </select>
+            <input type="date" id="filter-quality-start" class="form-input" placeholder="Start Date">
+            <input type="date" id="filter-quality-end" class="form-input" placeholder="End Date">
+        </div>
+    </div>
+    <div class="quality-overview" id="quality-overview">
+        <div class="quality-stat-card">
+            <span class="stat-value" id="quality-avg-score">--</span>
+            <span class="stat-label">Average Score</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="quality-passing-rate">--</span>
+            <span class="stat-label">Passing Rate</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="quality-total-evals">--</span>
+            <span class="stat-label">Total Evaluations</span>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="quality-table">
+            <thead>
+                <tr>
+                    <th>Report #</th>
+                    <th>Agent</th>
+                    <th>Evaluator</th>
+                    <th>Type</th>
+                    <th>Score</th>
+                    <th>Result</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="quality-tbody">
+            </tbody>
+        </table>
+    </div>
+</section>

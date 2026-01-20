@@ -1,0 +1,53 @@
+<section id="view-knowledgeCheck" class="view">
+    <div class="kc-tiles-container" id="kc-tiles-container">
+        <div class="kc-tile" data-navigate="kcQuestions" data-permission="kc_questions_view">
+            <div class="kc-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </div>
+            <h3>Fragen Katalog</h3>
+            <p>Verwalten Sie Ihren Fragenkatalog mit Kategorien und verschiedenen Fragetypen</p>
+            <span class="kc-tile-stat" id="kc-stat-questions">0 Fragen</span>
+        </div>
+        <div class="kc-tile" data-navigate="kcTests" data-permission="kc_tests_view">
+            <div class="kc-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            </div>
+            <h3>Test Katalog</h3>
+            <p>Erstellen und verwalten Sie Tests aus Ihrem Fragenkatalog</p>
+            <span class="kc-tile-stat" id="kc-stat-tests">0 Tests</span>
+        </div>
+        <div class="kc-tile" data-navigate="kcResults" data-permission="kc_results_view">
+            <div class="kc-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            </div>
+            <h3>Test Ergebnisse</h3>
+            <p>Sehen Sie alle durchgeführten Tests und deren Ergebnisse ein</p>
+            <span class="kc-tile-stat" id="kc-stat-results">0 Ergebnisse</span>
+        </div>
+    </div>
+    <!-- Message for users without sub-page access -->
+    <div class="kc-no-access-message" id="kc-no-access-message" style="display: none;">
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <h3>Eingeschränkter Zugriff</h3>
+            <p>Sie haben keine Berechtigung auf die Knowledge Check Module zuzugreifen. Kontaktieren Sie Ihren Administrator für erweiterte Zugriffsrechte.</p>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,62 @@
+<section id="view-kcResults" class="view">
+    <div class="view-header">
+        <div class="view-actions">
+            <button class="btn btn-primary" id="add-kc-result-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Neuer Test
+            </button>
+            <button class="btn btn-secondary" id="export-kc-results-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export
+            </button>
+        </div>
+        <div class="view-filters">
+            <select id="filter-kc-result-test" class="form-select">
+                <option value="">Alle Tests</option>
+            </select>
+            <select id="filter-kc-result-user" class="form-select">
+                <option value="">Alle Benutzer</option>
+            </select>
+            <input type="date" id="filter-kc-result-start" class="form-input" placeholder="Von">
+            <input type="date" id="filter-kc-result-end" class="form-input" placeholder="Bis">
+        </div>
+    </div>
+    <div class="kc-results-overview" id="kc-results-overview">
+        <div class="quality-stat-card">
+            <span class="stat-value" id="kc-results-avg-score">--</span>
+            <span class="stat-label">Durchschnitt</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="kc-results-passing-rate">--</span>
+            <span class="stat-label">Bestanden</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="kc-results-total">--</span>
+            <span class="stat-label">Gesamt</span>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="kc-results-table">
+            <thead>
+                <tr>
+                    <th>Test #</th>
+                    <th>Test Name</th>
+                    <th>Benutzer</th>
+                    <th>Ergebnis</th>
+                    <th>Status</th>
+                    <th>Datum</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody id="kc-results-tbody">
+            </tbody>
+        </table>
+    </div>
+</section>

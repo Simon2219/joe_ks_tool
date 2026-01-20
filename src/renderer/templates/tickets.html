@@ -1,0 +1,60 @@
+<section id="view-tickets" class="view">
+    <div class="view-header">
+        <div class="view-actions">
+            <button class="btn btn-primary" id="add-ticket-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Ticket
+            </button>
+            <button class="btn btn-secondary" id="export-tickets-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export
+            </button>
+        </div>
+        <div class="view-filters">
+            <select id="filter-ticket-status" class="form-select">
+                <option value="">All Status</option>
+                <option value="new">New</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="pending">Pending</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+            </select>
+            <select id="filter-ticket-priority" class="form-select">
+                <option value="">All Priority</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+            </select>
+            <select id="filter-ticket-assignee" class="form-select">
+                <option value="">All Assignees</option>
+            </select>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="tickets-table">
+            <thead>
+                <tr>
+                    <th>Ticket #</th>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Assigned To</th>
+                    <th>Created</th>
+                    <th>Due Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tickets-tbody">
+            </tbody>
+        </table>
+    </div>
+</section>
