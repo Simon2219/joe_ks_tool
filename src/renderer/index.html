@@ -98,6 +98,33 @@
                         </svg>
                         <span>QualitySystem</span>
                     </a>
+                    
+                    <!-- Knowledge Check with Sub-menu -->
+                    <div class="nav-item-group" data-permission="kc_view">
+                        <a href="#" class="nav-item has-submenu" data-view="knowledgeCheck" data-permission="kc_view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                <line x1="12" y1="6" x2="12" y2="12"></line>
+                                <line x1="9" y1="9" x2="15" y2="9"></line>
+                            </svg>
+                            <span>Knowledge Check</span>
+                            <svg class="submenu-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </a>
+                        <div class="nav-submenu">
+                            <a href="#" class="nav-item nav-subitem" data-view="kcQuestions" data-permission="kc_view">
+                                <span>Fragen Katalog</span>
+                            </a>
+                            <a href="#" class="nav-item nav-subitem" data-view="kcTests" data-permission="kc_view">
+                                <span>Test Katalog</span>
+                            </a>
+                            <a href="#" class="nav-item nav-subitem" data-view="kcResults" data-permission="kc_view">
+                                <span>Test Ergebnisse</span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="nav-section nav-section-admin" id="admin-nav-section">
@@ -402,6 +429,159 @@
                     </div>
                 </section>
 
+                <!-- Knowledge Check Main View -->
+                <section id="view-knowledgeCheck" class="view">
+                    <div class="kc-tiles-container">
+                        <div class="kc-tile" data-navigate="kcQuestions">
+                            <div class="kc-tile-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                            </div>
+                            <h3>Fragen Katalog</h3>
+                            <p>Verwalten Sie Ihren Fragenkatalog mit Kategorien und verschiedenen Fragetypen</p>
+                            <span class="kc-tile-stat" id="kc-stat-questions">0 Fragen</span>
+                        </div>
+                        <div class="kc-tile" data-navigate="kcTests">
+                            <div class="kc-tile-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10 9 9 9 8 9"></polyline>
+                                </svg>
+                            </div>
+                            <h3>Test Katalog</h3>
+                            <p>Erstellen und verwalten Sie Tests aus Ihrem Fragenkatalog</p>
+                            <span class="kc-tile-stat" id="kc-stat-tests">0 Tests</span>
+                        </div>
+                        <div class="kc-tile" data-navigate="kcResults">
+                            <div class="kc-tile-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                            </div>
+                            <h3>Test Ergebnisse</h3>
+                            <p>Sehen Sie alle durchgeführten Tests und deren Ergebnisse ein</p>
+                            <span class="kc-tile-stat" id="kc-stat-results">0 Ergebnisse</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- KC Questions View (Fragen Katalog) -->
+                <section id="view-kcQuestions" class="view">
+                    <div class="view-header">
+                        <div class="view-actions">
+                            <button class="btn btn-primary" id="add-kc-category-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Kategorie hinzufügen
+                            </button>
+                            <button class="btn btn-primary" id="add-kc-question-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Frage hinzufügen
+                            </button>
+                        </div>
+                        <div class="view-filters">
+                            <select id="filter-kc-category" class="form-select">
+                                <option value="">Alle Kategorien</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="kc-questions-list" class="kc-catalog-list">
+                        <!-- Questions catalog will be rendered here -->
+                    </div>
+                </section>
+
+                <!-- KC Tests View (Test Katalog) -->
+                <section id="view-kcTests" class="view">
+                    <div class="view-header">
+                        <div class="view-actions">
+                            <button class="btn btn-primary" id="add-kc-test-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Test erstellen
+                            </button>
+                        </div>
+                        <div class="view-filters">
+                            <select id="filter-kc-test-category" class="form-select">
+                                <option value="">Alle Kategorien</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="kc-tests-list" class="kc-catalog-list">
+                        <!-- Tests catalog will be rendered here -->
+                    </div>
+                </section>
+
+                <!-- KC Results View (Test Ergebnisse) -->
+                <section id="view-kcResults" class="view">
+                    <div class="view-header">
+                        <div class="view-actions">
+                            <button class="btn btn-primary" id="new-kc-result-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Neuer Test
+                            </button>
+                            <button class="btn btn-secondary" id="export-kc-results-btn">Export</button>
+                        </div>
+                        <div class="view-filters">
+                            <select id="filter-kc-result-test" class="form-select">
+                                <option value="">Alle Tests</option>
+                            </select>
+                            <select id="filter-kc-result-user" class="form-select">
+                                <option value="">Alle Benutzer</option>
+                            </select>
+                            <input type="date" id="filter-kc-result-start" class="form-input" placeholder="Von">
+                            <input type="date" id="filter-kc-result-end" class="form-input" placeholder="Bis">
+                        </div>
+                    </div>
+                    <div class="kc-results-overview" id="kc-results-overview">
+                        <div class="quality-stat-card">
+                            <span class="stat-value" id="kc-results-avg-score">--</span>
+                            <span class="stat-label">Durchschnitt</span>
+                        </div>
+                        <div class="quality-stat-card">
+                            <span class="stat-value" id="kc-results-passing-rate">--</span>
+                            <span class="stat-label">Bestanden</span>
+                        </div>
+                        <div class="quality-stat-card">
+                            <span class="stat-value" id="kc-results-total">--</span>
+                            <span class="stat-label">Gesamt</span>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="kc-results-table">
+                            <thead>
+                                <tr>
+                                    <th>Test #</th>
+                                    <th>Test Name</th>
+                                    <th>Benutzer</th>
+                                    <th>Ergebnis</th>
+                                    <th>Status</th>
+                                    <th>Datum</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="kc-results-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
                 <!-- Roles View -->
                 <section id="view-roles" class="view">
                     <div class="view-header">
@@ -585,6 +765,10 @@
     <script src="js/views/users.js"></script>
     <script src="js/views/tickets.js"></script>
     <script src="js/views/quality.js"></script>
+    <script src="js/views/knowledgeCheck.js"></script>
+    <script src="js/views/kcQuestions.js"></script>
+    <script src="js/views/kcTests.js"></script>
+    <script src="js/views/kcResults.js"></script>
     <script src="js/views/roles.js"></script>
     <script src="js/views/settings.js"></script>
     <script src="js/views/integrations.js"></script>

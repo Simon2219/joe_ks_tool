@@ -297,7 +297,130 @@ function initSchema() {
         )
     `);
 
+    // ============================================
+    // KNOWLEDGE CHECK SYSTEM TABLES
+    // ============================================
+
+    // Categories for grouping questions
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_categories (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            default_weighting INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    `);
+
+    // Questions catalog
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_questions (
+            id TEXT PRIMARY KEY,
+            category_id TEXT,
+            title TEXT DEFAULT '',
+            question_text TEXT NOT NULL,
+            question_type TEXT DEFAULT 'multiple_choice',
+            weighting INTEGER DEFAULT NULL,
+            exact_answer TEXT DEFAULT '',
+            trigger_words TEXT DEFAULT '[]',
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES kc_categories(id)
+        )
+    `);
+
+    // Multiple choice options for questions
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_question_options (
+            id TEXT PRIMARY KEY,
+            question_id TEXT NOT NULL,
+            option_text TEXT NOT NULL,
+            is_correct INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            FOREIGN KEY (question_id) REFERENCES kc_questions(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Test catalog (groupings of questions)
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_tests (
+            id TEXT PRIMARY KEY,
+            test_number TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            category_id TEXT,
+            time_limit_minutes INTEGER DEFAULT NULL,
+            passing_score INTEGER DEFAULT 80,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES kc_categories(id)
+        )
+    `);
+
+    // Junction table for tests and questions
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_test_questions (
+            id TEXT PRIMARY KEY,
+            test_id TEXT NOT NULL,
+            question_id TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            weighting_override INTEGER DEFAULT NULL,
+            FOREIGN KEY (test_id) REFERENCES kc_tests(id) ON DELETE CASCADE,
+            FOREIGN KEY (question_id) REFERENCES kc_questions(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Test results
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_test_results (
+            id TEXT PRIMARY KEY,
+            result_number TEXT UNIQUE NOT NULL,
+            test_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            evaluator_id TEXT,
+            started_at TEXT NOT NULL,
+            completed_at TEXT,
+            total_score REAL DEFAULT 0,
+            max_score REAL DEFAULT 0,
+            percentage REAL DEFAULT 0,
+            passed INTEGER DEFAULT 0,
+            notes TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (test_id) REFERENCES kc_tests(id),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (evaluator_id) REFERENCES users(id)
+        )
+    `);
+
+    // Individual answers in a test result
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_test_answers (
+            id TEXT PRIMARY KEY,
+            result_id TEXT NOT NULL,
+            question_id TEXT NOT NULL,
+            answer_text TEXT DEFAULT '',
+            selected_options TEXT DEFAULT '[]',
+            is_correct INTEGER DEFAULT 0,
+            score REAL DEFAULT 0,
+            max_score REAL DEFAULT 0,
+            evaluator_notes TEXT DEFAULT '',
+            FOREIGN KEY (result_id) REFERENCES kc_test_results(id) ON DELETE CASCADE,
+            FOREIGN KEY (question_id) REFERENCES kc_questions(id)
+        )
+    `);
+
     // Create indexes
+    database.run('CREATE INDEX IF NOT EXISTS idx_kc_questions_category ON kc_questions(category_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_questions_test ON kc_test_questions(test_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_test ON kc_test_results(test_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_user ON kc_test_results(user_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
     database.run('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)');
@@ -342,6 +465,12 @@ async function seedData() {
         { id: 'quality_edit', name: 'Edit Evaluations', module: 'quality' },
         { id: 'quality_delete', name: 'Delete Evaluations', module: 'quality' },
         { id: 'quality_manage', name: 'Manage Categories', module: 'quality' },
+        { id: 'kc_view', name: 'View Knowledge Check', module: 'knowledge_check' },
+        { id: 'kc_view_all', name: 'View All Results', module: 'knowledge_check' },
+        { id: 'kc_manage_questions', name: 'Manage Questions', module: 'knowledge_check' },
+        { id: 'kc_manage_tests', name: 'Manage Tests', module: 'knowledge_check' },
+        { id: 'kc_take_tests', name: 'Take Tests', module: 'knowledge_check' },
+        { id: 'kc_evaluate', name: 'Evaluate Tests', module: 'knowledge_check' },
         { id: 'role_view', name: 'View Roles', module: 'roles' },
         { id: 'role_create', name: 'Create Roles', module: 'roles' },
         { id: 'role_edit', name: 'Edit Roles', module: 'roles' },
@@ -361,11 +490,11 @@ async function seedData() {
     const roles = [
         { id: 'admin', name: 'Administrator', description: 'Full system access', isAdmin: 1, isSystem: 1, permissions: allPermIds },
         { id: 'supervisor', name: 'Supervisor', description: 'Team management', isAdmin: 0, isSystem: 1, 
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 'quality_view', 'quality_view_all', 'quality_create', 'role_view', 'settings_view'] },
+          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 'quality_view', 'quality_view_all', 'quality_create', 'kc_view', 'kc_view_all', 'kc_manage_tests', 'kc_evaluate', 'role_view', 'settings_view'] },
         { id: 'qa_analyst', name: 'QA Analyst', description: 'Quality evaluations', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage'] },
+          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage', 'kc_view', 'kc_view_all', 'kc_manage_questions', 'kc_manage_tests', 'kc_evaluate'] },
         { id: 'agent', name: 'Support Agent', description: 'Ticket handling', isAdmin: 0, isSystem: 1,
-          permissions: ['ticket_view', 'ticket_create', 'ticket_edit', 'quality_view'] }
+          permissions: ['ticket_view', 'ticket_create', 'ticket_edit', 'quality_view', 'kc_view', 'kc_take_tests'] }
     ];
     
     roles.forEach(r => {
@@ -407,12 +536,27 @@ async function seedData() {
         'general.timezone': Config.get('app.timezone', 'UTC'),
         'tickets.defaultPriority': Config.get('tickets.defaultPriority', 'medium'),
         'tickets.slaEnabled': String(Config.get('tickets.slaEnabled', true)),
-        'quality.passingScore': String(Config.get('quality.passingScore', 80))
+        'quality.passingScore': String(Config.get('quality.passingScore', 80)),
+        'knowledgeCheck.passingScore': '80'
     };
     
     Object.entries(defaultSettings).forEach(([k, v]) => {
         run('INSERT OR IGNORE INTO settings (key, value, encrypted, updated_at) VALUES (?, ?, ?, ?)', [k, v, 0, now]);
     });
+    
+    // Default Knowledge Check category
+    const defaultKcCategory = {
+        id: uuidv4(),
+        name: 'Allgemein',
+        description: 'Allgemeine Fragen',
+        defaultWeighting: 1,
+        sortOrder: 0
+    };
+    
+    run(`INSERT OR IGNORE INTO kc_categories (id, name, description, default_weighting, sort_order, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+        [defaultKcCategory.id, defaultKcCategory.name, defaultKcCategory.description, 
+         defaultKcCategory.defaultWeighting, defaultKcCategory.sortOrder, now, now]);
     
     saveDb();
     console.log('Database seeding complete');
@@ -995,6 +1139,684 @@ const QualitySystem = {
 };
 
 // ============================================
+// KNOWLEDGE CHECK SYSTEM
+// ============================================
+
+const KnowledgeCheckSystem = {
+    // ID Generation helpers
+    generateTestNumber() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let id = '';
+        for (let i = 0; i < 4; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `KC-${id}`;
+    },
+
+    generateResultNumber(testNumber) {
+        // Get the last result for this test to increment
+        const lastResult = get(
+            "SELECT result_number FROM kc_test_results WHERE test_id = (SELECT id FROM kc_tests WHERE test_number = ?) ORDER BY created_at DESC LIMIT 1",
+            [testNumber]
+        );
+        
+        let suffix = '0000';
+        if (lastResult && lastResult.result_number) {
+            // Extract the suffix and increment
+            const parts = lastResult.result_number.split('-');
+            if (parts.length === 3) {
+                const lastSuffix = parts[2];
+                suffix = this.incrementBase36(lastSuffix);
+            }
+        }
+        
+        return `${testNumber}-${suffix}`;
+    },
+
+    incrementBase36(str) {
+        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let result = str.toUpperCase().split('');
+        let carry = 1;
+        
+        for (let i = result.length - 1; i >= 0 && carry; i--) {
+            let index = chars.indexOf(result[i]);
+            index += carry;
+            if (index >= chars.length) {
+                index = 0;
+                carry = 1;
+            } else {
+                carry = 0;
+            }
+            result[i] = chars[index];
+        }
+        
+        return result.join('');
+    },
+
+    // ============================================
+    // CATEGORIES
+    // ============================================
+    
+    getAllCategories() {
+        const categories = all('SELECT * FROM kc_categories ORDER BY sort_order, name');
+        return categories.map(c => ({
+            ...c,
+            is_active: !!c.is_active,
+            questionCount: get('SELECT COUNT(*) as count FROM kc_questions WHERE category_id = ?', [c.id])?.count || 0
+        }));
+    },
+
+    getCategoryById(id) {
+        const category = get('SELECT * FROM kc_categories WHERE id = ?', [id]);
+        if (!category) return null;
+        return { ...category, is_active: !!category.is_active };
+    },
+
+    createCategory(data) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const maxOrder = get('SELECT MAX(sort_order) as max FROM kc_categories')?.max || 0;
+        
+        run(`INSERT INTO kc_categories (id, name, description, default_weighting, sort_order, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.name, data.description || '', data.defaultWeighting || 1, maxOrder + 1, 1, now, now]);
+        
+        saveDb();
+        return this.getCategoryById(id);
+    },
+
+    updateCategory(id, data) {
+        const now = new Date().toISOString();
+        let sql = 'UPDATE kc_categories SET updated_at = ?';
+        let params = [now];
+        
+        if (data.name !== undefined) { sql += ', name = ?'; params.push(data.name); }
+        if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
+        if (data.defaultWeighting !== undefined) { sql += ', default_weighting = ?'; params.push(data.defaultWeighting); }
+        if (data.sortOrder !== undefined) { sql += ', sort_order = ?'; params.push(data.sortOrder); }
+        if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        run(sql, params);
+        
+        saveDb();
+        return this.getCategoryById(id);
+    },
+
+    deleteCategory(id) {
+        const questionCount = get('SELECT COUNT(*) as count FROM kc_questions WHERE category_id = ?', [id])?.count || 0;
+        if (questionCount > 0) {
+            // Move questions to uncategorized (null category)
+            run('UPDATE kc_questions SET category_id = NULL WHERE category_id = ?', [id]);
+        }
+        
+        run('DELETE FROM kc_categories WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    reorderCategories(categoryIds) {
+        categoryIds.forEach((id, index) => {
+            run('UPDATE kc_categories SET sort_order = ? WHERE id = ?', [index, id]);
+        });
+        saveDb();
+        return true;
+    },
+
+    // ============================================
+    // QUESTIONS
+    // ============================================
+
+    getAllQuestions(filters = {}) {
+        let sql = 'SELECT q.*, c.name as category_name FROM kc_questions q LEFT JOIN kc_categories c ON q.category_id = c.id WHERE 1=1';
+        const params = [];
+        
+        if (filters.categoryId) {
+            if (filters.categoryId === 'uncategorized') {
+                sql += ' AND q.category_id IS NULL';
+            } else {
+                sql += ' AND q.category_id = ?';
+                params.push(filters.categoryId);
+            }
+        }
+        if (filters.isActive !== undefined) {
+            sql += ' AND q.is_active = ?';
+            params.push(filters.isActive ? 1 : 0);
+        }
+        
+        sql += ' ORDER BY c.sort_order, c.name, q.sort_order, q.created_at';
+        
+        const questions = all(sql, params);
+        return questions.map(q => this.formatQuestion(q));
+    },
+
+    getQuestionById(id) {
+        const question = get(`
+            SELECT q.*, c.name as category_name, c.default_weighting as category_weighting
+            FROM kc_questions q 
+            LEFT JOIN kc_categories c ON q.category_id = c.id 
+            WHERE q.id = ?
+        `, [id]);
+        
+        if (!question) return null;
+        return this.formatQuestion(question);
+    },
+
+    formatQuestion(question) {
+        const options = all('SELECT * FROM kc_question_options WHERE question_id = ? ORDER BY sort_order', [question.id]);
+        let triggerWords = [];
+        try {
+            triggerWords = JSON.parse(question.trigger_words || '[]');
+        } catch (e) {
+            triggerWords = [];
+        }
+        
+        return {
+            id: question.id,
+            categoryId: question.category_id,
+            categoryName: question.category_name || 'Uncategorized',
+            title: question.title || '',
+            questionText: question.question_text,
+            questionType: question.question_type,
+            weighting: question.weighting,
+            effectiveWeighting: question.weighting || question.category_weighting || 1,
+            exactAnswer: question.exact_answer || '',
+            triggerWords: triggerWords,
+            isActive: !!question.is_active,
+            sortOrder: question.sort_order,
+            options: options.map(o => ({
+                id: o.id,
+                text: o.option_text,
+                isCorrect: !!o.is_correct,
+                sortOrder: o.sort_order
+            })),
+            createdAt: question.created_at,
+            updatedAt: question.updated_at
+        };
+    },
+
+    createQuestion(data) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const maxOrder = get('SELECT MAX(sort_order) as max FROM kc_questions WHERE category_id = ?', [data.categoryId])?.max || 0;
+        
+        run(`INSERT INTO kc_questions (id, category_id, title, question_text, question_type, weighting, exact_answer, trigger_words, is_active, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.categoryId || null, data.title || '', data.questionText, data.questionType || 'multiple_choice',
+             data.weighting || null, data.exactAnswer || '', JSON.stringify(data.triggerWords || []), 1, maxOrder + 1, now, now]);
+        
+        // Add options if multiple choice
+        if (data.options && data.options.length > 0) {
+            data.options.forEach((opt, index) => {
+                run('INSERT INTO kc_question_options (id, question_id, option_text, is_correct, sort_order) VALUES (?, ?, ?, ?, ?)',
+                    [uuidv4(), id, opt.text, opt.isCorrect ? 1 : 0, index]);
+            });
+        }
+        
+        saveDb();
+        return this.getQuestionById(id);
+    },
+
+    updateQuestion(id, data) {
+        const now = new Date().toISOString();
+        let sql = 'UPDATE kc_questions SET updated_at = ?';
+        let params = [now];
+        
+        if (data.categoryId !== undefined) { sql += ', category_id = ?'; params.push(data.categoryId || null); }
+        if (data.title !== undefined) { sql += ', title = ?'; params.push(data.title); }
+        if (data.questionText !== undefined) { sql += ', question_text = ?'; params.push(data.questionText); }
+        if (data.questionType !== undefined) { sql += ', question_type = ?'; params.push(data.questionType); }
+        if (data.weighting !== undefined) { sql += ', weighting = ?'; params.push(data.weighting); }
+        if (data.exactAnswer !== undefined) { sql += ', exact_answer = ?'; params.push(data.exactAnswer); }
+        if (data.triggerWords !== undefined) { sql += ', trigger_words = ?'; params.push(JSON.stringify(data.triggerWords)); }
+        if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
+        if (data.sortOrder !== undefined) { sql += ', sort_order = ?'; params.push(data.sortOrder); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        run(sql, params);
+        
+        // Update options if provided
+        if (data.options !== undefined) {
+            run('DELETE FROM kc_question_options WHERE question_id = ?', [id]);
+            data.options.forEach((opt, index) => {
+                run('INSERT INTO kc_question_options (id, question_id, option_text, is_correct, sort_order) VALUES (?, ?, ?, ?, ?)',
+                    [uuidv4(), id, opt.text, opt.isCorrect ? 1 : 0, index]);
+            });
+        }
+        
+        saveDb();
+        return this.getQuestionById(id);
+    },
+
+    deleteQuestion(id) {
+        run('DELETE FROM kc_question_options WHERE question_id = ?', [id]);
+        run('DELETE FROM kc_test_questions WHERE question_id = ?', [id]);
+        run('DELETE FROM kc_questions WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    moveQuestion(questionId, newCategoryId) {
+        const now = new Date().toISOString();
+        run('UPDATE kc_questions SET category_id = ?, updated_at = ? WHERE id = ?', 
+            [newCategoryId || null, now, questionId]);
+        saveDb();
+        return this.getQuestionById(questionId);
+    },
+
+    // ============================================
+    // TESTS
+    // ============================================
+
+    getAllTests(filters = {}) {
+        let sql = `
+            SELECT t.*, c.name as category_name,
+                (SELECT COUNT(*) FROM kc_test_questions WHERE test_id = t.id) as question_count
+            FROM kc_tests t 
+            LEFT JOIN kc_categories c ON t.category_id = c.id 
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        if (filters.categoryId) {
+            sql += ' AND t.category_id = ?';
+            params.push(filters.categoryId);
+        }
+        if (filters.isActive !== undefined) {
+            sql += ' AND t.is_active = ?';
+            params.push(filters.isActive ? 1 : 0);
+        }
+        
+        sql += ' ORDER BY t.created_at DESC';
+        
+        return all(sql, params).map(t => ({
+            id: t.id,
+            testNumber: t.test_number,
+            name: t.name,
+            description: t.description,
+            categoryId: t.category_id,
+            categoryName: t.category_name || 'Uncategorized',
+            timeLimitMinutes: t.time_limit_minutes,
+            passingScore: t.passing_score,
+            isActive: !!t.is_active,
+            questionCount: t.question_count,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at
+        }));
+    },
+
+    getTestById(id) {
+        const test = get(`
+            SELECT t.*, c.name as category_name
+            FROM kc_tests t 
+            LEFT JOIN kc_categories c ON t.category_id = c.id 
+            WHERE t.id = ?
+        `, [id]);
+        
+        if (!test) return null;
+        
+        const questions = all(`
+            SELECT tq.*, q.title, q.question_text, q.question_type
+            FROM kc_test_questions tq
+            JOIN kc_questions q ON tq.question_id = q.id
+            WHERE tq.test_id = ?
+            ORDER BY tq.sort_order
+        `, [id]);
+        
+        return {
+            id: test.id,
+            testNumber: test.test_number,
+            name: test.name,
+            description: test.description,
+            categoryId: test.category_id,
+            categoryName: test.category_name || 'Uncategorized',
+            timeLimitMinutes: test.time_limit_minutes,
+            passingScore: test.passing_score,
+            isActive: !!test.is_active,
+            questions: questions.map(q => ({
+                id: q.id,
+                questionId: q.question_id,
+                title: q.title,
+                questionText: q.question_text,
+                questionType: q.question_type,
+                sortOrder: q.sort_order,
+                weightingOverride: q.weighting_override
+            })),
+            createdAt: test.created_at,
+            updatedAt: test.updated_at
+        };
+    },
+
+    createTest(data) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const testNumber = this.generateTestNumber();
+        
+        run(`INSERT INTO kc_tests (id, test_number, name, description, category_id, time_limit_minutes, passing_score, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, testNumber, data.name, data.description || '', data.categoryId || null, 
+             data.timeLimitMinutes || null, data.passingScore || 80, 1, now, now]);
+        
+        // Add questions to test
+        if (data.questionIds && data.questionIds.length > 0) {
+            data.questionIds.forEach((qId, index) => {
+                run('INSERT INTO kc_test_questions (id, test_id, question_id, sort_order) VALUES (?, ?, ?, ?)',
+                    [uuidv4(), id, qId, index]);
+            });
+        }
+        
+        saveDb();
+        return this.getTestById(id);
+    },
+
+    updateTest(id, data) {
+        const now = new Date().toISOString();
+        let sql = 'UPDATE kc_tests SET updated_at = ?';
+        let params = [now];
+        
+        if (data.name !== undefined) { sql += ', name = ?'; params.push(data.name); }
+        if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
+        if (data.categoryId !== undefined) { sql += ', category_id = ?'; params.push(data.categoryId || null); }
+        if (data.timeLimitMinutes !== undefined) { sql += ', time_limit_minutes = ?'; params.push(data.timeLimitMinutes); }
+        if (data.passingScore !== undefined) { sql += ', passing_score = ?'; params.push(data.passingScore); }
+        if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        run(sql, params);
+        
+        // Update questions if provided
+        if (data.questionIds !== undefined) {
+            run('DELETE FROM kc_test_questions WHERE test_id = ?', [id]);
+            data.questionIds.forEach((qId, index) => {
+                run('INSERT INTO kc_test_questions (id, test_id, question_id, sort_order) VALUES (?, ?, ?, ?)',
+                    [uuidv4(), id, qId, index]);
+            });
+        }
+        
+        saveDb();
+        return this.getTestById(id);
+    },
+
+    deleteTest(id) {
+        run('DELETE FROM kc_test_questions WHERE test_id = ?', [id]);
+        run('DELETE FROM kc_tests WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
+    // TEST RESULTS
+    // ============================================
+
+    getAllResults(filters = {}) {
+        let sql = `
+            SELECT r.*, t.name as test_name, t.test_number,
+                u.first_name || ' ' || u.last_name as user_name,
+                e.first_name || ' ' || e.last_name as evaluator_name
+            FROM kc_test_results r
+            JOIN kc_tests t ON r.test_id = t.id
+            JOIN users u ON r.user_id = u.id
+            LEFT JOIN users e ON r.evaluator_id = e.id
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        if (filters.testId) {
+            sql += ' AND r.test_id = ?';
+            params.push(filters.testId);
+        }
+        if (filters.userId) {
+            sql += ' AND r.user_id = ?';
+            params.push(filters.userId);
+        }
+        if (filters.startDate) {
+            sql += ' AND r.created_at >= ?';
+            params.push(filters.startDate);
+        }
+        if (filters.endDate) {
+            sql += ' AND r.created_at <= ?';
+            params.push(filters.endDate);
+        }
+        
+        sql += ' ORDER BY r.created_at DESC';
+        
+        return all(sql, params).map(r => ({
+            id: r.id,
+            resultNumber: r.result_number,
+            testId: r.test_id,
+            testNumber: r.test_number,
+            testName: r.test_name,
+            userId: r.user_id,
+            userName: r.user_name,
+            evaluatorId: r.evaluator_id,
+            evaluatorName: r.evaluator_name,
+            startedAt: r.started_at,
+            completedAt: r.completed_at,
+            totalScore: r.total_score,
+            maxScore: r.max_score,
+            percentage: r.percentage,
+            passed: !!r.passed,
+            notes: r.notes,
+            createdAt: r.created_at,
+            updatedAt: r.updated_at
+        }));
+    },
+
+    getResultById(id) {
+        const result = get(`
+            SELECT r.*, t.name as test_name, t.test_number,
+                u.first_name || ' ' || u.last_name as user_name,
+                e.first_name || ' ' || e.last_name as evaluator_name
+            FROM kc_test_results r
+            JOIN kc_tests t ON r.test_id = t.id
+            JOIN users u ON r.user_id = u.id
+            LEFT JOIN users e ON r.evaluator_id = e.id
+            WHERE r.id = ?
+        `, [id]);
+        
+        if (!result) return null;
+        
+        const answers = all(`
+            SELECT a.*, q.question_text, q.question_type, q.title
+            FROM kc_test_answers a
+            JOIN kc_questions q ON a.question_id = q.id
+            WHERE a.result_id = ?
+        `, [id]);
+        
+        return {
+            id: result.id,
+            resultNumber: result.result_number,
+            testId: result.test_id,
+            testNumber: result.test_number,
+            testName: result.test_name,
+            userId: result.user_id,
+            userName: result.user_name,
+            evaluatorId: result.evaluator_id,
+            evaluatorName: result.evaluator_name,
+            startedAt: result.started_at,
+            completedAt: result.completed_at,
+            totalScore: result.total_score,
+            maxScore: result.max_score,
+            percentage: result.percentage,
+            passed: !!result.passed,
+            notes: result.notes,
+            answers: answers.map(a => {
+                let selectedOptions = [];
+                try {
+                    selectedOptions = JSON.parse(a.selected_options || '[]');
+                } catch (e) {
+                    selectedOptions = [];
+                }
+                return {
+                    id: a.id,
+                    questionId: a.question_id,
+                    questionTitle: a.title,
+                    questionText: a.question_text,
+                    questionType: a.question_type,
+                    answerText: a.answer_text,
+                    selectedOptions: selectedOptions,
+                    isCorrect: !!a.is_correct,
+                    score: a.score,
+                    maxScore: a.max_score,
+                    evaluatorNotes: a.evaluator_notes
+                };
+            }),
+            createdAt: result.created_at,
+            updatedAt: result.updated_at
+        };
+    },
+
+    createResult(data, evaluatorId) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        
+        // Get test for passing score and to generate result number
+        const test = this.getTestById(data.testId);
+        if (!test) throw new Error('Test not found');
+        
+        const resultNumber = this.generateResultNumber(test.testNumber);
+        const percentage = data.maxScore > 0 ? Math.round((data.totalScore / data.maxScore) * 100) : 0;
+        const passed = percentage >= test.passingScore;
+        
+        run(`INSERT INTO kc_test_results (id, result_number, test_id, user_id, evaluator_id, started_at, completed_at, total_score, max_score, percentage, passed, notes, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, resultNumber, data.testId, data.userId, evaluatorId, data.startedAt || now, 
+             data.completedAt || now, data.totalScore || 0, data.maxScore || 0, percentage, passed ? 1 : 0, 
+             data.notes || '', now, now]);
+        
+        // Add answers
+        if (data.answers && data.answers.length > 0) {
+            data.answers.forEach(ans => {
+                run(`INSERT INTO kc_test_answers (id, result_id, question_id, answer_text, selected_options, is_correct, score, max_score, evaluator_notes)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [uuidv4(), id, ans.questionId, ans.answerText || '', JSON.stringify(ans.selectedOptions || []),
+                     ans.isCorrect ? 1 : 0, ans.score || 0, ans.maxScore || 0, ans.evaluatorNotes || '']);
+            });
+        }
+        
+        saveDb();
+        return this.getResultById(id);
+    },
+
+    updateResult(id, data) {
+        const now = new Date().toISOString();
+        let sql = 'UPDATE kc_test_results SET updated_at = ?';
+        let params = [now];
+        
+        if (data.completedAt !== undefined) { sql += ', completed_at = ?'; params.push(data.completedAt); }
+        if (data.totalScore !== undefined) { sql += ', total_score = ?'; params.push(data.totalScore); }
+        if (data.maxScore !== undefined) { sql += ', max_score = ?'; params.push(data.maxScore); }
+        if (data.percentage !== undefined) { sql += ', percentage = ?'; params.push(data.percentage); }
+        if (data.passed !== undefined) { sql += ', passed = ?'; params.push(data.passed ? 1 : 0); }
+        if (data.notes !== undefined) { sql += ', notes = ?'; params.push(data.notes); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        run(sql, params);
+        
+        saveDb();
+        return this.getResultById(id);
+    },
+
+    deleteResult(id) {
+        run('DELETE FROM kc_test_answers WHERE result_id = ?', [id]);
+        run('DELETE FROM kc_test_results WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
+    // STATISTICS
+    // ============================================
+
+    getStatistics() {
+        const totalTests = get('SELECT COUNT(*) as count FROM kc_tests WHERE is_active = 1')?.count || 0;
+        const totalQuestions = get('SELECT COUNT(*) as count FROM kc_questions WHERE is_active = 1')?.count || 0;
+        const totalResults = get('SELECT COUNT(*) as count FROM kc_test_results')?.count || 0;
+        const passedResults = get('SELECT COUNT(*) as count FROM kc_test_results WHERE passed = 1')?.count || 0;
+        const avgScore = get('SELECT AVG(percentage) as avg FROM kc_test_results')?.avg || 0;
+        
+        return {
+            totalTests,
+            totalQuestions,
+            totalResults,
+            passedResults,
+            passingRate: totalResults > 0 ? Math.round((passedResults / totalResults) * 100) : 0,
+            averageScore: Math.round(avgScore)
+        };
+    },
+
+    // Answer checking helper for open questions
+    checkOpenAnswer(answer, exactAnswer, triggerWords) {
+        if (!answer || !answer.trim()) return { isCorrect: false, matchedTriggers: [] };
+        
+        const normalizedAnswer = answer.toLowerCase().trim();
+        const normalizedExact = (exactAnswer || '').toLowerCase().trim();
+        
+        // Check exact match (with typo tolerance using Levenshtein)
+        if (normalizedExact && this.levenshteinDistance(normalizedAnswer, normalizedExact) <= 2) {
+            return { isCorrect: true, matchedTriggers: ['exact_match'] };
+        }
+        
+        // Check trigger words
+        const matchedTriggers = [];
+        if (triggerWords && triggerWords.length > 0) {
+            for (const trigger of triggerWords) {
+                const normalizedTrigger = trigger.toLowerCase().trim();
+                // Check if trigger word is present (with minor typo tolerance)
+                if (normalizedAnswer.includes(normalizedTrigger) || 
+                    this.fuzzyContains(normalizedAnswer, normalizedTrigger)) {
+                    matchedTriggers.push(trigger);
+                }
+            }
+        }
+        
+        return {
+            isCorrect: matchedTriggers.length > 0,
+            matchedTriggers
+        };
+    },
+
+    levenshteinDistance(a, b) {
+        const matrix = [];
+        for (let i = 0; i <= b.length; i++) {
+            matrix[i] = [i];
+        }
+        for (let j = 0; j <= a.length; j++) {
+            matrix[0][j] = j;
+        }
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i-1) === a.charAt(j-1)) {
+                    matrix[i][j] = matrix[i-1][j-1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i-1][j-1] + 1,
+                        matrix[i][j-1] + 1,
+                        matrix[i-1][j] + 1
+                    );
+                }
+            }
+        }
+        return matrix[b.length][a.length];
+    },
+
+    fuzzyContains(text, search) {
+        // Simple fuzzy match - checks if search appears in text with up to 1 typo
+        const words = text.split(/\s+/);
+        for (const word of words) {
+            if (this.levenshteinDistance(word, search) <= 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+// ============================================
 // SETTINGS SYSTEM
 // ============================================
 
@@ -1151,6 +1973,7 @@ module.exports = {
     RoleSystem,
     TicketSystem,
     QualitySystem,
+    KnowledgeCheckSystem,
     SettingsSystem,
     IntegrationSystem,
     TokenSystem

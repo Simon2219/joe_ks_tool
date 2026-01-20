@@ -1,0 +1,714 @@
+/**
+ * KC Questions View (Fragen Katalog)
+ * Manages the question catalog with categories
+ */
+
+const KCQuestionsView = {
+    categories: [],
+    questions: [],
+    filters: {
+        categoryId: ''
+    },
+
+    /**
+     * Initializes the questions view
+     */
+    async init() {
+        this.bindEvents();
+        await this.loadCategories();
+        await this.loadQuestions();
+        this.renderCatalog();
+    },
+
+    /**
+     * Binds event handlers
+     */
+    bindEvents() {
+        // Add category button
+        document.getElementById('add-kc-category-btn')?.addEventListener('click', () => {
+            this.showCategoryForm();
+        });
+
+        // Add question button
+        document.getElementById('add-kc-question-btn')?.addEventListener('click', () => {
+            this.showQuestionForm();
+        });
+
+        // Category filter
+        document.getElementById('filter-kc-category')?.addEventListener('change', (e) => {
+            this.filters.categoryId = e.target.value;
+            this.renderCatalog();
+        });
+    },
+
+    /**
+     * Loads all categories
+     */
+    async loadCategories() {
+        try {
+            const result = await window.api.knowledgeCheck.getCategories();
+            if (result.success) {
+                this.categories = result.categories;
+                this.populateCategoryFilter();
+            }
+        } catch (error) {
+            console.error('Failed to load KC categories:', error);
+            Toast.error('Kategorien konnten nicht geladen werden');
+        }
+    },
+
+    /**
+     * Loads all questions
+     */
+    async loadQuestions() {
+        try {
+            const result = await window.api.knowledgeCheck.getQuestions(this.filters);
+            if (result.success) {
+                this.questions = result.questions;
+            }
+        } catch (error) {
+            console.error('Failed to load KC questions:', error);
+            Toast.error('Fragen konnten nicht geladen werden');
+        }
+    },
+
+    /**
+     * Populates the category filter dropdown
+     */
+    populateCategoryFilter() {
+        const select = document.getElementById('filter-kc-category');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Alle Kategorien</option>';
+        this.categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = cat.name;
+            select.appendChild(option);
+        });
+    },
+
+    /**
+     * Renders the catalog list
+     */
+    renderCatalog() {
+        const container = document.getElementById('kc-questions-list');
+        if (!container) return;
+
+        // Group questions by category
+        const groupedQuestions = this.groupQuestionsByCategory();
+        
+        if (Object.keys(groupedQuestions).length === 0 && this.categories.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>Keine Kategorien vorhanden</h3>
+                    <p>Erstellen Sie eine Kategorie, um Fragen hinzuzufügen.</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+
+        // Render categories with their questions
+        for (const category of this.categories) {
+            if (this.filters.categoryId && this.filters.categoryId !== category.id) continue;
+            
+            const categoryQuestions = groupedQuestions[category.id] || [];
+            html += this.renderCategory(category, categoryQuestions);
+        }
+
+        // Render uncategorized questions
+        const uncategorized = groupedQuestions['uncategorized'] || [];
+        if (uncategorized.length > 0 && !this.filters.categoryId) {
+            html += this.renderCategory({
+                id: 'uncategorized',
+                name: 'Unkategorisiert',
+                description: 'Fragen ohne Kategorie',
+                defaultWeighting: 1
+            }, uncategorized, true);
+        }
+
+        container.innerHTML = html;
+
+        // Bind category and question actions
+        this.bindCatalogActions();
+    },
+
+    /**
+     * Groups questions by category
+     */
+    groupQuestionsByCategory() {
+        const groups = { uncategorized: [] };
+        
+        this.questions.forEach(q => {
+            const catId = q.categoryId || 'uncategorized';
+            if (!groups[catId]) groups[catId] = [];
+            groups[catId].push(q);
+        });
+        
+        return groups;
+    },
+
+    /**
+     * Renders a category with its questions
+     */
+    renderCategory(category, questions, isUncategorized = false) {
+        const isCollapsed = false; // Could be stored in localStorage
+        
+        return `
+            <div class="kc-category ${isCollapsed ? 'collapsed' : ''}" data-category-id="${category.id}">
+                <div class="kc-category-header">
+                    <button class="kc-category-toggle btn-icon" title="Kategorie ein-/ausklappen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div class="kc-category-info">
+                        <h3>${Helpers.escapeHtml(category.name)}</h3>
+                        <span class="kc-category-meta">${questions.length} Fragen · Gewichtung: ${category.defaultWeighting || category.default_weighting || 1}</span>
+                    </div>
+                    <div class="kc-category-actions">
+                        ${!isUncategorized ? `
+                            <button class="btn btn-sm btn-secondary kc-add-question-to-cat" data-category-id="${category.id}" title="Frage hinzufügen">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                            <button class="btn-icon kc-category-menu" data-category-id="${category.id}" title="Mehr Optionen">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="1"></circle>
+                                    <circle cx="12" cy="5" r="1"></circle>
+                                    <circle cx="12" cy="19" r="1"></circle>
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="kc-category-content">
+                    ${questions.length === 0 ? `
+                        <div class="kc-empty-category">
+                            <span>Keine Fragen in dieser Kategorie</span>
+                        </div>
+                    ` : questions.map(q => this.renderQuestion(q)).join('')}
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Renders a single question item
+     */
+    renderQuestion(question) {
+        const typeLabels = {
+            'multiple_choice': 'Multiple Choice',
+            'open_question': 'Offene Frage'
+        };
+        const typeLabel = typeLabels[question.questionType] || question.questionType;
+        
+        return `
+            <div class="kc-question-item" data-question-id="${question.id}">
+                <div class="kc-question-drag-handle" title="Zum Verschieben ziehen">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="5" r="1"></circle>
+                        <circle cx="9" cy="12" r="1"></circle>
+                        <circle cx="9" cy="19" r="1"></circle>
+                        <circle cx="15" cy="5" r="1"></circle>
+                        <circle cx="15" cy="12" r="1"></circle>
+                        <circle cx="15" cy="19" r="1"></circle>
+                    </svg>
+                </div>
+                <div class="kc-question-content">
+                    ${question.title ? `<div class="kc-question-title">${Helpers.escapeHtml(question.title)}</div>` : ''}
+                    <div class="kc-question-text">${Helpers.escapeHtml(Helpers.truncate(question.questionText, 100))}</div>
+                    <div class="kc-question-meta">
+                        <span class="badge badge-secondary">${typeLabel}</span>
+                        ${question.weighting ? `<span class="badge badge-info">Gewichtung: ${question.weighting}</span>` : ''}
+                        ${question.options && question.options.length > 0 ? `<span>${question.options.length} Antworten</span>` : ''}
+                    </div>
+                </div>
+                <div class="kc-question-actions">
+                    <button class="btn-icon kc-edit-question" data-id="${question.id}" title="Bearbeiten">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="btn-icon kc-move-question" data-id="${question.id}" title="Verschieben">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="5 9 2 12 5 15"></polyline>
+                            <polyline points="9 5 12 2 15 5"></polyline>
+                            <polyline points="15 19 12 22 9 19"></polyline>
+                            <polyline points="19 9 22 12 19 15"></polyline>
+                            <line x1="2" y1="12" x2="22" y2="12"></line>
+                            <line x1="12" y1="2" x2="12" y2="22"></line>
+                        </svg>
+                    </button>
+                    <button class="btn-icon kc-delete-question" data-id="${question.id}" title="Löschen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Binds actions for catalog items
+     */
+    bindCatalogActions() {
+        // Category toggle
+        document.querySelectorAll('.kc-category-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const category = e.target.closest('.kc-category');
+                if (category) category.classList.toggle('collapsed');
+            });
+        });
+
+        // Add question to category
+        document.querySelectorAll('.kc-add-question-to-cat').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const categoryId = btn.dataset.categoryId;
+                this.showQuestionForm(null, categoryId);
+            });
+        });
+
+        // Category menu (3 dots)
+        document.querySelectorAll('.kc-category-menu').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showCategoryMenu(btn.dataset.categoryId, btn);
+            });
+        });
+
+        // Edit question
+        document.querySelectorAll('.kc-edit-question').forEach(btn => {
+            btn.addEventListener('click', () => this.editQuestion(btn.dataset.id));
+        });
+
+        // Move question
+        document.querySelectorAll('.kc-move-question').forEach(btn => {
+            btn.addEventListener('click', () => this.showMoveDialog(btn.dataset.id));
+        });
+
+        // Delete question
+        document.querySelectorAll('.kc-delete-question').forEach(btn => {
+            btn.addEventListener('click', () => this.deleteQuestion(btn.dataset.id));
+        });
+    },
+
+    /**
+     * Shows the category form
+     */
+    async showCategoryForm(category = null) {
+        const isEdit = !!category;
+        const title = isEdit ? 'Kategorie bearbeiten' : 'Neue Kategorie';
+
+        const fields = [
+            { name: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Kategoriename' },
+            { name: 'description', label: 'Beschreibung', type: 'textarea', rows: 2, placeholder: 'Beschreibung (optional)' },
+            { name: 'defaultWeighting', label: 'Standard-Gewichtung', type: 'number', min: 1, max: 10, default: 1 }
+        ];
+
+        const result = await Modal.form({
+            title,
+            fields,
+            data: category || { defaultWeighting: 1 },
+            submitText: isEdit ? 'Speichern' : 'Erstellen',
+            validate: (data) => {
+                if (!data.name || data.name.trim().length < 2) {
+                    return 'Name muss mindestens 2 Zeichen haben';
+                }
+                return null;
+            }
+        });
+
+        if (result) {
+            try {
+                if (isEdit) {
+                    await window.api.knowledgeCheck.updateCategory(category.id, result);
+                    Toast.success('Kategorie aktualisiert');
+                } else {
+                    await window.api.knowledgeCheck.createCategory(result);
+                    Toast.success('Kategorie erstellt');
+                }
+                await this.loadCategories();
+                await this.loadQuestions();
+                this.renderCatalog();
+            } catch (error) {
+                console.error('Category save error:', error);
+                Toast.error('Fehler beim Speichern');
+            }
+        }
+    },
+
+    /**
+     * Shows the category menu
+     */
+    async showCategoryMenu(categoryId, buttonEl) {
+        const category = this.categories.find(c => c.id === categoryId);
+        if (!category) return;
+
+        // Simple confirmation for delete
+        const confirmed = await Modal.confirm({
+            title: 'Kategorie löschen',
+            message: `Möchten Sie die Kategorie "${category.name}" wirklich löschen? Die Fragen werden in "Unkategorisiert" verschoben.`,
+            confirmText: 'Löschen',
+            confirmClass: 'btn-danger'
+        });
+
+        if (confirmed) {
+            try {
+                await window.api.knowledgeCheck.deleteCategory(categoryId);
+                Toast.success('Kategorie gelöscht');
+                await this.loadCategories();
+                await this.loadQuestions();
+                this.renderCatalog();
+            } catch (error) {
+                console.error('Delete category error:', error);
+                Toast.error('Fehler beim Löschen');
+            }
+        }
+    },
+
+    /**
+     * Shows the question form
+     */
+    async showQuestionForm(question = null, preselectedCategoryId = null) {
+        const isEdit = !!question;
+        const title = isEdit ? 'Frage bearbeiten' : 'Neue Frage';
+
+        // Build form HTML manually for complex form
+        const categoryOptions = this.categories.map(c => 
+            `<option value="${c.id}" ${(question?.categoryId || preselectedCategoryId) === c.id ? 'selected' : ''}>${Helpers.escapeHtml(c.name)}</option>`
+        ).join('');
+
+        const formHtml = `
+            <form id="question-form" class="question-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="q-category">Kategorie</label>
+                        <select id="q-category" name="categoryId" class="form-select">
+                            <option value="">Unkategorisiert</option>
+                            ${categoryOptions}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="q-type">Fragetyp *</label>
+                        <select id="q-type" name="questionType" class="form-select" required>
+                            <option value="multiple_choice" ${question?.questionType === 'multiple_choice' || !question ? 'selected' : ''}>Multiple Choice</option>
+                            <option value="open_question" ${question?.questionType === 'open_question' ? 'selected' : ''}>Offene Frage</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="q-title">Titel (optional)</label>
+                    <input type="text" id="q-title" name="title" class="form-input" value="${Helpers.escapeHtml(question?.title || '')}" placeholder="Kurzer Titel für die Frage">
+                </div>
+                
+                <div class="form-group">
+                    <label for="q-text">Frage *</label>
+                    <textarea id="q-text" name="questionText" class="form-textarea" rows="3" required placeholder="Die eigentliche Frage">${Helpers.escapeHtml(question?.questionText || '')}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="q-weighting">Gewichtung (optional - überschreibt Kategorie)</label>
+                    <input type="number" id="q-weighting" name="weighting" class="form-input" min="1" max="10" value="${question?.weighting || ''}" placeholder="Standard aus Kategorie">
+                </div>
+                
+                <!-- Multiple Choice Options -->
+                <div id="mc-options-section" class="${question?.questionType === 'open_question' ? 'hidden' : ''}">
+                    <div class="form-group">
+                        <label>Antwortmöglichkeiten</label>
+                        <div id="mc-options-list">
+                            ${(question?.options || [{ text: '', isCorrect: false }]).map((opt, i) => `
+                                <div class="mc-option-row">
+                                    <input type="checkbox" class="mc-correct" ${opt.isCorrect ? 'checked' : ''}>
+                                    <input type="text" class="form-input mc-text" value="${Helpers.escapeHtml(opt.text)}" placeholder="Antwort ${i + 1}">
+                                    <button type="button" class="btn-icon mc-remove" title="Entfernen">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button type="button" id="add-mc-option" class="btn btn-sm btn-secondary" style="margin-top: var(--spacing-sm);">+ Antwort hinzufügen</button>
+                    </div>
+                </div>
+                
+                <!-- Open Question Options -->
+                <div id="open-question-section" class="${question?.questionType !== 'open_question' ? 'hidden' : ''}">
+                    <div class="form-group">
+                        <label for="q-exact-answer">Exakte Antwort</label>
+                        <input type="text" id="q-exact-answer" name="exactAnswer" class="form-input" value="${Helpers.escapeHtml(question?.exactAnswer || '')}" placeholder="Die exakt richtige Antwort">
+                    </div>
+                    <div class="form-group">
+                        <label>Schlüsselwörter (Trigger Words)</label>
+                        <div id="trigger-words-list">
+                            ${(question?.triggerWords || []).map(tw => `
+                                <div class="trigger-word-row">
+                                    <input type="text" class="form-input trigger-word" value="${Helpers.escapeHtml(tw)}">
+                                    <button type="button" class="btn-icon trigger-remove" title="Entfernen">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button type="button" id="add-trigger-word" class="btn btn-sm btn-secondary" style="margin-top: var(--spacing-sm);">+ Schlüsselwort hinzufügen</button>
+                        <small class="form-hint" style="display: block; margin-top: var(--spacing-xs); color: var(--text-muted);">
+                            Wörter oder Phrasen, die in der Antwort enthalten sein sollten
+                        </small>
+                    </div>
+                </div>
+            </form>
+        `;
+
+        const template = document.createElement('template');
+        template.innerHTML = formHtml.trim();
+        const content = template.content.firstElementChild;
+
+        const footer = document.createElement('div');
+        footer.style.display = 'flex';
+        footer.style.gap = 'var(--spacing-sm)';
+        footer.style.justifyContent = 'flex-end';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-secondary';
+        cancelBtn.textContent = 'Abbrechen';
+        cancelBtn.addEventListener('click', () => Modal.close());
+
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'btn btn-primary';
+        submitBtn.textContent = isEdit ? 'Speichern' : 'Erstellen';
+
+        footer.appendChild(cancelBtn);
+        footer.appendChild(submitBtn);
+
+        Modal.open({
+            title,
+            content,
+            footer,
+            size: 'lg'
+        });
+
+        // Bind form interactions
+        this.bindQuestionFormEvents(submitBtn, isEdit, question);
+    },
+
+    /**
+     * Binds events for the question form
+     */
+    bindQuestionFormEvents(submitBtn, isEdit, existingQuestion) {
+        const form = document.getElementById('question-form');
+        const typeSelect = document.getElementById('q-type');
+        const mcSection = document.getElementById('mc-options-section');
+        const openSection = document.getElementById('open-question-section');
+
+        // Question type change
+        typeSelect?.addEventListener('change', (e) => {
+            const isOpen = e.target.value === 'open_question';
+            mcSection?.classList.toggle('hidden', isOpen);
+            openSection?.classList.toggle('hidden', !isOpen);
+        });
+
+        // Add MC option
+        document.getElementById('add-mc-option')?.addEventListener('click', () => {
+            const list = document.getElementById('mc-options-list');
+            const index = list.children.length;
+            const row = document.createElement('div');
+            row.className = 'mc-option-row';
+            row.innerHTML = `
+                <input type="checkbox" class="mc-correct">
+                <input type="text" class="form-input mc-text" placeholder="Antwort ${index + 1}">
+                <button type="button" class="btn-icon mc-remove" title="Entfernen">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            `;
+            list.appendChild(row);
+            this.bindMcRemove(row.querySelector('.mc-remove'));
+        });
+
+        // Bind existing MC remove buttons
+        document.querySelectorAll('.mc-remove').forEach(btn => this.bindMcRemove(btn));
+
+        // Add trigger word
+        document.getElementById('add-trigger-word')?.addEventListener('click', () => {
+            const list = document.getElementById('trigger-words-list');
+            const row = document.createElement('div');
+            row.className = 'trigger-word-row';
+            row.innerHTML = `
+                <input type="text" class="form-input trigger-word">
+                <button type="button" class="btn-icon trigger-remove" title="Entfernen">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            `;
+            list.appendChild(row);
+            this.bindTriggerRemove(row.querySelector('.trigger-remove'));
+        });
+
+        // Bind existing trigger remove buttons
+        document.querySelectorAll('.trigger-remove').forEach(btn => this.bindTriggerRemove(btn));
+
+        // Submit
+        submitBtn.addEventListener('click', async () => {
+            const questionText = document.getElementById('q-text').value.trim();
+            if (!questionText) {
+                Toast.error('Bitte geben Sie eine Frage ein');
+                return;
+            }
+
+            const data = {
+                categoryId: document.getElementById('q-category').value || null,
+                questionType: document.getElementById('q-type').value,
+                title: document.getElementById('q-title').value.trim(),
+                questionText: questionText,
+                weighting: parseInt(document.getElementById('q-weighting').value) || null
+            };
+
+            if (data.questionType === 'multiple_choice') {
+                data.options = [];
+                document.querySelectorAll('.mc-option-row').forEach(row => {
+                    const text = row.querySelector('.mc-text').value.trim();
+                    if (text) {
+                        data.options.push({
+                            text,
+                            isCorrect: row.querySelector('.mc-correct').checked
+                        });
+                    }
+                });
+            } else {
+                data.exactAnswer = document.getElementById('q-exact-answer').value.trim();
+                data.triggerWords = [];
+                document.querySelectorAll('.trigger-word').forEach(input => {
+                    const word = input.value.trim();
+                    if (word) data.triggerWords.push(word);
+                });
+            }
+
+            try {
+                if (isEdit) {
+                    await window.api.knowledgeCheck.updateQuestion(existingQuestion.id, data);
+                    Toast.success('Frage aktualisiert');
+                } else {
+                    await window.api.knowledgeCheck.createQuestion(data);
+                    Toast.success('Frage erstellt');
+                }
+                Modal.close();
+                await this.loadQuestions();
+                this.renderCatalog();
+            } catch (error) {
+                console.error('Question save error:', error);
+                Toast.error('Fehler beim Speichern');
+            }
+        });
+    },
+
+    bindMcRemove(btn) {
+        btn.addEventListener('click', () => btn.closest('.mc-option-row').remove());
+    },
+
+    bindTriggerRemove(btn) {
+        btn.addEventListener('click', () => btn.closest('.trigger-word-row').remove());
+    },
+
+    /**
+     * Edits a question
+     */
+    async editQuestion(questionId) {
+        const question = this.questions.find(q => q.id === questionId);
+        if (question) {
+            await this.showQuestionForm(question);
+        }
+    },
+
+    /**
+     * Shows the move question dialog
+     */
+    async showMoveDialog(questionId) {
+        const question = this.questions.find(q => q.id === questionId);
+        if (!question) return;
+
+        const currentCat = this.categories.find(c => c.id === question.categoryId);
+
+        const options = [
+            { value: '', label: 'Unkategorisiert' },
+            ...this.categories.map(c => ({ value: c.id, label: c.name }))
+        ];
+
+        const result = await Modal.form({
+            title: 'Frage verschieben',
+            fields: [
+                {
+                    name: 'info',
+                    label: `Aktuelle Kategorie: ${currentCat?.name || 'Unkategorisiert'}`,
+                    type: 'text',
+                    readonly: true,
+                    default: ''
+                },
+                {
+                    name: 'categoryId',
+                    label: 'Neue Kategorie',
+                    type: 'select',
+                    options,
+                    default: question.categoryId || ''
+                }
+            ],
+            submitText: 'Verschieben',
+            size: 'sm'
+        });
+
+        if (result) {
+            try {
+                await window.api.knowledgeCheck.moveQuestion(questionId, result.categoryId || null);
+                Toast.success('Frage verschoben');
+                await this.loadQuestions();
+                this.renderCatalog();
+            } catch (error) {
+                console.error('Move question error:', error);
+                Toast.error('Fehler beim Verschieben');
+            }
+        }
+    },
+
+    /**
+     * Deletes a question
+     */
+    async deleteQuestion(questionId) {
+        const question = this.questions.find(q => q.id === questionId);
+        if (!question) return;
+
+        const confirmed = await Modal.confirm({
+            title: 'Frage löschen',
+            message: `Möchten Sie diese Frage wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`,
+            confirmText: 'Löschen',
+            confirmClass: 'btn-danger'
+        });
+
+        if (confirmed) {
+            try {
+                await window.api.knowledgeCheck.deleteQuestion(questionId);
+                Toast.success('Frage gelöscht');
+                await this.loadQuestions();
+                this.renderCatalog();
+            } catch (error) {
+                console.error('Delete question error:', error);
+                Toast.error('Fehler beim Löschen');
+            }
+        }
+    },
+
+    /**
+     * Refreshes the view
+     */
+    async refresh() {
+        await this.loadCategories();
+        await this.loadQuestions();
+        this.renderCatalog();
+    }
+};
+
+// Export for use in other modules
+window.KCQuestionsView = KCQuestionsView;
