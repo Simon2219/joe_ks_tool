@@ -693,7 +693,33 @@ const KCTestsView = {
 
             const footer = document.createElement('div');
             footer.style.display = 'flex';
-            footer.style.justifyContent = 'flex-end';
+            footer.style.gap = 'var(--space-sm)';
+            footer.style.justifyContent = 'space-between';
+
+            const leftBtns = document.createElement('div');
+            leftBtns.style.display = 'flex';
+            leftBtns.style.gap = 'var(--space-sm)';
+
+            // Add "Neuer Testdurchgang" button if user can assign tests
+            if (Permissions.has('kc_assign_tests')) {
+                const assignBtn = document.createElement('button');
+                assignBtn.className = 'btn btn-primary';
+                assignBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 6px;">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                    </svg>
+                    Neuer Testdurchgang
+                `;
+                assignBtn.addEventListener('click', () => {
+                    Modal.close();
+                    setTimeout(() => this.showAssignTestForm(test), 250);
+                });
+                leftBtns.appendChild(assignBtn);
+            }
+            footer.appendChild(leftBtns);
 
             const closeBtn = document.createElement('button');
             closeBtn.className = 'btn btn-secondary';
@@ -718,6 +744,86 @@ const KCTestsView = {
         } catch (error) {
             console.error('View test error:', error);
             Toast.error('Fehler beim Laden');
+        }
+    },
+
+    /**
+     * Shows the form to assign a test to a user
+     */
+    async showAssignTestForm(test) {
+        if (!Permissions.has('kc_assign_tests')) {
+            Toast.error('Keine Berechtigung zum Zuweisen von Tests');
+            return;
+        }
+
+        try {
+            // Load users
+            const usersResult = await window.api.users.getAll();
+            if (!usersResult.success) {
+                Toast.error('Benutzer konnten nicht geladen werden');
+                return;
+            }
+
+            const userOptions = usersResult.users.map(u => ({
+                value: u.id,
+                label: `${u.firstName} ${u.lastName}`
+            }));
+
+            const result = await Modal.form({
+                title: `Testdurchgang: ${test.testNumber}`,
+                fields: [
+                    {
+                        name: 'testName',
+                        label: 'Test',
+                        type: 'text',
+                        default: `${test.testNumber} - ${test.name}`,
+                        readonly: true
+                    },
+                    {
+                        name: 'userId',
+                        label: 'Benutzer *',
+                        type: 'select',
+                        options: userOptions,
+                        required: true,
+                        placeholder: 'Benutzer auswählen'
+                    },
+                    {
+                        name: 'dueDate',
+                        label: 'Fälligkeitsdatum (optional)',
+                        type: 'date'
+                    },
+                    {
+                        name: 'notes',
+                        label: 'Hinweise (optional)',
+                        type: 'textarea',
+                        rows: 2,
+                        placeholder: 'Besondere Hinweise für den Teilnehmer'
+                    }
+                ],
+                submitText: 'Test zuweisen',
+                validate: (data) => {
+                    if (!data.userId) return 'Bitte wählen Sie einen Benutzer';
+                    return null;
+                }
+            });
+
+            if (result) {
+                const response = await window.api.knowledgeCheck.createAssignment({
+                    testId: test.id,
+                    userId: result.userId,
+                    dueDate: result.dueDate || null,
+                    notes: result.notes || ''
+                });
+
+                if (response && response.success) {
+                    Toast.success('Test wurde dem Benutzer zugewiesen');
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Zuweisen des Tests');
+                }
+            }
+        } catch (error) {
+            console.error('Assign test error:', error);
+            Toast.error('Fehler beim Zuweisen: ' + (error.message || 'Unbekannter Fehler'));
         }
     },
 

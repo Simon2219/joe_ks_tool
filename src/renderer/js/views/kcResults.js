@@ -287,8 +287,11 @@ const KCResultsView = {
      */
     async showNewResultForm() {
         // Check permissions
-        if (!Permissions.canCreate('kcResult')) {
-            Toast.error('Keine Berechtigung zum Durchführen von Tests');
+        const canConduct = Permissions.canCreate('kcResult');
+        const canAssign = Permissions.has('kc_assign_tests');
+        
+        if (!canConduct && !canAssign) {
+            Toast.error('Keine Berechtigung zum Durchführen oder Zuweisen von Tests');
             return;
         }
         
@@ -307,27 +310,59 @@ const KCResultsView = {
             label: `${u.firstName} ${u.lastName}`
         }));
 
+        // Build mode options based on permissions
+        const modeOptions = [];
+        if (canConduct) {
+            modeOptions.push({ value: 'conduct', label: 'Jetzt durchführen' });
+        }
+        if (canAssign) {
+            modeOptions.push({ value: 'assign', label: 'Benutzer zuweisen' });
+        }
+
+        const fields = [
+            {
+                name: 'testId',
+                label: 'Test *',
+                type: 'select',
+                options: testOptions,
+                required: true,
+                placeholder: 'Test auswählen'
+            },
+            {
+                name: 'userId',
+                label: 'Benutzer *',
+                type: 'select',
+                options: userOptions,
+                required: true,
+                placeholder: 'Benutzer auswählen'
+            }
+        ];
+
+        // Add mode selector if both options available
+        if (modeOptions.length > 1) {
+            fields.push({
+                name: 'mode',
+                label: 'Aktion',
+                type: 'select',
+                options: modeOptions,
+                default: 'conduct'
+            });
+        }
+
+        // Add due date field for assignment mode
+        if (canAssign) {
+            fields.push({
+                name: 'dueDate',
+                label: 'Fälligkeitsdatum (nur bei Zuweisung)',
+                type: 'date',
+                hint: 'Optional - nur relevant wenn Sie den Test zuweisen'
+            });
+        }
+
         const result = await Modal.form({
-            title: 'Neuen Test durchführen',
-            fields: [
-                {
-                    name: 'testId',
-                    label: 'Test *',
-                    type: 'select',
-                    options: testOptions,
-                    required: true,
-                    placeholder: 'Test auswählen'
-                },
-                {
-                    name: 'userId',
-                    label: 'Benutzer *',
-                    type: 'select',
-                    options: userOptions,
-                    required: true,
-                    placeholder: 'Benutzer auswählen'
-                }
-            ],
-            submitText: 'Test starten',
+            title: 'Neuer Test',
+            fields,
+            submitText: modeOptions.length > 1 ? 'Weiter' : (canConduct ? 'Test starten' : 'Test zuweisen'),
             validate: (data) => {
                 if (!data.testId) return 'Bitte wählen Sie einen Test';
                 if (!data.userId) return 'Bitte wählen Sie einen Benutzer';
@@ -336,7 +371,30 @@ const KCResultsView = {
         });
 
         if (result) {
-            await this.startTest(result.testId, result.userId);
+            const mode = result.mode || (canConduct ? 'conduct' : 'assign');
+            
+            if (mode === 'assign') {
+                // Assign test to user
+                try {
+                    const response = await window.api.knowledgeCheck.createAssignment({
+                        testId: result.testId,
+                        userId: result.userId,
+                        dueDate: result.dueDate || null
+                    });
+
+                    if (response && response.success) {
+                        Toast.success('Test wurde dem Benutzer zugewiesen');
+                    } else {
+                        Toast.error(response?.error || 'Fehler beim Zuweisen des Tests');
+                    }
+                } catch (error) {
+                    console.error('Assign test error:', error);
+                    Toast.error('Fehler beim Zuweisen: ' + (error.message || 'Unbekannter Fehler'));
+                }
+            } else {
+                // Conduct test immediately
+                await this.startTest(result.testId, result.userId);
+            }
         }
     },
 

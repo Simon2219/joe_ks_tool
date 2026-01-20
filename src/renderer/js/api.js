@@ -305,6 +305,18 @@ window.api = {
         updateResult: (id, data) => API.put(`/knowledge-check/results/${id}`, data),
         deleteResult: (id) => API.delete(`/knowledge-check/results/${id}`),
 
+        // Assignments
+        getAssignments: (filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/knowledge-check/assignments${params ? '?' + params : ''}`);
+        },
+        getMyAssignments: () => API.get('/knowledge-check/assignments/my'),
+        getPendingAssignmentsCount: () => API.get('/knowledge-check/assignments/pending-count'),
+        getAssignmentById: (id) => API.get(`/knowledge-check/assignments/${id}`),
+        createAssignment: (data) => API.post('/knowledge-check/assignments', data),
+        updateAssignment: (id, data) => API.put(`/knowledge-check/assignments/${id}`, data),
+        deleteAssignment: (id) => API.delete(`/knowledge-check/assignments/${id}`),
+
         // Statistics & Export
         getStatistics: () => API.get('/knowledge-check/stats'),
         exportResults: (filters = {}) => {

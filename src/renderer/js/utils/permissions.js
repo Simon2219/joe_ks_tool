@@ -267,6 +267,21 @@ const Permissions = {
         return this.hasPermission('kc_archive_delete');
     },
 
+    canAccessAssignedTests() {
+        return this.hasPermission('kc_assigned_view');
+    },
+
+    canAssignTests() {
+        return this.hasPermission('kc_assign_tests');
+    },
+
+    /**
+     * Shorthand for hasPermission
+     */
+    has(permission) {
+        return this.hasPermission(permission);
+    },
+
     /**
      * Checks if user can assign tickets
      */
@@ -378,6 +393,8 @@ const Permissions = {
             'kc_results_view': 'View Test Results',
             'kc_results_create': 'Conduct Tests',
             'kc_results_delete': 'Delete Test Results',
+            'kc_assign_tests': 'Assign Tests to Users',
+            'kc_assigned_view': 'View Assigned Tests',
             'kc_archive_view': 'View Archive',
             'kc_archive_restore': 'Restore from Archive',
             'kc_archive_delete': 'Permanently Delete Archived'

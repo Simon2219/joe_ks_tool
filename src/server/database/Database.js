@@ -433,11 +433,33 @@ function initSchema() {
         )
     `);
 
+    // Test assignments - assign tests to users
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_test_assignments (
+            id TEXT PRIMARY KEY,
+            test_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            assigned_by TEXT NOT NULL,
+            due_date TEXT,
+            status TEXT DEFAULT 'pending',
+            result_id TEXT,
+            notes TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (test_id) REFERENCES kc_tests(id),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (assigned_by) REFERENCES users(id),
+            FOREIGN KEY (result_id) REFERENCES kc_test_results(id)
+        )
+    `);
+
     // Create indexes
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_questions_category ON kc_questions(category_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_questions_test ON kc_test_questions(test_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_test ON kc_test_results(test_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_user ON kc_test_results(user_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_user ON kc_test_assignments(user_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_test ON kc_test_assignments(test_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
     database.run('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)');
@@ -532,6 +554,8 @@ function ensurePermissions() {
         { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
         { id: 'kc_results_create', name: 'Conduct Tests', module: 'knowledge_check' },
         { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
+        { id: 'kc_assign_tests', name: 'Assign Tests to Users', module: 'knowledge_check' },
+        { id: 'kc_assigned_view', name: 'View Assigned Tests', module: 'knowledge_check' },
         { id: 'kc_archive_view', name: 'View Archive', module: 'knowledge_check' },
         { id: 'kc_archive_restore', name: 'Restore from Archive', module: 'knowledge_check' },
         { id: 'kc_archive_delete', name: 'Permanently Delete Archived', module: 'knowledge_check' },
@@ -617,6 +641,8 @@ async function seedData() {
         { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
         { id: 'kc_results_create', name: 'Conduct Tests', module: 'knowledge_check' },
         { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
+        { id: 'kc_assign_tests', name: 'Assign Tests to Users', module: 'knowledge_check' },
+        { id: 'kc_assigned_view', name: 'View Assigned Tests', module: 'knowledge_check' },
         { id: 'kc_archive_view', name: 'View Archive', module: 'knowledge_check' },
         { id: 'kc_archive_restore', name: 'Restore from Archive', module: 'knowledge_check' },
         { id: 'kc_archive_delete', name: 'Permanently Delete Archived', module: 'knowledge_check' },
@@ -642,13 +668,15 @@ async function seedData() {
                            'kc_categories_create', 'kc_categories_edit', 'kc_categories_delete',
                            'kc_tests_view', 'kc_tests_create', 'kc_tests_edit', 'kc_tests_delete',
                            'kc_results_view', 'kc_results_create', 'kc_results_delete',
+                           'kc_assign_tests', 'kc_assigned_view',
                            'kc_archive_view', 'kc_archive_restore', 'kc_archive_delete'];
     const kcEditorPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit',
                           'kc_categories_create', 'kc_categories_edit',
                           'kc_tests_view', 'kc_tests_create', 'kc_tests_edit',
                           'kc_results_view', 'kc_results_create',
+                          'kc_assign_tests', 'kc_assigned_view',
                           'kc_archive_view']; // Editors can view archive but not restore or delete
-    const kcUserPerms = ['kc_view']; // Can only see the tab, not the sub-pages
+    const kcUserPerms = ['kc_view', 'kc_assigned_view']; // Can see the tab and their assigned tests
     
     const roles = [
         { id: 'admin', name: 'Administrator', description: 'Full system access', isAdmin: 1, isSystem: 1, permissions: allPermIds },
@@ -1934,6 +1962,144 @@ const KnowledgeCheckSystem = {
             archivedQuestions: archivedQuestions?.count || 0,
             archivedTests: archivedTests?.count || 0
         };
+    },
+
+    // ============================================
+    // TEST ASSIGNMENTS
+    // ============================================
+
+    getAllAssignments(filters = {}) {
+        let sql = `
+            SELECT a.*, t.name as test_name, t.test_number, t.passing_score, t.time_limit_minutes,
+                u.first_name || ' ' || u.last_name as user_name,
+                ab.first_name || ' ' || ab.last_name as assigned_by_name,
+                tc.name as category_name
+            FROM kc_test_assignments a
+            JOIN kc_tests t ON a.test_id = t.id
+            LEFT JOIN kc_test_categories tc ON t.category_id = tc.id
+            JOIN users u ON a.user_id = u.id
+            JOIN users ab ON a.assigned_by = ab.id
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        if (filters.userId) {
+            sql += ' AND a.user_id = ?';
+            params.push(filters.userId);
+        }
+        if (filters.testId) {
+            sql += ' AND a.test_id = ?';
+            params.push(filters.testId);
+        }
+        if (filters.status) {
+            sql += ' AND a.status = ?';
+            params.push(filters.status);
+        }
+        if (filters.assignedBy) {
+            sql += ' AND a.assigned_by = ?';
+            params.push(filters.assignedBy);
+        }
+        
+        sql += ' ORDER BY a.created_at DESC';
+        
+        return all(sql, params).map(a => ({
+            id: a.id,
+            testId: a.test_id,
+            testNumber: a.test_number,
+            testName: a.test_name,
+            categoryName: a.category_name || 'Uncategorized',
+            passingScore: a.passing_score,
+            timeLimitMinutes: a.time_limit_minutes,
+            userId: a.user_id,
+            userName: a.user_name,
+            assignedBy: a.assigned_by,
+            assignedByName: a.assigned_by_name,
+            dueDate: a.due_date,
+            status: a.status,
+            resultId: a.result_id,
+            notes: a.notes,
+            createdAt: a.created_at,
+            updatedAt: a.updated_at
+        }));
+    },
+
+    getAssignmentById(id) {
+        const assignment = get(`
+            SELECT a.*, t.name as test_name, t.test_number, t.passing_score, t.time_limit_minutes,
+                u.first_name || ' ' || u.last_name as user_name,
+                ab.first_name || ' ' || ab.last_name as assigned_by_name
+            FROM kc_test_assignments a
+            JOIN kc_tests t ON a.test_id = t.id
+            JOIN users u ON a.user_id = u.id
+            JOIN users ab ON a.assigned_by = ab.id
+            WHERE a.id = ?
+        `, [id]);
+        
+        if (!assignment) return null;
+        
+        return {
+            id: assignment.id,
+            testId: assignment.test_id,
+            testNumber: assignment.test_number,
+            testName: assignment.test_name,
+            passingScore: assignment.passing_score,
+            timeLimitMinutes: assignment.time_limit_minutes,
+            userId: assignment.user_id,
+            userName: assignment.user_name,
+            assignedBy: assignment.assigned_by,
+            assignedByName: assignment.assigned_by_name,
+            dueDate: assignment.due_date,
+            status: assignment.status,
+            resultId: assignment.result_id,
+            notes: assignment.notes,
+            createdAt: assignment.created_at,
+            updatedAt: assignment.updated_at
+        };
+    },
+
+    createAssignment(data, assignedBy) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        
+        run(`INSERT INTO kc_test_assignments (id, test_id, user_id, assigned_by, due_date, status, notes, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.testId, data.userId, assignedBy, data.dueDate || null, 'pending', data.notes || '', now, now]);
+        
+        saveDb();
+        return this.getAssignmentById(id);
+    },
+
+    updateAssignment(id, data) {
+        const now = new Date().toISOString();
+        let sql = 'UPDATE kc_test_assignments SET updated_at = ?';
+        let params = [now];
+        
+        if (data.status !== undefined) { sql += ', status = ?'; params.push(data.status); }
+        if (data.dueDate !== undefined) { sql += ', due_date = ?'; params.push(data.dueDate); }
+        if (data.resultId !== undefined) { sql += ', result_id = ?'; params.push(data.resultId); }
+        if (data.notes !== undefined) { sql += ', notes = ?'; params.push(data.notes); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        run(sql, params);
+        
+        saveDb();
+        return this.getAssignmentById(id);
+    },
+
+    deleteAssignment(id) {
+        run('DELETE FROM kc_test_assignments WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    getMyAssignments(userId) {
+        return this.getAllAssignments({ userId });
+    },
+
+    getPendingAssignmentsCount(userId) {
+        const result = get('SELECT COUNT(*) as count FROM kc_test_assignments WHERE user_id = ? AND status = ?', [userId, 'pending']);
+        return result?.count || 0;
     },
 
     // ============================================

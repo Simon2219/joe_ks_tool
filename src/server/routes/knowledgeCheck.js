@@ -466,6 +466,149 @@ router.delete('/results/:id', requirePermission('kc_results_delete'), (req, res)
 });
 
 // ============================================
+// TEST ASSIGNMENTS
+// ============================================
+
+/**
+ * GET /api/knowledge-check/assignments
+ * Get all assignments (filtered by permissions - users see only their own)
+ */
+router.get('/assignments', requirePermission('kc_assigned_view'), (req, res) => {
+    try {
+        const filters = { ...req.query };
+        
+        // Regular users can only see their own assignments
+        if (!hasPermission(req.user, 'kc_assign_tests')) {
+            filters.userId = req.user.id;
+        }
+        
+        const assignments = KnowledgeCheckSystem.getAllAssignments(filters);
+        res.json({ success: true, assignments });
+    } catch (error) {
+        console.error('Get KC assignments error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch assignments' });
+    }
+});
+
+/**
+ * GET /api/knowledge-check/assignments/my
+ * Get current user's assignments
+ */
+router.get('/assignments/my', requirePermission('kc_assigned_view'), (req, res) => {
+    try {
+        const assignments = KnowledgeCheckSystem.getMyAssignments(req.user.id);
+        res.json({ success: true, assignments });
+    } catch (error) {
+        console.error('Get my assignments error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch your assignments' });
+    }
+});
+
+/**
+ * GET /api/knowledge-check/assignments/pending-count
+ * Get pending assignments count for current user
+ */
+router.get('/assignments/pending-count', requirePermission('kc_assigned_view'), (req, res) => {
+    try {
+        const count = KnowledgeCheckSystem.getPendingAssignmentsCount(req.user.id);
+        res.json({ success: true, count });
+    } catch (error) {
+        console.error('Get pending count error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch pending count' });
+    }
+});
+
+/**
+ * GET /api/knowledge-check/assignments/:id
+ */
+router.get('/assignments/:id', requirePermission('kc_assigned_view'), (req, res) => {
+    try {
+        const assignment = KnowledgeCheckSystem.getAssignmentById(req.params.id);
+        if (!assignment) {
+            return res.status(404).json({ success: false, error: 'Assignment not found' });
+        }
+        
+        // Check if user can access this assignment
+        if (!hasPermission(req.user, 'kc_assign_tests') && assignment.userId !== req.user.id) {
+            return res.status(403).json({ success: false, error: 'Access denied' });
+        }
+        
+        res.json({ success: true, assignment });
+    } catch (error) {
+        console.error('Get KC assignment error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch assignment' });
+    }
+});
+
+/**
+ * POST /api/knowledge-check/assignments
+ * Create a new test assignment
+ */
+router.post('/assignments', requirePermission('kc_assign_tests'), (req, res) => {
+    try {
+        const { testId, userId, dueDate, notes } = req.body;
+        
+        if (!testId || !userId) {
+            return res.status(400).json({ success: false, error: 'Test ID and User ID are required' });
+        }
+        
+        // Check if test exists
+        const test = KnowledgeCheckSystem.getTestById(testId);
+        if (!test) {
+            return res.status(400).json({ success: false, error: 'Test not found' });
+        }
+        
+        // Check if user exists
+        const user = UserSystem.getById(userId);
+        if (!user) {
+            return res.status(400).json({ success: false, error: 'User not found' });
+        }
+        
+        const assignment = KnowledgeCheckSystem.createAssignment(req.body, req.user.id);
+        res.status(201).json({ success: true, assignment });
+    } catch (error) {
+        console.error('Create KC assignment error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create assignment' });
+    }
+});
+
+/**
+ * PUT /api/knowledge-check/assignments/:id
+ */
+router.put('/assignments/:id', requirePermission('kc_assigned_view'), (req, res) => {
+    try {
+        const assignment = KnowledgeCheckSystem.getAssignmentById(req.params.id);
+        if (!assignment) {
+            return res.status(404).json({ success: false, error: 'Assignment not found' });
+        }
+        
+        // Regular users can only update status when completing
+        if (!hasPermission(req.user, 'kc_assign_tests') && assignment.userId !== req.user.id) {
+            return res.status(403).json({ success: false, error: 'Access denied' });
+        }
+        
+        const updated = KnowledgeCheckSystem.updateAssignment(req.params.id, req.body);
+        res.json({ success: true, assignment: updated });
+    } catch (error) {
+        console.error('Update KC assignment error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update assignment' });
+    }
+});
+
+/**
+ * DELETE /api/knowledge-check/assignments/:id
+ */
+router.delete('/assignments/:id', requirePermission('kc_assign_tests'), (req, res) => {
+    try {
+        const result = KnowledgeCheckSystem.deleteAssignment(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error('Delete KC assignment error:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete assignment' });
+    }
+});
+
+// ============================================
 // STATISTICS & EXPORT
 // ============================================
 

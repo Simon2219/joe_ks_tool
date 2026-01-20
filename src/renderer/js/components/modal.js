@@ -12,6 +12,7 @@ const Modal = {
     closeBtn: null,
     isOpen: false,
     onCloseCallback: null,
+    clearContentTimeout: null,
 
 
     /**
@@ -73,6 +74,11 @@ const Modal = {
         if(!content) throw new TypeError('Modal needs useable Content to be provided')
         if(!footer) throw new TypeError('Modal needs useable Footer to be provided')
 
+        // Cancel any pending content clear from previous modal close
+        if (this.clearContentTimeout) {
+            clearTimeout(this.clearContentTimeout);
+            this.clearContentTimeout = null;
+        }
 
         this.titleEl.textContent = title;
         
@@ -118,11 +124,15 @@ const Modal = {
             this.onCloseCallback = null;
         }
 
-        // Clear content after animation
-        setTimeout(() => 
+        // Clear content after animation (but allow cancellation if reopened)
+        this.clearContentTimeout = setTimeout(() => 
         {
-            this.contentEl.innerHTML = '';
-            this.footerEl.innerHTML = '';
+            // Only clear if modal is still closed
+            if (!this.isOpen) {
+                this.contentEl.innerHTML = '';
+                this.footerEl.innerHTML = '';
+            }
+            this.clearContentTimeout = null;
         }, 250);
     },
 

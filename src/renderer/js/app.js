@@ -413,6 +413,9 @@ const App = {
                 case 'kcArchive':
                     await KCArchiveView.init();
                     break;
+                case 'kcAssigned':
+                    await KCAssignedView.init();
+                    break;
                 case 'roles':
                     await RolesView.init();
                     break;
@@ -443,6 +446,7 @@ const App = {
             kcTests: KCTestsView,
             kcResults: KCResultsView,
             kcArchive: KCArchiveView,
+            kcAssigned: KCAssignedView,
             roles: RolesView,
             integrations: IntegrationsView,
             settings: SettingsView
