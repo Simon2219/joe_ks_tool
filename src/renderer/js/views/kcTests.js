@@ -10,12 +10,16 @@ const KCTestsView = {
     filters: {
         categoryId: ''
     },
+    eventsBound: false,
 
     /**
      * Initializes the tests view
      */
     async init() {
-        this.bindEvents();
+        if (!this.eventsBound) {
+            this.bindEvents();
+            this.eventsBound = true;
+        }
         await this.loadCategories();
         await this.loadQuestions();
         await this.loadTests();

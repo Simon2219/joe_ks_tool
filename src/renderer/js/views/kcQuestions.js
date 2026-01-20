@@ -9,12 +9,16 @@ const KCQuestionsView = {
     filters: {
         categoryId: ''
     },
+    eventsBound: false,
 
     /**
      * Initializes the questions view
      */
     async init() {
-        this.bindEvents();
+        if (!this.eventsBound) {
+            this.bindEvents();
+            this.eventsBound = true;
+        }
         await this.loadCategories();
         await this.loadQuestions();
         this.renderCatalog();
@@ -339,12 +343,14 @@ const KCQuestionsView = {
             { name: 'defaultWeighting', label: 'Standard-Gewichtung', type: 'number', min: 1, max: 10, default: 1 }
         ];
 
+        console.log('[KC] Opening category form...');
         const result = await Modal.form({
             title,
             fields,
             data: category || { defaultWeighting: 1 },
             submitText: isEdit ? 'Speichern' : 'Erstellen',
             validate: (data) => {
+                console.log('[KC] Validating:', data);
                 if (!data.name || data.name.trim().length < 2) {
                     return 'Name muss mindestens 2 Zeichen haben';
                 }
@@ -352,14 +358,20 @@ const KCQuestionsView = {
             }
         });
 
+        console.log('[KC] Modal.form returned:', result);
+
         if (result) {
+            console.log('[KC] Result is truthy, calling API...');
             try {
                 let response;
                 if (isEdit) {
                     response = await window.api.knowledgeCheck.updateCategory(category.id, result);
                 } else {
+                    console.log('[KC] Creating category with data:', result);
                     response = await window.api.knowledgeCheck.createCategory(result);
                 }
+                
+                console.log('[KC] API response:', response);
                 
                 if (response && response.success) {
                     Toast.success(isEdit ? 'Kategorie aktualisiert' : 'Kategorie erstellt');
@@ -370,9 +382,11 @@ const KCQuestionsView = {
                     Toast.error(response?.error || 'Fehler beim Speichern der Kategorie');
                 }
             } catch (error) {
-                console.error('Category save error:', error);
+                console.error('[KC] Category save error:', error);
                 Toast.error('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'));
             }
+        } else {
+            console.log('[KC] Result is falsy (cancelled or error)');
         }
     },
 

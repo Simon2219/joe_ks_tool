@@ -6,12 +6,16 @@
 const RolesView = {
     roles: [],
     allPermissions: [],
+    eventsBound: false,
 
     /**
      * Initializes the roles view
      */
     async init() {
-        this.bindEvents();
+        if (!this.eventsBound) {
+            this.bindEvents();
+            this.eventsBound = true;
+        }
         await this.loadPermissions();
         await this.loadRoles();
     },

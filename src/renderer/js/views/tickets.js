@@ -11,12 +11,16 @@ const TicketsView = {
         priority: '',
         assignee: ''
     },
+    eventsBound: false,
 
     /**
      * Initializes the tickets view
      */
     async init() {
-        this.bindEvents();
+        if (!this.eventsBound) {
+            this.bindEvents();
+            this.eventsBound = true;
+        }
         await this.loadUsers();
         await this.loadTickets();
     },

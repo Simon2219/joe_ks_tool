@@ -13,12 +13,16 @@ const KCResultsView = {
         startDate: '',
         endDate: ''
     },
+    eventsBound: false,
 
     /**
      * Initializes the results view
      */
     async init() {
-        this.bindEvents();
+        if (!this.eventsBound) {
+            this.bindEvents();
+            this.eventsBound = true;
+        }
         await this.loadTests();
         await this.loadUsers();
         await this.loadResults();
