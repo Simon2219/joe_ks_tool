@@ -305,7 +305,16 @@ window.api = {
             return API.get(`/knowledge-check/export/results${params ? '?' + params : ''}`);
         },
         checkAnswer: (answer, exactAnswer, triggerWords) => 
-            API.post('/knowledge-check/check-answer', { answer, exactAnswer, triggerWords })
+            API.post('/knowledge-check/check-answer', { answer, exactAnswer, triggerWords }),
+        
+        // Archive
+        getArchiveStats: () => API.get('/knowledge-check/archive/stats'),
+        getArchivedQuestions: () => API.get('/knowledge-check/archive/questions'),
+        getArchivedTests: () => API.get('/knowledge-check/archive/tests'),
+        restoreQuestion: (id) => API.put(`/knowledge-check/archive/questions/${id}/restore`),
+        restoreTest: (id) => API.put(`/knowledge-check/archive/tests/${id}/restore`),
+        permanentDeleteQuestion: (id) => API.delete(`/knowledge-check/archive/questions/${id}`),
+        permanentDeleteTest: (id) => API.delete(`/knowledge-check/archive/tests/${id}`)
     },
 
     settings: {

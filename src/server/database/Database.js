@@ -327,6 +327,8 @@ function initSchema() {
             exact_answer TEXT DEFAULT '',
             trigger_words TEXT DEFAULT '[]',
             is_active INTEGER DEFAULT 1,
+            is_archived INTEGER DEFAULT 0,
+            archived_at TEXT DEFAULT NULL,
             sort_order INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
@@ -357,6 +359,8 @@ function initSchema() {
             time_limit_minutes INTEGER DEFAULT NULL,
             passing_score INTEGER DEFAULT 80,
             is_active INTEGER DEFAULT 1,
+            is_archived INTEGER DEFAULT 0,
+            archived_at TEXT DEFAULT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             FOREIGN KEY (category_id) REFERENCES kc_categories(id)
@@ -480,6 +484,9 @@ async function seedData() {
         { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
         { id: 'kc_results_create', name: 'Conduct Tests', module: 'knowledge_check' },
         { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
+        { id: 'kc_archive_view', name: 'View Archive', module: 'knowledge_check' },
+        { id: 'kc_archive_restore', name: 'Restore from Archive', module: 'knowledge_check' },
+        { id: 'kc_archive_delete', name: 'Permanently Delete Archived', module: 'knowledge_check' },
         { id: 'role_view', name: 'View Roles', module: 'roles' },
         { id: 'role_create', name: 'Create Roles', module: 'roles' },
         { id: 'role_edit', name: 'Edit Roles', module: 'roles' },
@@ -501,11 +508,13 @@ async function seedData() {
     const kcManagerPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit', 'kc_questions_delete', 
                            'kc_categories_create', 'kc_categories_edit', 'kc_categories_delete',
                            'kc_tests_view', 'kc_tests_create', 'kc_tests_edit', 'kc_tests_delete',
-                           'kc_results_view', 'kc_results_create', 'kc_results_delete'];
+                           'kc_results_view', 'kc_results_create', 'kc_results_delete',
+                           'kc_archive_view', 'kc_archive_restore', 'kc_archive_delete'];
     const kcEditorPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit',
                           'kc_categories_create', 'kc_categories_edit',
                           'kc_tests_view', 'kc_tests_create', 'kc_tests_edit',
-                          'kc_results_view', 'kc_results_create'];
+                          'kc_results_view', 'kc_results_create',
+                          'kc_archive_view']; // Editors can view archive but not restore or delete
     const kcUserPerms = ['kc_view']; // Can only see the tab, not the sub-pages
     
     const roles = [
@@ -1300,6 +1309,15 @@ const KnowledgeCheckSystem = {
         let sql = 'SELECT q.*, c.name as category_name FROM kc_questions q LEFT JOIN kc_categories c ON q.category_id = c.id WHERE 1=1';
         const params = [];
         
+        // Exclude archived by default unless specifically requested
+        if (filters.includeArchived) {
+            // Include all
+        } else if (filters.archivedOnly) {
+            sql += ' AND q.is_archived = 1';
+        } else {
+            sql += ' AND q.is_archived = 0';
+        }
+        
         if (filters.categoryId) {
             if (filters.categoryId === 'uncategorized') {
                 sql += ' AND q.category_id IS NULL';
@@ -1352,6 +1370,8 @@ const KnowledgeCheckSystem = {
             exactAnswer: question.exact_answer || '',
             triggerWords: triggerWords,
             isActive: !!question.is_active,
+            isArchived: !!question.is_archived,
+            archivedAt: question.archived_at,
             sortOrder: question.sort_order,
             options: options.map(o => ({
                 id: o.id,
@@ -1419,8 +1439,46 @@ const KnowledgeCheckSystem = {
     },
 
     deleteQuestion(id) {
+        // Check if question has been used in any test (exists in kc_test_questions or kc_test_answers)
+        const usedInTest = get('SELECT COUNT(*) as count FROM kc_test_questions WHERE question_id = ?', [id]);
+        const hasAnswers = get('SELECT COUNT(*) as count FROM kc_test_answers WHERE question_id = ?', [id]);
+        
+        if ((usedInTest && usedInTest.count > 0) || (hasAnswers && hasAnswers.count > 0)) {
+            // Archive instead of delete - question has been used
+            const now = new Date().toISOString();
+            run('UPDATE kc_questions SET is_archived = 1, archived_at = ?, updated_at = ? WHERE id = ?', 
+                [now, now, id]);
+            // Remove from active tests (but keep historical answer records intact)
+            run('DELETE FROM kc_test_questions WHERE question_id = ?', [id]);
+            saveDb();
+            return { success: true, archived: true };
+        } else {
+            // Safe to delete permanently - never used
+            run('DELETE FROM kc_question_options WHERE question_id = ?', [id]);
+            run('DELETE FROM kc_questions WHERE id = ?', [id]);
+            saveDb();
+            return { success: true, deleted: true };
+        }
+    },
+
+    restoreQuestion(id) {
+        const now = new Date().toISOString();
+        run('UPDATE kc_questions SET is_archived = 0, archived_at = NULL, updated_at = ? WHERE id = ?', 
+            [now, id]);
+        saveDb();
+        return this.getQuestionById(id);
+    },
+
+    permanentDeleteQuestion(id) {
+        // Only allow permanent delete for archived questions
+        const question = get('SELECT is_archived FROM kc_questions WHERE id = ?', [id]);
+        if (!question || !question.is_archived) {
+            return { success: false, error: 'Question must be archived before permanent deletion' };
+        }
+        
+        // Also delete any orphaned test answers for this question
+        run('DELETE FROM kc_test_answers WHERE question_id = ?', [id]);
         run('DELETE FROM kc_question_options WHERE question_id = ?', [id]);
-        run('DELETE FROM kc_test_questions WHERE question_id = ?', [id]);
         run('DELETE FROM kc_questions WHERE id = ?', [id]);
         saveDb();
         return { success: true };
@@ -1448,6 +1506,15 @@ const KnowledgeCheckSystem = {
         `;
         const params = [];
         
+        // Exclude archived by default unless specifically requested
+        if (filters.includeArchived) {
+            // Include all
+        } else if (filters.archivedOnly) {
+            sql += ' AND t.is_archived = 1';
+        } else {
+            sql += ' AND t.is_archived = 0';
+        }
+        
         if (filters.categoryId) {
             sql += ' AND t.category_id = ?';
             params.push(filters.categoryId);
@@ -1469,6 +1536,8 @@ const KnowledgeCheckSystem = {
             timeLimitMinutes: t.time_limit_minutes,
             passingScore: t.passing_score,
             isActive: !!t.is_active,
+            isArchived: !!t.is_archived,
+            archivedAt: t.archived_at,
             questionCount: t.question_count,
             createdAt: t.created_at,
             updatedAt: t.updated_at
@@ -1569,10 +1638,61 @@ const KnowledgeCheckSystem = {
     },
 
     deleteTest(id) {
+        // Check if test has any results
+        const hasResults = get('SELECT COUNT(*) as count FROM kc_test_results WHERE test_id = ?', [id]);
+        
+        if (hasResults && hasResults.count > 0) {
+            // Archive instead of delete - test has results
+            const now = new Date().toISOString();
+            run('UPDATE kc_tests SET is_archived = 1, archived_at = ?, is_active = 0, updated_at = ? WHERE id = ?', 
+                [now, now, id]);
+            saveDb();
+            return { success: true, archived: true };
+        } else {
+            // Safe to delete permanently - no results
+            run('DELETE FROM kc_test_questions WHERE test_id = ?', [id]);
+            run('DELETE FROM kc_tests WHERE id = ?', [id]);
+            saveDb();
+            return { success: true, deleted: true };
+        }
+    },
+
+    restoreTest(id) {
+        const now = new Date().toISOString();
+        run('UPDATE kc_tests SET is_archived = 0, archived_at = NULL, updated_at = ? WHERE id = ?', 
+            [now, id]);
+        saveDb();
+        return this.getTestById(id);
+    },
+
+    permanentDeleteTest(id) {
+        // Only allow permanent delete for archived tests
+        const test = get('SELECT is_archived FROM kc_tests WHERE id = ?', [id]);
+        if (!test || !test.is_archived) {
+            return { success: false, error: 'Test must be archived before permanent deletion' };
+        }
+        
+        // Delete all related data
+        run('DELETE FROM kc_test_answers WHERE result_id IN (SELECT id FROM kc_test_results WHERE test_id = ?)', [id]);
+        run('DELETE FROM kc_test_results WHERE test_id = ?', [id]);
         run('DELETE FROM kc_test_questions WHERE test_id = ?', [id]);
         run('DELETE FROM kc_tests WHERE id = ?', [id]);
         saveDb();
         return { success: true };
+    },
+
+    // ============================================
+    // ARCHIVE STATISTICS
+    // ============================================
+    
+    getArchiveStatistics() {
+        const archivedQuestions = get('SELECT COUNT(*) as count FROM kc_questions WHERE is_archived = 1');
+        const archivedTests = get('SELECT COUNT(*) as count FROM kc_tests WHERE is_archived = 1');
+        
+        return {
+            archivedQuestions: archivedQuestions?.count || 0,
+            archivedTests: archivedTests?.count || 0
+        };
     },
 
     // ============================================
