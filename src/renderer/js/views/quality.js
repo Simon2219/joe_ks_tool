@@ -12,12 +12,16 @@ const QualityView = {
         startDate: '',
         endDate: ''
     },
+    eventsBound: false,
 
     /**
      * Initializes the quality view
      */
     async init() {
-        this.bindEvents();
+        if (!this.eventsBound) {
+            this.bindEvents();
+            this.eventsBound = true;
+        }
         await this.loadCategories();
         await this.loadAgents();
         await this.loadReports();

@@ -10,12 +10,16 @@ const UsersView = {
         role: '',
         status: ''
     },
+    eventsBound: false,
 
     /**
      * Initializes the users view
      */
     async init() {
-        this.bindEvents();
+        if (!this.eventsBound) {
+            this.bindEvents();
+            this.eventsBound = true;
+        }
         await this.loadRoles();
         await this.loadUsers();
     },

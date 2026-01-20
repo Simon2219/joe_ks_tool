@@ -274,8 +274,10 @@ const Modal = {
                     }
                 }
     
-                this.close();
+                // IMPORTANT: Resolve with formData BEFORE closing to prevent
+                // onCloseCallback from resolving with null first
                 done(formData);
+                this.close();
             };
     
             form.addEventListener('submit', (e) => {

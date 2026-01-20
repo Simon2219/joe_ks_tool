@@ -9,12 +9,16 @@ const KCQuestionsView = {
     filters: {
         categoryId: ''
     },
+    eventsBound: false,
 
     /**
      * Initializes the questions view
      */
     async init() {
-        this.bindEvents();
+        if (!this.eventsBound) {
+            this.bindEvents();
+            this.eventsBound = true;
+        }
         await this.loadCategories();
         await this.loadQuestions();
         this.renderCatalog();
