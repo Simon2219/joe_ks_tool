@@ -590,13 +590,17 @@ const KCResultsView = {
 
         if (confirmed) {
             try {
-                await window.api.knowledgeCheck.deleteResult(resultId);
-                Toast.success('Ergebnis gelöscht');
-                await this.loadResults();
-                await this.loadStatistics();
+                const response = await window.api.knowledgeCheck.deleteResult(resultId);
+                if (response && response.success) {
+                    Toast.success('Ergebnis gelöscht');
+                    await this.loadResults();
+                    await this.loadStatistics();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Löschen des Ergebnisses');
+                }
             } catch (error) {
                 console.error('Delete result error:', error);
-                Toast.error('Fehler beim Löschen');
+                Toast.error('Fehler beim Löschen: ' + (error.message || 'Unbekannter Fehler'));
             }
         }
     },

@@ -409,19 +409,24 @@ const KCTestsView = {
             }
 
             try {
+                let response;
                 if (isEdit) {
-                    await window.api.knowledgeCheck.updateTest(test.id, data);
-                    Toast.success('Test aktualisiert');
+                    response = await window.api.knowledgeCheck.updateTest(test.id, data);
                 } else {
-                    await window.api.knowledgeCheck.createTest(data);
-                    Toast.success('Test erstellt');
+                    response = await window.api.knowledgeCheck.createTest(data);
                 }
-                Modal.close();
-                await this.loadTests();
-                this.renderTestList();
+                
+                if (response && response.success) {
+                    Toast.success(isEdit ? 'Test aktualisiert' : 'Test erstellt');
+                    Modal.close();
+                    await this.loadTests();
+                    this.renderTestList();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Speichern des Tests');
+                }
             } catch (error) {
                 console.error('Test save error:', error);
-                Toast.error('Fehler beim Speichern');
+                Toast.error('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'));
             }
         });
     },
@@ -537,13 +542,17 @@ const KCTestsView = {
 
         if (confirmed) {
             try {
-                await window.api.knowledgeCheck.deleteTest(testId);
-                Toast.success('Test gelöscht');
-                await this.loadTests();
-                this.renderTestList();
+                const response = await window.api.knowledgeCheck.deleteTest(testId);
+                if (response && response.success) {
+                    Toast.success(response.archived ? 'Test archiviert' : 'Test gelöscht');
+                    await this.loadTests();
+                    this.renderTestList();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Löschen des Tests');
+                }
             } catch (error) {
                 console.error('Delete test error:', error);
-                Toast.error('Fehler beim Löschen');
+                Toast.error('Fehler beim Löschen: ' + (error.message || 'Unbekannter Fehler'));
             }
         }
     },

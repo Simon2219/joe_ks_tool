@@ -455,7 +455,7 @@ img, svg {
 }
 
 .nav-item.active {
-    background: var(--brand-gradient);
+    background: var(--brand-primary);
     color: white;
 }
 

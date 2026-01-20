@@ -354,19 +354,24 @@ const KCQuestionsView = {
 
         if (result) {
             try {
+                let response;
                 if (isEdit) {
-                    await window.api.knowledgeCheck.updateCategory(category.id, result);
-                    Toast.success('Kategorie aktualisiert');
+                    response = await window.api.knowledgeCheck.updateCategory(category.id, result);
                 } else {
-                    await window.api.knowledgeCheck.createCategory(result);
-                    Toast.success('Kategorie erstellt');
+                    response = await window.api.knowledgeCheck.createCategory(result);
                 }
-                await this.loadCategories();
-                await this.loadQuestions();
-                this.renderCatalog();
+                
+                if (response && response.success) {
+                    Toast.success(isEdit ? 'Kategorie aktualisiert' : 'Kategorie erstellt');
+                    await this.loadCategories();
+                    await this.loadQuestions();
+                    this.renderCatalog();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Speichern der Kategorie');
+                }
             } catch (error) {
                 console.error('Category save error:', error);
-                Toast.error('Fehler beim Speichern');
+                Toast.error('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'));
             }
         }
     },
@@ -394,14 +399,18 @@ const KCQuestionsView = {
 
         if (confirmed) {
             try {
-                await window.api.knowledgeCheck.deleteCategory(categoryId);
-                Toast.success('Kategorie gelöscht');
-                await this.loadCategories();
-                await this.loadQuestions();
-                this.renderCatalog();
+                const response = await window.api.knowledgeCheck.deleteCategory(categoryId);
+                if (response && response.success) {
+                    Toast.success('Kategorie gelöscht');
+                    await this.loadCategories();
+                    await this.loadQuestions();
+                    this.renderCatalog();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Löschen der Kategorie');
+                }
             } catch (error) {
                 console.error('Delete category error:', error);
-                Toast.error('Fehler beim Löschen');
+                Toast.error('Fehler beim Löschen: ' + (error.message || 'Unbekannter Fehler'));
             }
         }
     },
@@ -632,19 +641,24 @@ const KCQuestionsView = {
             }
 
             try {
+                let response;
                 if (isEdit) {
-                    await window.api.knowledgeCheck.updateQuestion(existingQuestion.id, data);
-                    Toast.success('Frage aktualisiert');
+                    response = await window.api.knowledgeCheck.updateQuestion(existingQuestion.id, data);
                 } else {
-                    await window.api.knowledgeCheck.createQuestion(data);
-                    Toast.success('Frage erstellt');
+                    response = await window.api.knowledgeCheck.createQuestion(data);
                 }
-                Modal.close();
-                await this.loadQuestions();
-                this.renderCatalog();
+                
+                if (response && response.success) {
+                    Toast.success(isEdit ? 'Frage aktualisiert' : 'Frage erstellt');
+                    Modal.close();
+                    await this.loadQuestions();
+                    this.renderCatalog();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Speichern der Frage');
+                }
             } catch (error) {
                 console.error('Question save error:', error);
-                Toast.error('Fehler beim Speichern');
+                Toast.error('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'));
             }
         });
     },
@@ -738,13 +752,17 @@ const KCQuestionsView = {
 
         if (confirmed) {
             try {
-                await window.api.knowledgeCheck.deleteQuestion(questionId);
-                Toast.success('Frage gelöscht');
-                await this.loadQuestions();
-                this.renderCatalog();
+                const response = await window.api.knowledgeCheck.deleteQuestion(questionId);
+                if (response && response.success) {
+                    Toast.success(response.archived ? 'Frage archiviert' : 'Frage gelöscht');
+                    await this.loadQuestions();
+                    this.renderCatalog();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Löschen der Frage');
+                }
             } catch (error) {
                 console.error('Delete question error:', error);
-                Toast.error('Fehler beim Löschen');
+                Toast.error('Fehler beim Löschen: ' + (error.message || 'Unbekannter Fehler'));
             }
         }
     },
