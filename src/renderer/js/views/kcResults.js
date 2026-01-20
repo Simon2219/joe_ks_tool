@@ -300,102 +300,177 @@ const KCResultsView = {
             return;
         }
 
-        const testOptions = this.tests.filter(t => t.isActive).map(t => ({
-            value: t.id,
-            label: `${t.testNumber} - ${t.name}`
-        }));
+        const tests = this.tests.filter(t => t.isActive);
+        const users = this.users;
 
-        const userOptions = this.users.map(u => ({
-            value: u.id,
-            label: `${u.firstName} ${u.lastName}`
-        }));
+        // Build custom form with mode selection and multi-user support for assign mode
+        const formHtml = `
+            <div class="new-test-form">
+                <div class="form-group">
+                    <label for="new-test-select">Test *</label>
+                    <select id="new-test-select" class="form-select" required>
+                        <option value="">Test auswählen</option>
+                        ${tests.map(t => `<option value="${t.id}">${Helpers.escapeHtml(t.testNumber)} - ${Helpers.escapeHtml(t.name)}</option>`).join('')}
+                    </select>
+                </div>
+                
+                ${canConduct && canAssign ? `
+                    <div class="form-group">
+                        <label for="new-test-mode">Aktion</label>
+                        <select id="new-test-mode" class="form-select">
+                            <option value="conduct">Jetzt durchführen (1 Benutzer)</option>
+                            <option value="assign">Benutzer zuweisen (mehrere möglich)</option>
+                        </select>
+                    </div>
+                ` : ''}
+                
+                <!-- Single user selection for conduct mode -->
+                <div id="single-user-section" class="form-group" ${!canConduct ? 'style="display:none"' : ''}>
+                    <label for="new-test-user">Benutzer *</label>
+                    <select id="new-test-user" class="form-select">
+                        <option value="">Benutzer auswählen</option>
+                        ${users.map(u => `<option value="${u.id}">${Helpers.escapeHtml(u.firstName)} ${Helpers.escapeHtml(u.lastName)}</option>`).join('')}
+                    </select>
+                </div>
+                
+                <!-- Multi-user selection for assign mode -->
+                <div id="multi-user-section" class="form-group" style="display: ${!canConduct && canAssign ? 'block' : 'none'}">
+                    <label>Benutzer auswählen *</label>
+                    <div style="margin-bottom: var(--space-xs);">
+                        <button type="button" class="btn btn-sm btn-secondary" id="new-test-select-all">Alle</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="new-test-deselect-all">Keine</button>
+                    </div>
+                    <div class="user-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: var(--space-sm);">
+                        ${users.map(u => `
+                            <label class="form-checkbox" style="display: flex; padding: var(--space-xs) 0;">
+                                <input type="checkbox" name="assignUserIds" value="${u.id}">
+                                <span>${Helpers.escapeHtml(u.firstName)} ${Helpers.escapeHtml(u.lastName)}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <!-- Due date for assignment -->
+                <div id="due-date-section" class="form-group" style="display: ${!canConduct && canAssign ? 'block' : 'none'}">
+                    <label for="new-test-due-date">Fälligkeitsdatum (optional)</label>
+                    <input type="date" id="new-test-due-date" class="form-input">
+                </div>
+            </div>
+        `;
 
-        // Build mode options based on permissions
-        const modeOptions = [];
-        if (canConduct) {
-            modeOptions.push({ value: 'conduct', label: 'Jetzt durchführen' });
-        }
-        if (canAssign) {
-            modeOptions.push({ value: 'assign', label: 'Benutzer zuweisen' });
-        }
+        const template = document.createElement('template');
+        template.innerHTML = formHtml.trim();
+        const content = template.content.firstElementChild;
 
-        const fields = [
-            {
-                name: 'testId',
-                label: 'Test *',
-                type: 'select',
-                options: testOptions,
-                required: true,
-                placeholder: 'Test auswählen'
-            },
-            {
-                name: 'userId',
-                label: 'Benutzer *',
-                type: 'select',
-                options: userOptions,
-                required: true,
-                placeholder: 'Benutzer auswählen'
-            }
-        ];
+        const footer = document.createElement('div');
+        footer.style.display = 'flex';
+        footer.style.gap = 'var(--space-sm)';
+        footer.style.justifyContent = 'flex-end';
 
-        // Add mode selector if both options available
-        if (modeOptions.length > 1) {
-            fields.push({
-                name: 'mode',
-                label: 'Aktion',
-                type: 'select',
-                options: modeOptions,
-                default: 'conduct'
-            });
-        }
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-secondary';
+        cancelBtn.textContent = 'Abbrechen';
+        cancelBtn.addEventListener('click', () => Modal.close());
 
-        // Add due date field for assignment mode
-        if (canAssign) {
-            fields.push({
-                name: 'dueDate',
-                label: 'Fälligkeitsdatum (nur bei Zuweisung)',
-                type: 'date',
-                hint: 'Optional - nur relevant wenn Sie den Test zuweisen'
-            });
-        }
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'btn btn-primary';
+        submitBtn.textContent = canConduct ? 'Weiter' : 'Zuweisen';
 
-        const result = await Modal.form({
+        footer.appendChild(cancelBtn);
+        footer.appendChild(submitBtn);
+
+        Modal.open({
             title: 'Neuer Test',
-            fields,
-            submitText: modeOptions.length > 1 ? 'Weiter' : (canConduct ? 'Test starten' : 'Test zuweisen'),
-            validate: (data) => {
-                if (!data.testId) return 'Bitte wählen Sie einen Test';
-                if (!data.userId) return 'Bitte wählen Sie einen Benutzer';
-                return null;
-            }
+            content,
+            footer,
+            size: 'default'
         });
 
-        if (result) {
-            const mode = result.mode || (canConduct ? 'conduct' : 'assign');
-            
-            if (mode === 'assign') {
-                // Assign test to user
-                try {
-                    const response = await window.api.knowledgeCheck.createAssignment({
-                        testId: result.testId,
-                        userId: result.userId,
-                        dueDate: result.dueDate || null
-                    });
+        // Toggle visibility based on mode
+        const modeSelect = document.getElementById('new-test-mode');
+        const singleUserSection = document.getElementById('single-user-section');
+        const multiUserSection = document.getElementById('multi-user-section');
+        const dueDateSection = document.getElementById('due-date-section');
 
-                    if (response && response.success) {
-                        Toast.success('Test wurde dem Benutzer zugewiesen');
-                    } else {
-                        Toast.error(response?.error || 'Fehler beim Zuweisen des Tests');
+        if (modeSelect) {
+            modeSelect.addEventListener('change', () => {
+                const isAssign = modeSelect.value === 'assign';
+                singleUserSection.style.display = isAssign ? 'none' : 'block';
+                multiUserSection.style.display = isAssign ? 'block' : 'none';
+                dueDateSection.style.display = isAssign ? 'block' : 'none';
+                submitBtn.textContent = isAssign ? 'Zuweisen' : 'Test starten';
+            });
+        }
+
+        // Select all / deselect all
+        document.getElementById('new-test-select-all')?.addEventListener('click', () => {
+            document.querySelectorAll('input[name="assignUserIds"]').forEach(cb => cb.checked = true);
+        });
+        document.getElementById('new-test-deselect-all')?.addEventListener('click', () => {
+            document.querySelectorAll('input[name="assignUserIds"]').forEach(cb => cb.checked = false);
+        });
+
+        // Submit handler
+        submitBtn.addEventListener('click', async () => {
+            const testId = document.getElementById('new-test-select')?.value;
+            if (!testId) {
+                Toast.error('Bitte wählen Sie einen Test');
+                return;
+            }
+
+            const mode = modeSelect?.value || (canConduct ? 'conduct' : 'assign');
+
+            if (mode === 'assign') {
+                // Assign to multiple users
+                const selectedUsers = Array.from(document.querySelectorAll('input[name="assignUserIds"]:checked')).map(cb => cb.value);
+                const dueDate = document.getElementById('new-test-due-date')?.value || null;
+
+                if (selectedUsers.length === 0) {
+                    Toast.error('Bitte wählen Sie mindestens einen Benutzer');
+                    return;
+                }
+
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (const userId of selectedUsers) {
+                    try {
+                        const response = await window.api.knowledgeCheck.createAssignment({
+                            testId,
+                            userId,
+                            dueDate
+                        });
+                        if (response && response.success) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                        }
+                    } catch (error) {
+                        errorCount++;
                     }
-                } catch (error) {
-                    console.error('Assign test error:', error);
-                    Toast.error('Fehler beim Zuweisen: ' + (error.message || 'Unbekannter Fehler'));
+                }
+
+                Modal.close();
+
+                if (successCount > 0 && errorCount === 0) {
+                    Toast.success(`Test wurde ${successCount} Benutzer(n) zugewiesen`);
+                } else if (successCount > 0) {
+                    Toast.warning(`${successCount} zugewiesen, ${errorCount} fehlgeschlagen`);
+                } else {
+                    Toast.error('Fehler beim Zuweisen');
                 }
             } else {
-                // Conduct test immediately
-                await this.startTest(result.testId, result.userId);
+                // Conduct immediately
+                const userId = document.getElementById('new-test-user')?.value;
+                if (!userId) {
+                    Toast.error('Bitte wählen Sie einen Benutzer');
+                    return;
+                }
+
+                Modal.close();
+                await this.startTest(testId, userId);
             }
-        }
+        });
     },
 
     /**

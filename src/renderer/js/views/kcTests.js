@@ -748,7 +748,7 @@ const KCTestsView = {
     },
 
     /**
-     * Shows the form to assign a test to a user
+     * Shows the form to assign a test to multiple users
      */
     async showAssignTestForm(test) {
         if (!Permissions.has('kc_assign_tests')) {
@@ -764,63 +764,122 @@ const KCTestsView = {
                 return;
             }
 
-            const userOptions = usersResult.users.map(u => ({
-                value: u.id,
-                label: `${u.firstName} ${u.lastName}`
-            }));
+            const users = usersResult.users;
 
-            const result = await Modal.form({
+            // Build custom form with checkboxes for multiple user selection
+            const formHtml = `
+                <div class="assign-test-form">
+                    <div class="form-group">
+                        <label>Test</label>
+                        <input type="text" class="form-input" value="${Helpers.escapeHtml(test.testNumber)} - ${Helpers.escapeHtml(test.name)}" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Benutzer auswählen *</label>
+                        <div class="user-select-actions" style="margin-bottom: var(--space-xs);">
+                            <button type="button" class="btn btn-sm btn-secondary" id="select-all-users">Alle auswählen</button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="deselect-all-users">Keine auswählen</button>
+                        </div>
+                        <div class="user-checkboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: var(--space-sm);">
+                            ${users.map(u => `
+                                <label class="form-checkbox" style="display: flex; padding: var(--space-xs) 0;">
+                                    <input type="checkbox" name="userIds" value="${u.id}">
+                                    <span>${Helpers.escapeHtml(u.firstName)} ${Helpers.escapeHtml(u.lastName)}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="assign-due-date">Fälligkeitsdatum (optional)</label>
+                        <input type="date" id="assign-due-date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="assign-notes">Hinweise (optional)</label>
+                        <textarea id="assign-notes" class="form-textarea" rows="2" placeholder="Besondere Hinweise für die Teilnehmer"></textarea>
+                    </div>
+                </div>
+            `;
+
+            const template = document.createElement('template');
+            template.innerHTML = formHtml.trim();
+            const content = template.content.firstElementChild;
+
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.gap = 'var(--space-sm)';
+            footer.style.justifyContent = 'flex-end';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn btn-secondary';
+            cancelBtn.textContent = 'Abbrechen';
+            cancelBtn.addEventListener('click', () => Modal.close());
+
+            const submitBtn = document.createElement('button');
+            submitBtn.className = 'btn btn-primary';
+            submitBtn.textContent = 'Test zuweisen';
+
+            footer.appendChild(cancelBtn);
+            footer.appendChild(submitBtn);
+
+            Modal.open({
                 title: `Testdurchgang: ${test.testNumber}`,
-                fields: [
-                    {
-                        name: 'testName',
-                        label: 'Test',
-                        type: 'text',
-                        default: `${test.testNumber} - ${test.name}`,
-                        readonly: true
-                    },
-                    {
-                        name: 'userId',
-                        label: 'Benutzer *',
-                        type: 'select',
-                        options: userOptions,
-                        required: true,
-                        placeholder: 'Benutzer auswählen'
-                    },
-                    {
-                        name: 'dueDate',
-                        label: 'Fälligkeitsdatum (optional)',
-                        type: 'date'
-                    },
-                    {
-                        name: 'notes',
-                        label: 'Hinweise (optional)',
-                        type: 'textarea',
-                        rows: 2,
-                        placeholder: 'Besondere Hinweise für den Teilnehmer'
-                    }
-                ],
-                submitText: 'Test zuweisen',
-                validate: (data) => {
-                    if (!data.userId) return 'Bitte wählen Sie einen Benutzer';
-                    return null;
-                }
+                content,
+                footer,
+                size: 'default'
             });
 
-            if (result) {
-                const response = await window.api.knowledgeCheck.createAssignment({
-                    testId: test.id,
-                    userId: result.userId,
-                    dueDate: result.dueDate || null,
-                    notes: result.notes || ''
-                });
+            // Bind select all / deselect all
+            document.getElementById('select-all-users')?.addEventListener('click', () => {
+                document.querySelectorAll('input[name="userIds"]').forEach(cb => cb.checked = true);
+            });
+            document.getElementById('deselect-all-users')?.addEventListener('click', () => {
+                document.querySelectorAll('input[name="userIds"]').forEach(cb => cb.checked = false);
+            });
 
-                if (response && response.success) {
-                    Toast.success('Test wurde dem Benutzer zugewiesen');
-                } else {
-                    Toast.error(response?.error || 'Fehler beim Zuweisen des Tests');
+            // Submit handler
+            submitBtn.addEventListener('click', async () => {
+                const selectedUsers = Array.from(document.querySelectorAll('input[name="userIds"]:checked')).map(cb => cb.value);
+                const dueDate = document.getElementById('assign-due-date')?.value || null;
+                const notes = document.getElementById('assign-notes')?.value || '';
+
+                if (selectedUsers.length === 0) {
+                    Toast.error('Bitte wählen Sie mindestens einen Benutzer');
+                    return;
                 }
-            }
+
+                // Create assignments for each selected user
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (const userId of selectedUsers) {
+                    try {
+                        const response = await window.api.knowledgeCheck.createAssignment({
+                            testId: test.id,
+                            userId,
+                            dueDate,
+                            notes
+                        });
+
+                        if (response && response.success) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                        }
+                    } catch (error) {
+                        console.error('Assignment error for user:', userId, error);
+                        errorCount++;
+                    }
+                }
+
+                Modal.close();
+
+                if (successCount > 0 && errorCount === 0) {
+                    Toast.success(`Test wurde ${successCount} Benutzer(n) zugewiesen`);
+                } else if (successCount > 0 && errorCount > 0) {
+                    Toast.warning(`${successCount} zugewiesen, ${errorCount} fehlgeschlagen`);
+                } else {
+                    Toast.error('Fehler beim Zuweisen des Tests');
+                }
+            });
         } catch (error) {
             console.error('Assign test error:', error);
             Toast.error('Fehler beim Zuweisen: ' + (error.message || 'Unbekannter Fehler'));
