@@ -1,6 +1,6 @@
 /**
  * Settings View
- * Handles account and system settings
+ * Handles account, appearance, and system settings
  */
 
 const SettingsView = {
@@ -10,15 +10,57 @@ const SettingsView = {
      * Initializes the settings view
      */
     async init() {
+        this.initTheme();
         this.bindEvents();
         await this.loadSettings();
         this.populateAccountSettings();
     },
 
     /**
+     * Initializes theme from localStorage
+     */
+    initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        this.applyTheme(savedTheme);
+        
+        // Update toggle state
+        const toggle = document.getElementById('theme-toggle');
+        if (toggle) {
+            toggle.checked = savedTheme === 'light';
+        }
+        this.updateThemeLabel(savedTheme);
+    },
+
+    /**
+     * Applies the theme to the document
+     */
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    },
+
+    /**
+     * Updates the theme label text
+     */
+    updateThemeLabel(theme) {
+        const label = document.getElementById('theme-label');
+        if (label) {
+            label.textContent = theme === 'dark' ? 'Dark' : 'Light';
+        }
+    },
+
+    /**
      * Binds event handlers
      */
     bindEvents() {
+        // Theme toggle
+        document.getElementById('theme-toggle')?.addEventListener('change', (e) => {
+            const theme = e.target.checked ? 'light' : 'dark';
+            this.applyTheme(theme);
+            this.updateThemeLabel(theme);
+            Toast.success(`Switched to ${theme} mode`);
+        });
+
         // Change password button
         document.getElementById('change-password-btn')?.addEventListener('click', () => {
             this.changePassword();
