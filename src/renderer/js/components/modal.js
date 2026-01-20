@@ -256,9 +256,7 @@ const Modal = {
             }
     
             const handleSubmit = async () => {
-                console.log('[Modal] handleSubmit called');
                 const formData = Helpers.getFormData(form);
-                console.log('[Modal] Form data extracted:', formData);
     
                 // Normalize checkboxes
                 for (const field of fields) {
@@ -269,19 +267,17 @@ const Modal = {
                 }
     
                 if (validate) {
-                    console.log('[Modal] Running validation...');
                     const error = validate(formData);
                     if (error) {
-                        console.log('[Modal] Validation failed:', error);
                         Toast.error(error);
                         return;
                     }
-                    console.log('[Modal] Validation passed');
                 }
     
-                console.log('[Modal] Closing modal and resolving with:', formData);
-                this.close();
+                // IMPORTANT: Resolve with formData BEFORE closing to prevent
+                // onCloseCallback from resolving with null first
                 done(formData);
+                this.close();
             };
     
             form.addEventListener('submit', (e) => {
