@@ -39,18 +39,25 @@ const App = {
             this.handleLogout();
         });
 
-        // Navigation items (excluding submenu parent items)
+        // Navigation items
         document.querySelectorAll('.nav-item[data-view]').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 
-                // If it has a submenu, toggle it instead of navigating
+                const viewName = item.dataset.view;
+                
+                // If it has a submenu, navigate to the view AND expand submenu
                 if (item.classList.contains('has-submenu')) {
-                    this.toggleSubmenu(item);
+                    this.navigateTo(viewName);
+                    // Ensure submenu is expanded
+                    const group = item.closest('.nav-item-group');
+                    if (group) {
+                        group.classList.add('expanded');
+                    }
                     return;
                 }
                 
-                this.navigateTo(item.dataset.view);
+                this.navigateTo(viewName);
             });
         });
 
@@ -228,17 +235,39 @@ const App = {
      * Navigates to a view
      */
     async navigateTo(viewName) {
+        // Define which views belong to which submenu groups
+        const submenuGroups = {
+            knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcResults', 'kcArchive']
+        };
+        
         // Update active nav item
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.toggle('active', item.dataset.view === viewName);
         });
 
-        // Update submenu parent states
+        // Update submenu parent states and expand/collapse based on active section
         document.querySelectorAll('.nav-item-group').forEach(group => {
+            const parentNavItem = group.querySelector('.nav-item.has-submenu');
+            const parentView = parentNavItem?.dataset.view;
+            
+            // Check if the current view belongs to this group's submenu
+            const groupViews = submenuGroups[parentView] || [];
+            const isInThisGroup = groupViews.includes(viewName);
+            
+            // Check if this is the parent view or a child view
+            const isParentActive = parentView === viewName;
             const hasActiveChild = group.querySelector(`.nav-subitem[data-view="${viewName}"]`);
+            
+            // Set child-active class for styling (parent should look active when child is selected)
             group.classList.toggle('child-active', !!hasActiveChild);
-            if (hasActiveChild && !group.classList.contains('expanded')) {
+            
+            // Expand submenu if we're in this group (parent or any child)
+            if (isInThisGroup) {
                 group.classList.add('expanded');
+            } else {
+                // Collapse submenu when navigating away from this section
+                group.classList.remove('expanded');
+                group.classList.remove('child-active');
             }
         });
 
@@ -263,6 +292,7 @@ const App = {
             kcQuestions: 'Fragen Katalog',
             kcTests: 'Test Katalog',
             kcResults: 'Test Ergebnisse',
+            kcArchive: 'Archiv',
             roles: 'RoleSystem',
             integrations: 'IntegrationSystem',
             settings: 'SettingsSystem'
@@ -304,6 +334,9 @@ const App = {
                 case 'kcResults':
                     await KCResultsView.init();
                     break;
+                case 'kcArchive':
+                    await KCArchiveView.init();
+                    break;
                 case 'roles':
                     await RolesView.init();
                     break;
@@ -333,6 +366,7 @@ const App = {
             kcQuestions: KCQuestionsView,
             kcTests: KCTestsView,
             kcResults: KCResultsView,
+            kcArchive: KCArchiveView,
             roles: RolesView,
             integrations: IntegrationsView,
             settings: SettingsView

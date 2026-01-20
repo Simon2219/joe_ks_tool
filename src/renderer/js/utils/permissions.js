@@ -255,6 +255,18 @@ const Permissions = {
         return this.hasPermission('kc_results_view');
     },
 
+    canAccessKCArchive() {
+        return this.hasPermission('kc_archive_view');
+    },
+
+    canRestoreFromArchive() {
+        return this.hasPermission('kc_archive_restore');
+    },
+
+    canPermanentDelete() {
+        return this.hasPermission('kc_archive_delete');
+    },
+
     /**
      * Checks if user can assign tickets
      */
@@ -365,7 +377,10 @@ const Permissions = {
             'kc_tests_delete': 'Delete Tests',
             'kc_results_view': 'View Test Results',
             'kc_results_create': 'Conduct Tests',
-            'kc_results_delete': 'Delete Test Results'
+            'kc_results_delete': 'Delete Test Results',
+            'kc_archive_view': 'View Archive',
+            'kc_archive_restore': 'Restore from Archive',
+            'kc_archive_delete': 'Permanently Delete Archived'
         };
         
         return permissionNames[permissionId] || permissionId;

@@ -376,6 +376,11 @@ input, select, textarea {
     animation: slideDown var(--transition-normal) ease;
 }
 
+/* Also show submenu when parent nav-item is active */
+.nav-item-group > .nav-item.has-submenu.active + .nav-submenu {
+    display: block;
+}
+
 @keyframes slideDown {
     from {
         opacity: 0;

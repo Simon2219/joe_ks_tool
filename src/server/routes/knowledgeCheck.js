@@ -447,4 +447,105 @@ router.post('/check-answer', requirePermission('kc_results_create'), (req, res) 
     }
 });
 
+// ============================================
+// ARCHIVE
+// ============================================
+
+/**
+ * GET /api/knowledge-check/archive/stats
+ */
+router.get('/archive/stats', requirePermission('kc_archive_view'), (req, res) => {
+    try {
+        const stats = KnowledgeCheckSystem.getArchiveStatistics();
+        res.json({ success: true, statistics: stats });
+    } catch (error) {
+        console.error('Get archive stats error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch archive statistics' });
+    }
+});
+
+/**
+ * GET /api/knowledge-check/archive/questions
+ */
+router.get('/archive/questions', requirePermission('kc_archive_view'), (req, res) => {
+    try {
+        const questions = KnowledgeCheckSystem.getAllQuestions({ archivedOnly: true });
+        res.json({ success: true, questions });
+    } catch (error) {
+        console.error('Get archived questions error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch archived questions' });
+    }
+});
+
+/**
+ * GET /api/knowledge-check/archive/tests
+ */
+router.get('/archive/tests', requirePermission('kc_archive_view'), (req, res) => {
+    try {
+        const tests = KnowledgeCheckSystem.getAllTests({ archivedOnly: true });
+        res.json({ success: true, tests });
+    } catch (error) {
+        console.error('Get archived tests error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch archived tests' });
+    }
+});
+
+/**
+ * PUT /api/knowledge-check/archive/questions/:id/restore
+ */
+router.put('/archive/questions/:id/restore', requirePermission('kc_archive_restore'), (req, res) => {
+    try {
+        const question = KnowledgeCheckSystem.restoreQuestion(req.params.id);
+        if (!question) {
+            return res.status(404).json({ success: false, error: 'Question not found' });
+        }
+        res.json({ success: true, question });
+    } catch (error) {
+        console.error('Restore question error:', error);
+        res.status(500).json({ success: false, error: 'Failed to restore question' });
+    }
+});
+
+/**
+ * PUT /api/knowledge-check/archive/tests/:id/restore
+ */
+router.put('/archive/tests/:id/restore', requirePermission('kc_archive_restore'), (req, res) => {
+    try {
+        const test = KnowledgeCheckSystem.restoreTest(req.params.id);
+        if (!test) {
+            return res.status(404).json({ success: false, error: 'Test not found' });
+        }
+        res.json({ success: true, test });
+    } catch (error) {
+        console.error('Restore test error:', error);
+        res.status(500).json({ success: false, error: 'Failed to restore test' });
+    }
+});
+
+/**
+ * DELETE /api/knowledge-check/archive/questions/:id
+ */
+router.delete('/archive/questions/:id', requirePermission('kc_archive_delete'), (req, res) => {
+    try {
+        const result = KnowledgeCheckSystem.permanentDeleteQuestion(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error('Permanent delete question error:', error);
+        res.status(500).json({ success: false, error: 'Failed to permanently delete question' });
+    }
+});
+
+/**
+ * DELETE /api/knowledge-check/archive/tests/:id
+ */
+router.delete('/archive/tests/:id', requirePermission('kc_archive_delete'), (req, res) => {
+    try {
+        const result = KnowledgeCheckSystem.permanentDeleteTest(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error('Permanent delete test error:', error);
+        res.status(500).json({ success: false, error: 'Failed to permanently delete test' });
+    }
+});
+
 module.exports = router;
