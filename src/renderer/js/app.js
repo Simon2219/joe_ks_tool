@@ -11,6 +11,9 @@ const App = {
      * Initializes the application
      */
     async init() {
+        // Initialize theme early (before any UI rendering)
+        this.initTheme();
+
         // Initialize components
         Modal.init();
         Toast.init();
@@ -22,6 +25,14 @@ const App = {
         this.bindEvents();
 
         console.log('Customer Support Tool initialized');
+    },
+
+    /**
+     * Initializes theme from localStorage
+     */
+    initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
     },
 
     /**
