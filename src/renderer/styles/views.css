@@ -141,6 +141,19 @@
     margin-top: var(--space-sm);
 }
 
+/* Stat value color classes (pastel colors for percentage indicators) */
+.stat-value.stat-color-danger {
+    color: #e57373; /* Pastel red */
+}
+
+.stat-value.stat-color-warning {
+    color: #ffb74d; /* Pastel orange/yellow */
+}
+
+.stat-value.stat-color-success {
+    color: #81c784; /* Pastel green */
+}
+
 /* ============================================
    ROLES GRID
    ============================================ */
@@ -818,11 +831,41 @@
     margin-bottom: var(--space-sm);
 }
 
-.mc-option-row input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
+/* Custom checkbox for correct/incorrect answers */
+.mc-option-row input[type="checkbox"].mc-correct {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 28px;
+    height: 28px;
     flex-shrink: 0;
-    accent-color: var(--brand-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    position: relative;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+    background: var(--color-danger-bg);
+    border: 2px solid var(--color-danger);
+}
+
+.mc-option-row input[type="checkbox"].mc-correct::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23dc3545' stroke-width='3'%3E%3Cline x1='18' y1='6' x2='6' y2='18'%3E%3C/line%3E%3Cline x1='6' y1='6' x2='18' y2='18'%3E%3C/line%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+.mc-option-row input[type="checkbox"].mc-correct:checked {
+    background: var(--color-success-bg);
+    border-color: var(--color-success);
+}
+
+.mc-option-row input[type="checkbox"].mc-correct:checked::after {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2328a745' stroke-width='3'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
 .mc-option-row .mc-text,

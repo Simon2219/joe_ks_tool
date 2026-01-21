@@ -1,5 +1,5 @@
 /**
- * KC Test Runs View (Testdurchläufe)
+ * KC Test Runs View (Test Durchläufe)
  * Shows all test runs and allows creating new ones
  */
 
@@ -87,7 +87,7 @@ const KCTestRunsView = {
             }
         } catch (error) {
             console.error('Failed to load test runs:', error);
-            Toast.error('Testdurchläufe konnten nicht geladen werden');
+            Toast.error('Test Durchläufe konnten nicht geladen werden');
         }
     },
 
@@ -121,7 +121,7 @@ const KCTestRunsView = {
         if (this.runs.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="empty-state">Keine Testdurchläufe gefunden</td>
+                    <td colspan="9" class="empty-state">Keine Test Durchläufe gefunden</td>
                 </tr>
             `;
             return;
@@ -220,7 +220,7 @@ const KCTestRunsView = {
      */
     async showNewRunForm() {
         if (!Permissions.has('kc_assign_tests')) {
-            Toast.error('Keine Berechtigung zum Erstellen von Testdurchläufen');
+            Toast.error('Keine Berechtigung zum Erstellen von Test Durchläufen');
             return;
         }
 
@@ -234,7 +234,7 @@ const KCTestRunsView = {
                 
                 <div class="form-group">
                     <label for="run-description">Beschreibung (optional)</label>
-                    <textarea id="run-description" class="form-textarea" rows="2" placeholder="Beschreibung des Testdurchlaufs"></textarea>
+                    <textarea id="run-description" class="form-textarea" rows="2" placeholder="Beschreibung des Test Durchlaufs"></textarea>
                 </div>
                 
                 <div class="form-row">
@@ -294,13 +294,13 @@ const KCTestRunsView = {
 
         const submitBtn = document.createElement('button');
         submitBtn.className = 'btn btn-primary';
-        submitBtn.textContent = 'Testdurchlauf erstellen';
+        submitBtn.textContent = 'Test Durchlauf erstellen';
 
         footer.appendChild(cancelBtn);
         footer.appendChild(submitBtn);
 
         Modal.open({
-            title: 'Neuer Testdurchlauf',
+            title: 'Neuer Test Durchlauf',
             content,
             footer,
             size: 'lg'
@@ -351,7 +351,7 @@ const KCTestRunsView = {
                 });
 
                 if (response && response.success) {
-                    Toast.success(`Testdurchlauf "${name}" wurde erstellt mit ${testIds.length} Tests für ${userIds.length} Teilnehmer`);
+                    Toast.success(`Test Durchlauf "${name}" wurde erstellt mit ${testIds.length} Tests für ${userIds.length} Teilnehmer`);
                     Modal.close();
                     await this.loadRuns();
                 } else {
@@ -371,7 +371,7 @@ const KCTestRunsView = {
         try {
             const result = await window.api.knowledgeCheck.getTestRunById(runId);
             if (!result.success) {
-                Toast.error('Testdurchlauf konnte nicht geladen werden');
+                Toast.error('Test Durchlauf konnte nicht geladen werden');
                 return;
             }
 
@@ -386,6 +386,16 @@ const KCTestRunsView = {
                 ? Math.round((completedResults.filter(a => a.passed).length / completedResults.length) * 100)
                 : 0;
 
+            // Determine color class based on percentage
+            const getStatColorClass = (value) => {
+                if (value < 50) return 'stat-color-danger';
+                if (value <= 75) return 'stat-color-warning';
+                return 'stat-color-success';
+            };
+
+            const avgScoreColorClass = getStatColorClass(avgScore);
+            const passingRateColorClass = getStatColorClass(passingRate);
+
             const contentHtml = `
                 <div class="run-detail-full">
                     <div class="run-detail-header-info">
@@ -399,11 +409,11 @@ const KCTestRunsView = {
                     
                     <div class="kc-results-overview">
                         <div class="quality-stat-card">
-                            <span class="stat-value">${avgScore}%</span>
+                            <span class="stat-value ${avgScoreColorClass}">${avgScore}%</span>
                             <span class="stat-label">Ø Ergebnis</span>
                         </div>
                         <div class="quality-stat-card">
-                            <span class="stat-value">${passingRate}%</span>
+                            <span class="stat-value ${passingRateColorClass}">${passingRate}%</span>
                             <span class="stat-label">Bestehensrate</span>
                         </div>
                         <div class="quality-stat-card">
@@ -448,10 +458,7 @@ const KCTestRunsView = {
                                         <tr data-assignment-id="${a.id}" data-result-id="${a.resultId || ''}" class="${a.resultId ? 'clickable-row' : ''}">
                                             <td><strong>${Helpers.escapeHtml(a.userName)}</strong></td>
                                             <td>
-                                                <div class="test-info">
-                                                    <span class="test-number">${Helpers.escapeHtml(a.testNumber)}</span>
-                                                    <span class="test-name text-muted">${Helpers.escapeHtml(a.testName)}</span>
-                                                </div>
+                                                <strong>${Helpers.escapeHtml(a.testName)}</strong>
                                             </td>
                                             <td>
                                                 ${a.status === 'completed' 
@@ -496,7 +503,7 @@ const KCTestRunsView = {
             footer.appendChild(closeBtn);
 
             Modal.open({
-                title: `Testdurchlauf: ${run.runNumber}`,
+                title: `Test Durchlauf: ${run.runNumber}`,
                 content,
                 footer,
                 size: 'full'
@@ -628,8 +635,8 @@ const KCTestRunsView = {
         if (!run) return;
 
         const confirmed = await Modal.confirm({
-            title: 'Testdurchlauf löschen',
-            message: `Möchten Sie den Testdurchlauf "${run.name}" wirklich löschen? Alle zugehörigen Zuweisungen werden ebenfalls gelöscht.`,
+            title: 'Test Durchlauf löschen',
+            message: `Möchten Sie den Test Durchlauf "${run.name}" wirklich löschen? Alle zugehörigen Zuweisungen werden ebenfalls gelöscht.`,
             confirmText: 'Löschen',
             confirmClass: 'btn-danger'
         });
@@ -638,7 +645,7 @@ const KCTestRunsView = {
             try {
                 const response = await window.api.knowledgeCheck.deleteTestRun(runId);
                 if (response && response.success) {
-                    Toast.success('Testdurchlauf gelöscht');
+                    Toast.success('Test Durchlauf gelöscht');
                     await this.loadRuns();
                 } else {
                     Toast.error(response?.error || 'Fehler beim Löschen');

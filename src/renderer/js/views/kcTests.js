@@ -250,7 +250,7 @@ const KCTestsView = {
             <div class="kc-question-item kc-test-item" data-test-id="${test.id}">
                 <div class="kc-question-content">
                     <div class="kc-question-title">
-                        <strong>${Helpers.escapeHtml(test.testNumber)}</strong> - ${Helpers.escapeHtml(test.name)}
+                        <strong>${Helpers.escapeHtml(test.name)}</strong>
                     </div>
                     ${test.description ? `<div class="kc-question-text">${Helpers.escapeHtml(Helpers.truncate(test.description, 100))}</div>` : ''}
                     <div class="kc-question-meta">
@@ -262,6 +262,12 @@ const KCTestsView = {
                 </div>
                 <div class="kc-question-actions">
                     ${canEdit ? `
+                        <button class="btn-icon kc-edit-test" data-id="${test.id}" title="Bearbeiten">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
                         <button class="btn-icon kc-move-test" data-id="${test.id}" data-category-id="${test.categoryId || ''}" title="Verschieben">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="5 9 2 12 5 15"></polyline>
@@ -270,12 +276,6 @@ const KCTestsView = {
                                 <polyline points="19 9 22 12 19 15"></polyline>
                                 <line x1="2" y1="12" x2="22" y2="12"></line>
                                 <line x1="12" y1="2" x2="12" y2="22"></line>
-                            </svg>
-                        </button>
-                        <button class="btn-icon kc-edit-test" data-id="${test.id}" title="Bearbeiten">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
                     ` : ''}
@@ -433,7 +433,7 @@ const KCTestsView = {
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                 </svg>`,
-                action: () => this.showCategoryForm(category)
+                action: () => this.showTestCategoryForm(category)
             });
         }
 
@@ -734,7 +734,6 @@ const KCTestsView = {
                                                 <span class="badge badge-secondary">${typeLabels[q.questionType] || q.questionType}</span>
                                                 <span class="badge badge-info">Gewichtung: ${q.effectiveWeighting}</span>
                                                 <span class="badge badge-outline">${q.categoryName}</span>
-                                                ${q.questionType === 'multiple_choice' && q.options ? `<span>${q.options.length} Antworten</span>` : ''}
                                             </div>
                                         </div>
                                     </div>

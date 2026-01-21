@@ -367,13 +367,13 @@ const App = {
             knowledgeCheck: 'Knowledge Check',
             kcQuestions: 'Fragen Katalog',
             kcTests: 'Test Katalog',
-            kcTestRuns: 'Testdurchläufe',
+            kcTestRuns: 'Test Durchläufe',
             kcResults: 'Test Ergebnisse',
             kcArchive: 'Archiv',
             kcAssigned: 'Zugewiesene Tests',
             roles: 'RoleSystem',
             integrations: 'IntegrationSystem',
-            settings: 'SettingsSystem'
+            settings: 'Settings'
         };
         document.getElementById('page-title').textContent = titles[viewName] || viewName;
 
