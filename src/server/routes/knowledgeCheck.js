@@ -972,4 +972,46 @@ router.delete('/archive/tests/:id', requirePermission('kc_archive_access'), (req
     }
 });
 
+/**
+ * GET /api/knowledge-check/archive/test-runs
+ */
+router.get('/archive/test-runs', requirePermission('kc_archive_access'), (req, res) => {
+    try {
+        const runs = KnowledgeCheckSystem.getArchivedTestRuns();
+        res.json({ success: true, runs });
+    } catch (error) {
+        console.error('Get archived test runs error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch archived test runs' });
+    }
+});
+
+/**
+ * PUT /api/knowledge-check/archive/test-runs/:id/restore
+ */
+router.put('/archive/test-runs/:id/restore', requirePermission('kc_archive_access'), (req, res) => {
+    try {
+        const run = KnowledgeCheckSystem.restoreTestRun(req.params.id);
+        if (!run) {
+            return res.status(404).json({ success: false, error: 'Test run not found' });
+        }
+        res.json({ success: true, run });
+    } catch (error) {
+        console.error('Restore test run error:', error);
+        res.status(500).json({ success: false, error: 'Failed to restore test run' });
+    }
+});
+
+/**
+ * DELETE /api/knowledge-check/archive/test-runs/:id
+ */
+router.delete('/archive/test-runs/:id', requirePermission('kc_archive_access'), (req, res) => {
+    try {
+        const result = KnowledgeCheckSystem.permanentDeleteTestRun(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error('Permanent delete test run error:', error);
+        res.status(500).json({ success: false, error: 'Failed to permanently delete test run' });
+    }
+});
+
 module.exports = router;

@@ -345,10 +345,13 @@ window.api = {
         getArchiveStats: () => API.get('/knowledge-check/archive/stats'),
         getArchivedQuestions: () => API.get('/knowledge-check/archive/questions'),
         getArchivedTests: () => API.get('/knowledge-check/archive/tests'),
+        getArchivedTestRuns: () => API.get('/knowledge-check/archive/test-runs'),
         restoreQuestion: (id) => API.put(`/knowledge-check/archive/questions/${id}/restore`),
         restoreTest: (id) => API.put(`/knowledge-check/archive/tests/${id}/restore`),
+        restoreTestRun: (id) => API.put(`/knowledge-check/archive/test-runs/${id}/restore`),
         permanentDeleteQuestion: (id) => API.delete(`/knowledge-check/archive/questions/${id}`),
-        permanentDeleteTest: (id) => API.delete(`/knowledge-check/archive/tests/${id}`)
+        permanentDeleteTest: (id) => API.delete(`/knowledge-check/archive/tests/${id}`),
+        permanentDeleteTestRun: (id) => API.delete(`/knowledge-check/archive/test-runs/${id}`)
     },
 
     settings: {
