@@ -338,6 +338,8 @@ const KCAssignedView = {
                 if (q.questionType === 'multiple_choice') {
                     const checkboxes = document.querySelectorAll(`input[name="q_${q.id}"]`);
                     const selectedOptions = [];
+                    const selectedOptionDetails = []; // Store detailed info about selections
+                    const allOptions = []; // Store all options with their status
                     let correctSelected = 0;
                     let incorrectSelected = 0;
                     let totalCorrectOptions = 0;
@@ -345,10 +347,25 @@ const KCAssignedView = {
 
                     checkboxes.forEach(cb => {
                         const isCorrectOption = cb.dataset.correct === 'true';
+                        const optionText = cb.parentElement.querySelector('span')?.textContent || '';
+                        
                         if (isCorrectOption) totalCorrectOptions++;
+                        
+                        // Track all options
+                        allOptions.push({
+                            id: cb.value,
+                            text: optionText,
+                            isCorrect: isCorrectOption,
+                            wasSelected: cb.checked
+                        });
                         
                         if (cb.checked) {
                             selectedOptions.push(cb.value);
+                            selectedOptionDetails.push({
+                                id: cb.value,
+                                text: optionText,
+                                isCorrect: isCorrectOption
+                            });
                             if (isCorrectOption) {
                                 correctSelected++;
                             } else {
@@ -370,7 +387,8 @@ const KCAssignedView = {
                             ? Math.max(0, (correctSelected - incorrectSelected) / totalCorrectOptions)
                             : 0;
                         score = partialRatio * weighting;
-                        isCorrect = correctSelected > 0 && incorrectSelected === 0 && correctSelected === totalCorrectOptions;
+                        // Question is "correct" only if all correct options selected and no wrong ones
+                        isCorrect = correctSelected === totalCorrectOptions && incorrectSelected === 0;
                     } else {
                         // All-or-nothing scoring: must have all correct selected and no wrong selected
                         score = allCorrect ? weighting : 0;
@@ -381,6 +399,12 @@ const KCAssignedView = {
                     answers.push({
                         questionId: q.id,
                         selectedOptions,
+                        selectedOptionDetails, // Include detailed selection info
+                        allOptions, // Include all options for display
+                        correctSelected,
+                        incorrectSelected,
+                        totalCorrectOptions,
+                        allowPartialAnswer: q.allowPartialAnswer,
                         isCorrect: isCorrect,
                         score: score,
                         maxScore: weighting
@@ -463,16 +487,70 @@ const KCAssignedView = {
             const data = result.result;
             const scoreClass = data.passed ? 'score-pass' : 'score-fail';
             
-            const answersHtml = data.answers?.map((a, i) => `
-                <div class="result-answer ${a.isCorrect ? 'correct' : 'incorrect'}">
-                    <div class="result-answer-header">
-                        <span>Frage ${i + 1}: ${Helpers.escapeHtml(a.questionTitle || Helpers.truncate(a.questionText, 40))}</span>
-                        <span class="badge ${a.isCorrect ? 'badge-success' : 'badge-danger'}">${a.score}/${a.maxScore}</span>
+            const answersHtml = data.answers?.map((a, i) => {
+                let answerDetailsHtml = '';
+                
+                if (a.questionType === 'multiple_choice') {
+                    const details = a.optionDetails || {};
+                    const allOptions = details.allOptions || [];
+                    
+                    if (allOptions.length > 0) {
+                        // Show all options with their status
+                        answerDetailsHtml = `
+                            <div class="result-options">
+                                ${allOptions.map(opt => {
+                                    let optClass = '';
+                                    let statusIcon = '';
+                                    
+                                    if (opt.wasSelected && opt.isCorrect) {
+                                        optClass = 'option-correct-selected';
+                                        statusIcon = '✓';
+                                    } else if (opt.wasSelected && !opt.isCorrect) {
+                                        optClass = 'option-incorrect-selected';
+                                        statusIcon = '✗';
+                                    } else if (!opt.wasSelected && opt.isCorrect) {
+                                        optClass = 'option-correct-missed';
+                                        statusIcon = '○';
+                                    } else {
+                                        optClass = 'option-not-selected';
+                                        statusIcon = '';
+                                    }
+                                    
+                                    return `
+                                        <div class="result-option ${optClass}">
+                                            <span class="option-status">${statusIcon}</span>
+                                            <span class="option-text">${Helpers.escapeHtml(opt.text)}</span>
+                                            ${opt.isCorrect ? '<span class="option-badge correct">Richtig</span>' : ''}
+                                            ${opt.wasSelected ? '<span class="option-badge selected">Gewählt</span>' : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            ${details.allowPartialAnswer ? `
+                                <p class="result-scoring-info">
+                                    <small>Teilweise Antworten erlaubt · ${details.correctSelected || 0}/${details.totalCorrectOptions || 0} richtige gewählt, ${details.incorrectSelected || 0} falsche gewählt</small>
+                                </p>
+                            ` : ''}
+                        `;
+                    } else {
+                        // Fallback for old data without option details
+                        answerDetailsHtml = `<p class="result-answer-text">Ausgewählt: ${a.selectedOptions?.length || 0} Option(en)</p>`;
+                    }
+                } else if (a.answerText) {
+                    answerDetailsHtml = `<p class="result-answer-text"><strong>Antwort:</strong> ${Helpers.escapeHtml(a.answerText)}</p>`;
+                }
+                
+                return `
+                    <div class="result-answer ${a.isCorrect ? 'correct' : 'incorrect'}">
+                        <div class="result-answer-header">
+                            <span>Frage ${i + 1}: ${Helpers.escapeHtml(a.questionTitle || Helpers.truncate(a.questionText, 40))}</span>
+                            <span class="badge ${a.isCorrect ? 'badge-success' : 'badge-danger'}">${Math.round(a.score * 100) / 100}/${a.maxScore}</span>
+                        </div>
+                        <p class="result-question-text">${Helpers.escapeHtml(a.questionText)}</p>
+                        ${answerDetailsHtml}
                     </div>
-                    ${a.answerText ? `<p class="result-answer-text">Antwort: ${Helpers.escapeHtml(a.answerText)}</p>` : ''}
-                    ${a.selectedOptions?.length > 0 ? `<p class="result-answer-text">Ausgewählt: ${a.selectedOptions.length} Option(en)</p>` : ''}
-                </div>
-            `).join('') || '<p>Keine Antwortdetails verfügbar</p>';
+                `;
+            }).join('') || '<p>Keine Antwortdetails verfügbar</p>';
 
             const contentHtml = `
                 <div class="result-detail">
@@ -484,7 +562,7 @@ const KCAssignedView = {
                         <div class="result-meta">
                             <div><strong>Test:</strong> ${Helpers.escapeHtml(data.testName)}</div>
                             <div><strong>Datum:</strong> ${Helpers.formatDateTime(data.completedAt)}</div>
-                            <div><strong>Punkte:</strong> ${data.totalScore}/${data.maxScore}</div>
+                            <div><strong>Punkte:</strong> ${Math.round(data.totalScore * 100) / 100}/${data.maxScore}</div>
                         </div>
                     </div>
                     <div class="result-answers">

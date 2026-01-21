@@ -425,6 +425,7 @@ function initSchema() {
             question_id TEXT NOT NULL,
             answer_text TEXT DEFAULT '',
             selected_options TEXT DEFAULT '[]',
+            option_details TEXT DEFAULT '[]',
             is_correct INTEGER DEFAULT 0,
             score REAL DEFAULT 0,
             max_score REAL DEFAULT 0,
@@ -555,6 +556,12 @@ function runMigrations(database) {
     if (!columnExists('kc_questions', 'allow_partial_answer')) {
         console.log('Adding allow_partial_answer column to kc_questions...');
         database.run('ALTER TABLE kc_questions ADD COLUMN allow_partial_answer INTEGER DEFAULT 0');
+    }
+    
+    // Migration 5: Add option_details to kc_test_answers for storing full answer info
+    if (!columnExists('kc_test_answers', 'option_details')) {
+        console.log('Adding option_details column to kc_test_answers...');
+        database.run('ALTER TABLE kc_test_answers ADD COLUMN option_details TEXT DEFAULT \'[]\'');
     }
     
     // Note: Migration for orphaned assignments is now manual - run from Admin Panel
@@ -2547,10 +2554,16 @@ const KnowledgeCheckSystem = {
             notes: result.notes,
             answers: answers.map(a => {
                 let selectedOptions = [];
+                let optionDetails = {};
                 try {
                     selectedOptions = JSON.parse(a.selected_options || '[]');
                 } catch (e) {
                     selectedOptions = [];
+                }
+                try {
+                    optionDetails = JSON.parse(a.option_details || '{}');
+                } catch (e) {
+                    optionDetails = {};
                 }
                 return {
                     id: a.id,
@@ -2560,6 +2573,7 @@ const KnowledgeCheckSystem = {
                     questionType: a.question_type,
                     answerText: a.answer_text,
                     selectedOptions: selectedOptions,
+                    optionDetails: optionDetails,
                     isCorrect: !!a.is_correct,
                     score: a.score,
                     maxScore: a.max_score,
@@ -2592,10 +2606,20 @@ const KnowledgeCheckSystem = {
         // Add answers
         if (data.answers && data.answers.length > 0) {
             data.answers.forEach(ans => {
-                run(`INSERT INTO kc_test_answers (id, result_id, question_id, answer_text, selected_options, is_correct, score, max_score, evaluator_notes)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                // Store all option details for comprehensive result display
+                const optionDetails = {
+                    selectedOptionDetails: ans.selectedOptionDetails || [],
+                    allOptions: ans.allOptions || [],
+                    correctSelected: ans.correctSelected || 0,
+                    incorrectSelected: ans.incorrectSelected || 0,
+                    totalCorrectOptions: ans.totalCorrectOptions || 0,
+                    allowPartialAnswer: ans.allowPartialAnswer || false
+                };
+                
+                run(`INSERT INTO kc_test_answers (id, result_id, question_id, answer_text, selected_options, option_details, is_correct, score, max_score, evaluator_notes)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [uuidv4(), id, ans.questionId, ans.answerText || '', JSON.stringify(ans.selectedOptions || []),
-                     ans.isCorrect ? 1 : 0, ans.score || 0, ans.maxScore || 0, ans.evaluatorNotes || '']);
+                     JSON.stringify(optionDetails), ans.isCorrect ? 1 : 0, ans.score || 0, ans.maxScore || 0, ans.evaluatorNotes || '']);
             });
         }
         
