@@ -766,16 +766,22 @@ img, svg {
 
 .view-filters-inline .form-select,
 .view-filters-inline .form-input {
-    min-width: 100px;
-    max-width: 130px;
-    flex-shrink: 1;
+    min-width: auto;
+    width: auto;
+    flex-shrink: 0;
 }
 
 .form-select-sm,
 .form-input-sm {
     height: 32px;
-    padding: 4px 8px;
+    padding: 4px 12px;
     font-size: 12px;
+    white-space: nowrap;
+}
+
+/* Ensure filter selects fit their content */
+.form-select-sm {
+    padding-right: 28px; /* Space for dropdown arrow */
 }
 
 /* KC Results specific header */
@@ -798,15 +804,7 @@ img, svg {
     height: 14px;
 }
 
-@media (max-width: 1400px) {
-    .view-filters-inline .form-select,
-    .view-filters-inline .form-input {
-        min-width: 80px;
-        max-width: 110px;
-    }
-}
-
-@media (max-width: 1100px) {
+@media (max-width: 1200px) {
     .view-actions-row {
         flex-wrap: wrap;
     }
@@ -815,13 +813,7 @@ img, svg {
         width: 100%;
         justify-content: flex-start;
         flex-wrap: wrap;
-    }
-    
-    .view-filters-inline .form-select,
-    .view-filters-inline .form-input {
-        flex: 1;
-        min-width: 100px;
-        max-width: none;
+        margin-top: var(--space-sm);
     }
 }
 

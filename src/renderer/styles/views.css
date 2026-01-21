@@ -1173,6 +1173,97 @@
     color: var(--text-secondary);
 }
 
+/* Answer items in result view */
+.answer-item {
+    padding: var(--space-md);
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-sm);
+    border-left: 4px solid var(--border-color);
+}
+
+.answer-item.correct {
+    border-left-color: var(--color-success);
+    background: var(--color-success-bg);
+}
+
+.answer-item.incorrect {
+    border-left-color: var(--color-danger);
+    background: var(--color-danger-bg);
+}
+
+.answer-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.answer-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    font-size: var(--text-caption);
+    font-weight: var(--font-bold);
+    flex-shrink: 0;
+}
+
+.answer-question {
+    flex: 1;
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+}
+
+.answer-content {
+    padding-left: 32px;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.answer-content > div {
+    margin-bottom: var(--space-xs);
+}
+
+.answer-given strong,
+.answer-correct strong,
+.answer-points strong {
+    color: var(--text-primary);
+}
+
+/* Run results section */
+.run-results-section {
+    margin-top: var(--space-md);
+}
+
+.run-results-section h4 {
+    margin-bottom: var(--space-md);
+    color: var(--text-primary);
+}
+
+/* Result header in modal */
+.result-header h3 {
+    margin: 0 0 var(--space-xs) 0;
+}
+
+.result-header p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.result-stats-row {
+    display: flex;
+    gap: var(--space-lg);
+    flex-wrap: wrap;
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-lg);
+}
+
 /* ============================================
    KC ARCHIVE VIEW
    ============================================ */

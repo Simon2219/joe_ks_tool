@@ -365,7 +365,7 @@ const KCTestRunsView = {
     },
 
     /**
-     * Views a test run's details
+     * Views a test run's details with full results
      */
     async viewRun(runId) {
         try {
@@ -383,6 +383,7 @@ const KCTestRunsView = {
                 if (!userAssignments[a.userId]) {
                     userAssignments[a.userId] = {
                         userName: a.userName,
+                        userId: a.userId,
                         assignments: []
                     };
                 }
@@ -418,41 +419,54 @@ const KCTestRunsView = {
                         ` : ''}
                     </div>
                     
-                    <div class="run-participants">
-                        <h4>Teilnehmer & Ergebnisse</h4>
-                        <table class="data-table">
+                    <div class="run-results-section">
+                        <h4>Ergebnisse</h4>
+                        <table class="data-table" id="run-results-table">
                             <thead>
                                 <tr>
                                     <th>Teilnehmer</th>
-                                    <th>Fortschritt</th>
-                                    <th>Tests</th>
+                                    <th>Test</th>
+                                    <th>Ergebnis</th>
+                                    <th>Status</th>
+                                    <th>Datum</th>
+                                    <th>Aktionen</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${Object.values(userAssignments).map(ua => {
-                                    const completed = ua.assignments.filter(a => a.status === 'completed').length;
-                                    const total = ua.assignments.length;
-                                    const progress = Math.round((completed / total) * 100);
-                                    const avgScore = ua.assignments.filter(a => a.percentage !== null).length > 0
-                                        ? Math.round(ua.assignments.filter(a => a.percentage !== null).reduce((s, a) => s + a.percentage, 0) / ua.assignments.filter(a => a.percentage !== null).length)
-                                        : null;
+                                ${run.assignments.map(a => {
+                                    let statusClass, statusText;
+                                    if (a.status === 'completed') {
+                                        if (a.passed) {
+                                            statusClass = 'badge-success';
+                                            statusText = 'Bestanden';
+                                        } else {
+                                            statusClass = 'badge-danger';
+                                            statusText = 'Nicht bestanden';
+                                        }
+                                    } else {
+                                        statusClass = 'badge-warning';
+                                        statusText = 'Ausstehend';
+                                    }
                                     
                                     return `
-                                        <tr>
-                                            <td><strong>${Helpers.escapeHtml(ua.userName)}</strong></td>
+                                        <tr data-assignment-id="${a.id}" data-result-id="${a.resultId || ''}" class="${a.resultId ? 'clickable-row' : ''}">
+                                            <td>${Helpers.escapeHtml(a.userName)}</td>
                                             <td>
-                                                <div class="progress-bar-container" style="width: 100px;">
-                                                    <div class="progress-bar" style="width: ${progress}%"></div>
-                                                    <span class="progress-text">${completed}/${total}</span>
-                                                </div>
+                                                <strong>${Helpers.escapeHtml(a.testNumber)}</strong><br>
+                                                <small class="text-muted">${Helpers.escapeHtml(a.testName)}</small>
                                             </td>
+                                            <td>${a.status === 'completed' ? `<strong>${a.percentage}%</strong>` : '-'}</td>
+                                            <td><span class="badge ${statusClass}">${statusText}</span></td>
+                                            <td>${a.completedAt ? Helpers.formatDate(a.completedAt) : '-'}</td>
                                             <td>
-                                                ${ua.assignments.map(a => `
-                                                    <span class="badge ${a.status === 'completed' ? (a.passed ? 'badge-success' : 'badge-danger') : 'badge-secondary'}" 
-                                                          title="${Helpers.escapeHtml(a.testName)}: ${a.status === 'completed' ? a.percentage + '%' : 'Ausstehend'}">
-                                                        ${Helpers.escapeHtml(a.testNumber)}${a.status === 'completed' ? ': ' + a.percentage + '%' : ''}
-                                                    </span>
-                                                `).join(' ')}
+                                                ${a.resultId ? `
+                                                    <button class="btn-icon btn-view-result" data-result-id="${a.resultId}" title="Ergebnis ansehen">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                            <circle cx="12" cy="12" r="3"></circle>
+                                                        </svg>
+                                                    </button>
+                                                ` : ''}
                                             </td>
                                         </tr>
                                     `;
@@ -470,11 +484,7 @@ const KCTestRunsView = {
             const footer = document.createElement('div');
             footer.style.display = 'flex';
             footer.style.gap = 'var(--space-sm)';
-            footer.style.justifyContent = 'space-between';
-
-            const leftBtns = document.createElement('div');
-            // Could add "Ergebnisse anzeigen" button here to navigate to results
-            footer.appendChild(leftBtns);
+            footer.style.justifyContent = 'flex-end';
 
             const closeBtn = document.createElement('button');
             closeBtn.className = 'btn btn-secondary';
@@ -486,11 +496,120 @@ const KCTestRunsView = {
                 title: 'Testdurchlauf Details',
                 content,
                 footer,
-                size: 'lg'
+                size: 'xl'
+            });
+
+            // Bind view result buttons
+            content.querySelectorAll('.btn-view-result').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.viewResult(btn.dataset.resultId);
+                });
+            });
+
+            // Bind double-click on rows with results
+            content.querySelectorAll('tr[data-result-id]').forEach(row => {
+                if (row.dataset.resultId) {
+                    row.addEventListener('dblclick', () => this.viewResult(row.dataset.resultId));
+                }
             });
         } catch (error) {
             console.error('View run error:', error);
             Toast.error('Fehler beim Laden');
+        }
+    },
+
+    /**
+     * Views a specific result
+     */
+    async viewResult(resultId) {
+        if (!resultId) return;
+
+        try {
+            const result = await window.api.knowledgeCheck.getResultById(resultId);
+            if (!result.success) {
+                Toast.error('Ergebnis konnte nicht geladen werden');
+                return;
+            }
+
+            const data = result.result;
+            
+            const contentHtml = `
+                <div class="result-detail">
+                    <div class="result-header">
+                        <h3>${Helpers.escapeHtml(data.resultNumber)}</h3>
+                        <p>${Helpers.escapeHtml(data.testName)} - ${Helpers.escapeHtml(data.userName)}</p>
+                    </div>
+                    
+                    <div class="result-stats-row">
+                        <div class="run-stat">
+                            Ergebnis: <strong>${data.percentage}%</strong>
+                        </div>
+                        <div class="run-stat">
+                            Punkte: <strong>${data.totalScore}/${data.maxScore}</strong>
+                        </div>
+                        <div class="run-stat">
+                            Status: <span class="badge ${data.passed ? 'badge-success' : 'badge-danger'}">${data.passed ? 'Bestanden' : 'Nicht bestanden'}</span>
+                        </div>
+                        <div class="run-stat">
+                            Datum: <strong>${Helpers.formatDate(data.completedAt)}</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="result-answers">
+                        <h4>Antworten</h4>
+                        ${data.answers.map((answer, index) => {
+                            const isCorrect = answer.isCorrect;
+                            return `
+                                <div class="answer-item ${isCorrect ? 'correct' : 'incorrect'}">
+                                    <div class="answer-header">
+                                        <span class="answer-number">${index + 1}</span>
+                                        <span class="answer-question">${Helpers.escapeHtml(answer.questionText)}</span>
+                                        <span class="badge ${isCorrect ? 'badge-success' : 'badge-danger'}">${isCorrect ? 'Richtig' : 'Falsch'}</span>
+                                    </div>
+                                    <div class="answer-content">
+                                        <div class="answer-given">
+                                            <strong>Gegebene Antwort:</strong> ${Helpers.escapeHtml(answer.givenAnswer || '-')}
+                                        </div>
+                                        ${!isCorrect ? `
+                                            <div class="answer-correct">
+                                                <strong>Richtige Antwort:</strong> ${Helpers.escapeHtml(answer.correctAnswer || '-')}
+                                            </div>
+                                        ` : ''}
+                                        <div class="answer-points">
+                                            <strong>Punkte:</strong> ${answer.score}/${answer.maxScore}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+
+            const template = document.createElement('template');
+            template.innerHTML = contentHtml.trim();
+            const content = template.content.firstElementChild;
+
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.justifyContent = 'flex-end';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.textContent = 'Schließen';
+            closeBtn.addEventListener('click', () => Modal.close());
+            footer.appendChild(closeBtn);
+
+            Modal.open({
+                title: 'Testergebnis Details',
+                content,
+                footer,
+                size: 'lg'
+            });
+        } catch (error) {
+            console.error('View result error:', error);
+            Toast.error('Fehler beim Laden des Ergebnisses');
         }
     },
 

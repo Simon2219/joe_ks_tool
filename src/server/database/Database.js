@@ -550,7 +550,53 @@ function runMigrations(database) {
         database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
     }
     
+    // Migration 4: Create default test run for orphaned assignments/results
+    migrateOrphanedAssignments(database);
+    
     console.log('Database migrations completed');
+}
+
+/**
+ * Creates a "Nicht Zugeteilt" test run for any assignments without a run_id
+ */
+function migrateOrphanedAssignments(database) {
+    // Check for orphaned assignments (those without a run_id)
+    const orphanedAssignments = all('SELECT * FROM kc_test_assignments WHERE run_id IS NULL');
+    
+    if (orphanedAssignments.length === 0) {
+        return; // No orphaned assignments
+    }
+    
+    console.log(`Found ${orphanedAssignments.length} orphaned assignments, creating default test run...`);
+    
+    const now = new Date().toISOString();
+    const defaultRunId = 'default-unassigned-run';
+    
+    // Check if default run already exists
+    const existingRun = get('SELECT id FROM kc_test_runs WHERE id = ?', [defaultRunId]);
+    
+    if (!existingRun) {
+        // Create the default test run
+        run(`INSERT INTO kc_test_runs (id, run_number, name, description, due_date, status, created_by, notes, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [defaultRunId, 'TR-0000', 'Nicht Zugeteilt', 'Automatisch erstellter Testdurchlauf für bestehende Tests ohne Zuweisung', 
+             null, 'completed', 'system', 'Dieser Testdurchlauf wurde automatisch erstellt für Tests, die vor der Einführung des Testdurchlauf-Systems erstellt wurden.', 
+             now, now]);
+        
+        // Get unique test IDs from orphaned assignments
+        const uniqueTestIds = [...new Set(orphanedAssignments.map(a => a.test_id))];
+        
+        // Add tests to the run
+        uniqueTestIds.forEach((testId, index) => {
+            run('INSERT OR IGNORE INTO kc_test_run_tests (id, run_id, test_id, sort_order) VALUES (?, ?, ?, ?)',
+                [uuidv4(), defaultRunId, testId, index]);
+        });
+    }
+    
+    // Update all orphaned assignments to belong to the default run
+    run('UPDATE kc_test_assignments SET run_id = ? WHERE run_id IS NULL', [defaultRunId]);
+    
+    console.log('Orphaned assignments migrated to default test run');
 }
 
 // ============================================

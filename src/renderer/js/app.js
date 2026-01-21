@@ -310,7 +310,7 @@ const App = {
     async navigateTo(viewName) {
         // Define which views belong to which submenu groups
         const submenuGroups = {
-            knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcTestRuns', 'kcResults', 'kcArchive', 'kcAssigned']
+            knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcTestRuns', 'kcArchive', 'kcAssigned']
         };
         
         // Update active nav item
