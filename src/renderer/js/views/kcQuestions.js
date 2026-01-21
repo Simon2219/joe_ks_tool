@@ -172,7 +172,7 @@ const KCQuestionsView = {
                     </button>
                     <div class="kc-category-info">
                         <h3>${Helpers.escapeHtml(category.name)}</h3>
-                        <span class="kc-category-meta">${questions.length} Fragen · Gewichtung: ${category.defaultWeighting || category.default_weighting || 1}</span>
+                        <span class="kc-category-meta">${questions.length} Fragen · Gewichtung: ${category.defaultWeighting || 1}</span>
                     </div>
                     <div class="kc-category-actions">
                         ${!isUncategorized ? `

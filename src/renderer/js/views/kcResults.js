@@ -252,6 +252,7 @@ const KCResultsView = {
             }
 
             const data = result.result;
+            const canEvaluate = result.canEvaluate;
             const scoreClass = data.passed ? 'score-pass' : 'score-fail';
             
             const answersHtml = data.answers?.map((a, i) => {
@@ -269,31 +270,42 @@ const KCResultsView = {
                                     let optClass = '';
                                     let statusIcon = '';
                                     
-                                    if (opt.wasSelected && opt.isCorrect) {
-                                        optClass = 'option-correct-selected';
-                                        statusIcon = '✓';
-                                    } else if (opt.wasSelected && !opt.isCorrect) {
-                                        optClass = 'option-incorrect-selected';
-                                        statusIcon = '✗';
-                                    } else if (!opt.wasSelected && opt.isCorrect) {
-                                        optClass = 'option-correct-missed';
-                                        statusIcon = '○';
+                                    if (canEvaluate) {
+                                        // Full evaluation view - show correct/incorrect status
+                                        if (opt.wasSelected && opt.isCorrect) {
+                                            optClass = 'option-correct-selected';
+                                            statusIcon = '✓';
+                                        } else if (opt.wasSelected && !opt.isCorrect) {
+                                            optClass = 'option-incorrect-selected';
+                                            statusIcon = '✗';
+                                        } else if (!opt.wasSelected && opt.isCorrect) {
+                                            optClass = 'option-correct-missed';
+                                            statusIcon = '○';
+                                        } else {
+                                            optClass = 'option-not-selected';
+                                            statusIcon = '';
+                                        }
                                     } else {
-                                        optClass = 'option-not-selected';
-                                        statusIcon = '';
+                                        // View only - just show what was selected
+                                        if (opt.wasSelected) {
+                                            optClass = 'option-selected-only';
+                                            statusIcon = '●';
+                                        } else {
+                                            optClass = 'option-not-selected';
+                                            statusIcon = '';
+                                        }
                                     }
                                     
                                     return `
                                         <div class="result-option ${optClass}">
                                             <span class="option-status">${statusIcon}</span>
                                             <span class="option-text">${Helpers.escapeHtml(opt.text)}</span>
-                                            ${opt.isCorrect ? '<span class="option-badge correct">Richtig</span>' : ''}
-                                            ${opt.wasSelected ? '<span class="option-badge selected">Gewählt</span>' : ''}
+                                            ${canEvaluate && opt.isCorrect ? '<span class="option-badge correct">Richtig</span>' : ''}
                                         </div>
                                     `;
                                 }).join('')}
                             </div>
-                            ${details.allowPartialAnswer ? `
+                            ${canEvaluate && details.allowPartialAnswer ? `
                                 <p class="result-scoring-info">
                                     <small>Teilweise Antworten erlaubt · ${details.correctSelected || 0}/${details.totalCorrectOptions || 0} richtige gewählt, ${details.incorrectSelected || 0} falsche gewählt</small>
                                 </p>
@@ -303,15 +315,20 @@ const KCResultsView = {
                         // Fallback for old data without option details
                         answerDetailsHtml = `<p class="result-answer-text">Ausgewählt: ${a.selectedOptions?.length || 0} Option(en)</p>`;
                     }
-                } else if (a.answerText) {
-                    answerDetailsHtml = `<p class="result-answer-text"><strong>Antwort:</strong> ${Helpers.escapeHtml(a.answerText)}</p>`;
+                } else {
+                    // Open question
+                    if (a.answerText) {
+                        answerDetailsHtml = `<p class="result-answer-text"><strong>Antwort:</strong> ${Helpers.escapeHtml(a.answerText)}</p>`;
+                    } else {
+                        answerDetailsHtml = `<p class="result-answer-text text-muted"><em>Keine Antwort eingegeben</em></p>`;
+                    }
                 }
                 
                 return `
-                    <div class="result-answer ${a.isCorrect ? 'correct' : 'incorrect'}">
+                    <div class="result-answer ${canEvaluate ? (a.isCorrect ? 'correct' : 'incorrect') : ''}">
                         <div class="result-answer-header">
                             <span>Frage ${i + 1}: ${Helpers.escapeHtml(a.questionTitle || Helpers.truncate(a.questionText, 40))}</span>
-                            <span class="badge ${a.isCorrect ? 'badge-success' : 'badge-danger'}">${Math.round(a.score * 100) / 100}/${a.maxScore}</span>
+                            ${canEvaluate ? `<span class="badge ${a.isCorrect ? 'badge-success' : 'badge-danger'}">${Math.round(a.score * 100) / 100}/${a.maxScore}</span>` : ''}
                         </div>
                         <p class="result-question-text">${Helpers.escapeHtml(a.questionText)}</p>
                         ${answerDetailsHtml}

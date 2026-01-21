@@ -811,7 +811,7 @@ const KCTestsView = {
     },
 
     /**
-     * Shows the form to assign a test to multiple users
+     * Shows the form to create a test run for a specific test
      */
     async showAssignTestForm(test) {
         if (!Permissions.has('kc_assign_tests')) {
@@ -827,7 +827,11 @@ const KCTestsView = {
                 return;
             }
 
-            const users = usersResult.users;
+            const users = usersResult.users.filter(u => u.isActive);
+            
+            // Generate default run name based on test name and date
+            const today = new Date();
+            const defaultRunName = `${test.name} - ${today.toLocaleDateString('de-DE')}`;
 
             // Build custom form with checkboxes for multiple user selection
             const formHtml = `
@@ -837,7 +841,15 @@ const KCTestsView = {
                         <input type="text" class="form-input" value="${Helpers.escapeHtml(test.testNumber)} - ${Helpers.escapeHtml(test.name)}" readonly>
                     </div>
                     <div class="form-group">
-                        <label>Benutzer auswählen *</label>
+                        <label for="run-name">Durchlauf Name *</label>
+                        <input type="text" id="run-name" class="form-input" value="${Helpers.escapeHtml(defaultRunName)}" placeholder="Name für diesen Testdurchlauf">
+                    </div>
+                    <div class="form-group">
+                        <label for="run-description">Beschreibung (optional)</label>
+                        <textarea id="run-description" class="form-textarea" rows="2" placeholder="Beschreibung des Testdurchlaufs"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Teilnehmer auswählen *</label>
                         <div class="user-select-actions" style="margin-bottom: var(--space-xs);">
                             <button type="button" class="btn btn-sm btn-secondary" id="select-all-users">Alle auswählen</button>
                             <button type="button" class="btn btn-sm btn-secondary" id="deselect-all-users">Keine auswählen</button>
@@ -854,10 +866,6 @@ const KCTestsView = {
                     <div class="form-group">
                         <label for="assign-due-date">Fälligkeitsdatum (optional)</label>
                         <input type="date" id="assign-due-date" class="form-input">
-                    </div>
-                    <div class="form-group">
-                        <label for="assign-notes">Hinweise (optional)</label>
-                        <textarea id="assign-notes" class="form-textarea" rows="2" placeholder="Besondere Hinweise für die Teilnehmer"></textarea>
                     </div>
                 </div>
             `;
@@ -878,13 +886,13 @@ const KCTestsView = {
 
             const submitBtn = document.createElement('button');
             submitBtn.className = 'btn btn-primary';
-            submitBtn.textContent = 'Test zuweisen';
+            submitBtn.textContent = 'Testdurchgang erstellen';
 
             footer.appendChild(cancelBtn);
             footer.appendChild(submitBtn);
 
             Modal.open({
-                title: `Testdurchgang: ${test.testNumber}`,
+                title: `Neuer Testdurchgang`,
                 content,
                 footer,
                 size: 'default'
@@ -900,47 +908,40 @@ const KCTestsView = {
 
             // Submit handler
             submitBtn.addEventListener('click', async () => {
+                const name = document.getElementById('run-name')?.value?.trim();
+                const description = document.getElementById('run-description')?.value?.trim() || '';
                 const selectedUsers = Array.from(document.querySelectorAll('input[name="userIds"]:checked')).map(cb => cb.value);
                 const dueDate = document.getElementById('assign-due-date')?.value || null;
-                const notes = document.getElementById('assign-notes')?.value || '';
 
-                if (selectedUsers.length === 0) {
-                    Toast.error('Bitte wählen Sie mindestens einen Benutzer');
+                if (!name) {
+                    Toast.error('Bitte geben Sie einen Namen für den Durchlauf ein');
                     return;
                 }
 
-                // Create assignments for each selected user
-                let successCount = 0;
-                let errorCount = 0;
-
-                for (const userId of selectedUsers) {
-                    try {
-                        const response = await window.api.knowledgeCheck.createAssignment({
-                            testId: test.id,
-                            userId,
-                            dueDate,
-                            notes
-                        });
-
-                        if (response && response.success) {
-                            successCount++;
-                        } else {
-                            errorCount++;
-                        }
-                    } catch (error) {
-                        console.error('Assignment error for user:', userId, error);
-                        errorCount++;
-                    }
+                if (selectedUsers.length === 0) {
+                    Toast.error('Bitte wählen Sie mindestens einen Teilnehmer');
+                    return;
                 }
 
-                Modal.close();
+                try {
+                    // Create a proper test run using the API
+                    const response = await window.api.knowledgeCheck.createTestRun({
+                        name,
+                        description,
+                        dueDate,
+                        testIds: [test.id],
+                        userIds: selectedUsers
+                    });
 
-                if (successCount > 0 && errorCount === 0) {
-                    Toast.success(`Test wurde ${successCount} Benutzer(n) zugewiesen`);
-                } else if (successCount > 0 && errorCount > 0) {
-                    Toast.warning(`${successCount} zugewiesen, ${errorCount} fehlgeschlagen`);
-                } else {
-                    Toast.error('Fehler beim Zuweisen des Tests');
+                    if (response && response.success) {
+                        Toast.success(`Testdurchgang "${name}" wurde erstellt mit ${selectedUsers.length} Teilnehmer(n)`);
+                        Modal.close();
+                    } else {
+                        Toast.error(response?.error || 'Fehler beim Erstellen des Testdurchgangs');
+                    }
+                } catch (error) {
+                    console.error('Create test run error:', error);
+                    Toast.error('Fehler beim Erstellen: ' + (error.message || 'Unbekannter Fehler'));
                 }
             });
         } catch (error) {

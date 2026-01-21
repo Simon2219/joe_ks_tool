@@ -611,8 +611,9 @@ function ensurePermissions() {
         { id: 'kc_tests_create', name: 'Create Tests', module: 'knowledge_check' },
         { id: 'kc_tests_edit', name: 'Edit Tests', module: 'knowledge_check' },
         { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
-        // Knowledge Check - Results (Delete > View)
+        // Knowledge Check - Results (Delete > Evaluate > View)
         { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
+        { id: 'kc_results_evaluate', name: 'Evaluate Test Results', module: 'knowledge_check' },
         { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
         // Knowledge Check - Test Runs & Assignments
         { id: 'kc_assign_tests', name: 'Create Test Run', module: 'knowledge_check' },
@@ -702,8 +703,9 @@ async function seedData() {
         { id: 'kc_tests_create', name: 'Create Tests', module: 'knowledge_check' },
         { id: 'kc_tests_edit', name: 'Edit Tests', module: 'knowledge_check' },
         { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
-        // Knowledge Check - Results (Delete > View)
+        // Knowledge Check - Results (Delete > Evaluate > View)
         { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
+        { id: 'kc_results_evaluate', name: 'Evaluate Test Results', module: 'knowledge_check' },
         { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
         // Knowledge Check - Test Runs & Assignments
         { id: 'kc_assign_tests', name: 'Create Test Run', module: 'knowledge_check' },
@@ -733,13 +735,13 @@ async function seedData() {
     const kcManagerPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit', 'kc_questions_delete', 
                            'kc_categories_create', 'kc_categories_edit', 'kc_categories_delete',
                            'kc_tests_view', 'kc_tests_create', 'kc_tests_edit', 'kc_tests_delete',
-                           'kc_results_view', 'kc_results_delete',
+                           'kc_results_view', 'kc_results_evaluate', 'kc_results_delete',
                            'kc_assign_tests', 'kc_assigned_view',
                            'kc_archive_access'];
     const kcEditorPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit',
                           'kc_categories_create', 'kc_categories_edit',
                           'kc_tests_view', 'kc_tests_create', 'kc_tests_edit',
-                          'kc_results_view',
+                          'kc_results_view', 'kc_results_evaluate',
                           'kc_assign_tests', 'kc_assigned_view'];
     const kcUserPerms = ['kc_view', 'kc_assigned_view']; // Can see the tab and their assigned tests
     
@@ -1463,8 +1465,14 @@ const KnowledgeCheckSystem = {
     getAllCategories() {
         const categories = all('SELECT * FROM kc_categories ORDER BY sort_order, name');
         return categories.map(c => ({
-            ...c,
-            is_active: !!c.is_active,
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            defaultWeighting: c.default_weighting,
+            sortOrder: c.sort_order,
+            isActive: !!c.is_active,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at,
             questionCount: get('SELECT COUNT(*) as count FROM kc_questions WHERE category_id = ?', [c.id])?.count || 0
         }));
     },
@@ -1472,7 +1480,16 @@ const KnowledgeCheckSystem = {
     getCategoryById(id) {
         const category = get('SELECT * FROM kc_categories WHERE id = ?', [id]);
         if (!category) return null;
-        return { ...category, is_active: !!category.is_active };
+        return {
+            id: category.id,
+            name: category.name,
+            description: category.description,
+            defaultWeighting: category.default_weighting,
+            sortOrder: category.sort_order,
+            isActive: !!category.is_active,
+            createdAt: category.created_at,
+            updatedAt: category.updated_at
+        };
     },
 
     createCategory(data) {
@@ -2529,7 +2546,7 @@ const KnowledgeCheckSystem = {
         if (!result) return null;
         
         const answers = all(`
-            SELECT a.*, q.question_text, q.question_type, q.title
+            SELECT a.*, q.question_text, q.question_type, q.title, q.allow_partial_answer
             FROM kc_test_answers a
             JOIN kc_questions q ON a.question_id = q.id
             WHERE a.result_id = ?
@@ -2565,6 +2582,45 @@ const KnowledgeCheckSystem = {
                 } catch (e) {
                     optionDetails = {};
                 }
+                
+                // For multiple choice questions, populate allOptions from the question if missing
+                if (a.question_type === 'multiple_choice' && (!optionDetails.allOptions || optionDetails.allOptions.length === 0)) {
+                    // Fetch the question's options from the database
+                    const questionOptions = all(
+                        'SELECT id, option_text, is_correct FROM kc_question_options WHERE question_id = ? ORDER BY sort_order',
+                        [a.question_id]
+                    );
+                    
+                    if (questionOptions && questionOptions.length > 0) {
+                        // Build allOptions array with selection status
+                        const allOptions = questionOptions.map(opt => ({
+                            id: opt.id,
+                            text: opt.option_text,
+                            isCorrect: !!opt.is_correct,
+                            wasSelected: selectedOptions.includes(opt.id)
+                        }));
+                        
+                        // Calculate statistics
+                        let correctSelected = 0;
+                        let incorrectSelected = 0;
+                        let totalCorrectOptions = 0;
+                        
+                        allOptions.forEach(opt => {
+                            if (opt.isCorrect) totalCorrectOptions++;
+                            if (opt.wasSelected && opt.isCorrect) correctSelected++;
+                            if (opt.wasSelected && !opt.isCorrect) incorrectSelected++;
+                        });
+                        
+                        optionDetails = {
+                            allOptions,
+                            correctSelected,
+                            incorrectSelected,
+                            totalCorrectOptions,
+                            allowPartialAnswer: !!a.allow_partial_answer
+                        };
+                    }
+                }
+                
                 return {
                     id: a.id,
                     questionId: a.question_id,
