@@ -74,14 +74,25 @@ const KnowledgeCheckView = {
                 const stats = result.statistics;
                 
                 // Only update stats for tiles the user can see
+                if (Permissions.hasPermission('kc_assigned_view')) {
+                    const assignedEl = document.getElementById('kc-stat-assigned');
+                    if (assignedEl) assignedEl.textContent = `${stats.myAssignedCount || 0} Zugewiesen`;
+                }
                 if (Permissions.hasPermission('kc_questions_view')) {
-                    document.getElementById('kc-stat-questions').textContent = `${stats.totalQuestions} Fragen`;
+                    const questionsEl = document.getElementById('kc-stat-questions');
+                    if (questionsEl) questionsEl.textContent = `${stats.totalQuestions} Fragen`;
                 }
                 if (Permissions.hasPermission('kc_tests_view')) {
-                    document.getElementById('kc-stat-tests').textContent = `${stats.totalTests} Tests`;
+                    const testsEl = document.getElementById('kc-stat-tests');
+                    if (testsEl) testsEl.textContent = `${stats.totalTests} Tests`;
                 }
                 if (Permissions.hasPermission('kc_results_view')) {
-                    document.getElementById('kc-stat-runs').textContent = `${stats.totalRuns || 0} Durchläufe`;
+                    const runsEl = document.getElementById('kc-stat-runs');
+                    if (runsEl) runsEl.textContent = `${stats.totalRuns || 0} Durchläufe`;
+                }
+                if (Permissions.hasPermission('kc_archive_view')) {
+                    const archivedEl = document.getElementById('kc-stat-archived');
+                    if (archivedEl) archivedEl.textContent = `${stats.totalArchived || 0} Archiviert`;
                 }
             }
         } catch (error) {

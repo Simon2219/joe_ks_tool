@@ -717,7 +717,8 @@ router.delete('/assignments/:id', requirePermission('kc_assign_tests'), (req, re
  */
 router.get('/stats', requirePermission('kc_view'), (req, res) => {
     try {
-        const statistics = KnowledgeCheckSystem.getStatistics();
+        const userId = req.user?.id;
+        const statistics = KnowledgeCheckSystem.getStatistics(userId);
         res.json({ success: true, statistics });
     } catch (error) {
         console.error('Get KC stats error:', error);

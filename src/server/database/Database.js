@@ -2627,19 +2627,32 @@ const KnowledgeCheckSystem = {
     // STATISTICS
     // ============================================
 
-    getStatistics() {
-        const totalTests = get('SELECT COUNT(*) as count FROM kc_tests WHERE is_active = 1')?.count || 0;
-        const totalQuestions = get('SELECT COUNT(*) as count FROM kc_questions WHERE is_active = 1')?.count || 0;
+    getStatistics(userId = null) {
+        const totalTests = get('SELECT COUNT(*) as count FROM kc_tests WHERE is_active = 1 AND is_archived = 0')?.count || 0;
+        const totalQuestions = get('SELECT COUNT(*) as count FROM kc_questions WHERE is_active = 1 AND is_archived = 0')?.count || 0;
         const totalResults = get('SELECT COUNT(*) as count FROM kc_test_results')?.count || 0;
         const totalRuns = get('SELECT COUNT(*) as count FROM kc_test_runs')?.count || 0;
         const passedResults = get('SELECT COUNT(*) as count FROM kc_test_results WHERE passed = 1')?.count || 0;
         const avgScore = get('SELECT AVG(percentage) as avg FROM kc_test_results')?.avg || 0;
+        
+        // Archived items count
+        const archivedQuestions = get('SELECT COUNT(*) as count FROM kc_questions WHERE is_archived = 1')?.count || 0;
+        const archivedTests = get('SELECT COUNT(*) as count FROM kc_tests WHERE is_archived = 1')?.count || 0;
+        const totalArchived = archivedQuestions + archivedTests;
+        
+        // User's assigned tests count (pending only)
+        let myAssignedCount = 0;
+        if (userId) {
+            myAssignedCount = get('SELECT COUNT(*) as count FROM kc_test_assignments WHERE user_id = ? AND status = ?', [userId, 'pending'])?.count || 0;
+        }
         
         return {
             totalTests,
             totalQuestions,
             totalResults,
             totalRuns,
+            totalArchived,
+            myAssignedCount,
             passedResults,
             passingRate: totalResults > 0 ? Math.round((passedResults / totalResults) * 100) : 0,
             averageScore: Math.round(avgScore)

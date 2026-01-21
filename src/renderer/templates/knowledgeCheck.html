@@ -1,5 +1,17 @@
 <section id="view-knowledgeCheck" class="view">
     <div class="kc-tiles-container" id="kc-tiles-container">
+        <div class="kc-tile" data-navigate="kcAssigned" data-permission="kc_assigned_view">
+            <div class="kc-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    <path d="M9 14l2 2 4-4"></path>
+                </svg>
+            </div>
+            <h3>Zugewiesene Tests</h3>
+            <p>Ihre zugewiesenen Tests anzeigen und durchführen</p>
+            <span class="kc-tile-stat" id="kc-stat-assigned">0 Zugewiesen</span>
+        </div>
         <div class="kc-tile" data-navigate="kcQuestions" data-permission="kc_questions_view">
             <div class="kc-tile-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -36,6 +48,18 @@
             <h3>Test Durchläufe</h3>
             <p>Erstellen und verwalten Sie Testdurchläufe für Ihre Mitarbeiter</p>
             <span class="kc-tile-stat" id="kc-stat-runs">0 Durchläufe</span>
+        </div>
+        <div class="kc-tile" data-navigate="kcArchive" data-permission="kc_archive_view">
+            <div class="kc-tile-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                    <rect x="1" y="3" width="22" height="5"></rect>
+                    <line x1="10" y1="12" x2="14" y2="12"></line>
+                </svg>
+            </div>
+            <h3>Archiv</h3>
+            <p>Archivierte Fragen und Tests verwalten und wiederherstellen</p>
+            <span class="kc-tile-stat" id="kc-stat-archived">0 Archiviert</span>
         </div>
     </div>
     <!-- Message for users without sub-page access -->
