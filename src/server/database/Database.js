@@ -2357,9 +2357,6 @@ const KnowledgeCheckSystem = {
             params.push(filters.assignedBy);
         }
         
-        sql += ' ORDER BY a.created_at DESC';
-        
-        // Add run_id filter
         if (filters.runId) {
             sql += ' AND a.run_id = ?';
             params.push(filters.runId);
