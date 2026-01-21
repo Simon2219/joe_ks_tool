@@ -325,7 +325,7 @@ const KCAssignedView = {
             title: `Test: ${test.testNumber}`,
             content,
             footer,
-            size: 'lg'
+            size: 'full'
         });
 
         // Submit handler
@@ -497,7 +497,7 @@ const KCAssignedView = {
                 title: `Ergebnis: ${data.resultNumber}`,
                 content,
                 footer,
-                size: 'lg'
+                size: 'xl'
             });
         } catch (error) {
             console.error('View result error:', error);

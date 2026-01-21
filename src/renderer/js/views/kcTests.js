@@ -749,7 +749,7 @@ const KCTestsView = {
                 title: `Test Details`,
                 content,
                 footer,
-                size: 'lg'
+                size: 'xl'
             });
 
             // Bind view question detail buttons
@@ -984,7 +984,7 @@ const KCTestsView = {
                 title: 'Frage Details',
                 content,
                 footer,
-                size: 'md'
+                size: 'lg'
             });
         } catch (error) {
             console.error('View question detail error:', error);

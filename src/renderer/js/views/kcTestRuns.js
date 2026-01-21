@@ -98,13 +98,10 @@ const KCTestRunsView = {
         const total = this.runs.length;
         const pending = this.runs.filter(r => r.status === 'pending' || r.pendingCount > 0).length;
         const completed = this.runs.filter(r => r.pendingCount === 0 && r.completedCount > 0).length;
-        const avgScores = this.runs.filter(r => r.avgScore !== null).map(r => r.avgScore);
-        const avgScore = avgScores.length > 0 ? Math.round(avgScores.reduce((a, b) => a + b, 0) / avgScores.length) : 0;
 
         document.getElementById('runs-total').textContent = total;
         document.getElementById('runs-pending').textContent = pending;
         document.getElementById('runs-completed').textContent = completed;
-        document.getElementById('runs-avg-score').textContent = `${avgScore}%`;
     },
 
     /**
@@ -190,7 +187,6 @@ const KCTestRunsView = {
                         <span class="progress-text">${progress}%</span>
                     </div>
                 </td>
-                <td>${run.avgScore !== null ? `${run.avgScore}%` : '-'}</td>
                 <td><span class="badge ${statusClass}">${status}</span></td>
                 <td>${Helpers.formatDate(run.createdAt)}</td>
                 <td>
@@ -365,7 +361,7 @@ const KCTestRunsView = {
     },
 
     /**
-     * Views a test run's details with full results
+     * Views a test run's details with full results (similar to Test Results page layout)
      */
     async viewRun(runId) {
         try {
@@ -377,50 +373,46 @@ const KCTestRunsView = {
 
             const run = result.run;
             
-            // Group assignments by user
-            const userAssignments = {};
-            run.assignments.forEach(a => {
-                if (!userAssignments[a.userId]) {
-                    userAssignments[a.userId] = {
-                        userName: a.userName,
-                        userId: a.userId,
-                        assignments: []
-                    };
-                }
-                userAssignments[a.userId].assignments.push(a);
-            });
+            // Calculate statistics
+            const completedResults = run.assignments.filter(a => a.status === 'completed');
+            const avgScore = completedResults.length > 0 
+                ? Math.round(completedResults.reduce((sum, a) => sum + (a.percentage || 0), 0) / completedResults.length)
+                : 0;
+            const passingRate = completedResults.length > 0
+                ? Math.round((completedResults.filter(a => a.passed).length / completedResults.length) * 100)
+                : 0;
 
             const contentHtml = `
-                <div class="run-detail">
-                    <div class="run-detail-header">
-                        <h3>${Helpers.escapeHtml(run.runNumber)} - ${Helpers.escapeHtml(run.name)}</h3>
-                        ${run.description ? `<p>${Helpers.escapeHtml(run.description)}</p>` : ''}
+                <div class="run-detail-full">
+                    <div class="run-detail-header-info">
+                        <div class="run-title-section">
+                            <span class="run-number">${Helpers.escapeHtml(run.runNumber)}</span>
+                            <span class="run-name">${Helpers.escapeHtml(run.name)}</span>
+                            ${run.dueDate ? `<span class="run-due">Fällig: ${Helpers.formatDate(run.dueDate)}</span>` : ''}
+                        </div>
+                        ${run.description ? `<p class="run-description">${Helpers.escapeHtml(run.description)}</p>` : ''}
                     </div>
                     
-                    <div class="run-stats-row">
-                        <div class="run-stat">
-                            <strong>${run.stats.testCount}</strong> Tests
+                    <div class="kc-results-overview">
+                        <div class="quality-stat-card">
+                            <span class="stat-value">${avgScore}%</span>
+                            <span class="stat-label">Ø Ergebnis</span>
                         </div>
-                        <div class="run-stat">
-                            <strong>${run.stats.userCount}</strong> Teilnehmer
+                        <div class="quality-stat-card">
+                            <span class="stat-value">${passingRate}%</span>
+                            <span class="stat-label">Bestehensrate</span>
                         </div>
-                        <div class="run-stat">
-                            <strong>${run.stats.completedCount}/${run.stats.totalAssignments}</strong> abgeschlossen
+                        <div class="quality-stat-card">
+                            <span class="stat-value">${completedResults.length}/${run.stats.totalAssignments}</span>
+                            <span class="stat-label">Abgeschlossen</span>
                         </div>
-                        ${run.stats.avgScore !== null ? `
-                            <div class="run-stat">
-                                Ø <strong>${run.stats.avgScore}%</strong>
-                            </div>
-                        ` : ''}
-                        ${run.dueDate ? `
-                            <div class="run-stat">
-                                Fällig: <strong>${Helpers.formatDate(run.dueDate)}</strong>
-                            </div>
-                        ` : ''}
+                        <div class="quality-stat-card">
+                            <span class="stat-value">${run.stats.userCount}</span>
+                            <span class="stat-label">Teilnehmer</span>
+                        </div>
                     </div>
                     
-                    <div class="run-results-section">
-                        <h4>Ergebnisse</h4>
+                    <div class="table-container">
                         <table class="data-table" id="run-results-table">
                             <thead>
                                 <tr>
@@ -428,7 +420,7 @@ const KCTestRunsView = {
                                     <th>Test</th>
                                     <th>Ergebnis</th>
                                     <th>Status</th>
-                                    <th>Datum</th>
+                                    <th>Abgeschlossen</th>
                                     <th>Aktionen</th>
                                 </tr>
                             </thead>
@@ -450,21 +442,28 @@ const KCTestRunsView = {
                                     
                                     return `
                                         <tr data-assignment-id="${a.id}" data-result-id="${a.resultId || ''}" class="${a.resultId ? 'clickable-row' : ''}">
-                                            <td>${Helpers.escapeHtml(a.userName)}</td>
+                                            <td><strong>${Helpers.escapeHtml(a.userName)}</strong></td>
                                             <td>
-                                                <strong>${Helpers.escapeHtml(a.testNumber)}</strong><br>
-                                                <small class="text-muted">${Helpers.escapeHtml(a.testName)}</small>
+                                                <div class="test-info">
+                                                    <span class="test-number">${Helpers.escapeHtml(a.testNumber)}</span>
+                                                    <span class="test-name text-muted">${Helpers.escapeHtml(a.testName)}</span>
+                                                </div>
                                             </td>
-                                            <td>${a.status === 'completed' ? `<strong>${a.percentage}%</strong>` : '-'}</td>
+                                            <td>
+                                                ${a.status === 'completed' 
+                                                    ? `<span class="result-percentage ${a.passed ? 'passed' : 'failed'}">${a.percentage}%</span>` 
+                                                    : '<span class="text-muted">-</span>'}
+                                            </td>
                                             <td><span class="badge ${statusClass}">${statusText}</span></td>
-                                            <td>${a.completedAt ? Helpers.formatDate(a.completedAt) : '-'}</td>
+                                            <td>${a.completedAt ? Helpers.formatDate(a.completedAt) : '<span class="text-muted">-</span>'}</td>
                                             <td>
                                                 ${a.resultId ? `
-                                                    <button class="btn-icon btn-view-result" data-result-id="${a.resultId}" title="Ergebnis ansehen">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <button class="btn btn-sm btn-secondary btn-view-result" data-result-id="${a.resultId}">
+                                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                                             <circle cx="12" cy="12" r="3"></circle>
                                                         </svg>
+                                                        Details
                                                     </button>
                                                 ` : ''}
                                             </td>
@@ -493,10 +492,10 @@ const KCTestRunsView = {
             footer.appendChild(closeBtn);
 
             Modal.open({
-                title: 'Testdurchlauf Details',
+                title: `Testdurchlauf: ${run.runNumber}`,
                 content,
                 footer,
-                size: 'xl'
+                size: 'full'
             });
 
             // Bind view result buttons
@@ -605,7 +604,7 @@ const KCTestRunsView = {
                 title: 'Testergebnis Details',
                 content,
                 footer,
-                size: 'lg'
+                size: 'xl'
             });
         } catch (error) {
             console.error('View result error:', error);

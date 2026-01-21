@@ -87,9 +87,11 @@ const Modal = {
         SetContainerContent(this.footerEl, footer)
 
         
-        this.modal.classList.remove('modal-sm', 'modal-lg');
+        this.modal.classList.remove('modal-sm', 'modal-lg', 'modal-xl', 'modal-full');
         if (size === 'sm') this.modal.classList.add('modal-sm');
         else if (size === 'lg') this.modal.classList.add('modal-lg');
+        else if (size === 'xl') this.modal.classList.add('modal-xl');
+        else if (size === 'full') this.modal.classList.add('modal-full');
         // default -> no extra class
 
 
