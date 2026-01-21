@@ -303,8 +303,13 @@ const KCResultsView = {
                         // Fallback for old data without option details
                         answerDetailsHtml = `<p class="result-answer-text">Ausgewählt: ${a.selectedOptions?.length || 0} Option(en)</p>`;
                     }
-                } else if (a.answerText) {
-                    answerDetailsHtml = `<p class="result-answer-text"><strong>Antwort:</strong> ${Helpers.escapeHtml(a.answerText)}</p>`;
+                } else {
+                    // Open question
+                    if (a.answerText) {
+                        answerDetailsHtml = `<p class="result-answer-text"><strong>Antwort:</strong> ${Helpers.escapeHtml(a.answerText)}</p>`;
+                    } else {
+                        answerDetailsHtml = `<p class="result-answer-text text-muted"><em>Keine Antwort eingegeben</em></p>`;
+                    }
                 }
                 
                 return `
