@@ -290,6 +290,10 @@ window.api = {
             const params = new URLSearchParams(filters).toString();
             return API.get(`/knowledge-check/tests${params ? '?' + params : ''}`);
         },
+        getTestsWithStats: (filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/knowledge-check/tests-with-stats${params ? '?' + params : ''}`);
+        },
         getTestById: (id) => API.get(`/knowledge-check/tests/${id}`),
         createTest: (data) => API.post('/knowledge-check/tests', data),
         updateTest: (id, data) => API.put(`/knowledge-check/tests/${id}`, data),

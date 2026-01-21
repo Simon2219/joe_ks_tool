@@ -4,10 +4,12 @@
             <div class="view-actions">
                 <button class="btn btn-primary" id="add-kc-result-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
                     </svg>
-                    Neuer Test
+                    Test zuweisen
                 </button>
                 <button class="btn btn-secondary" id="export-kc-results-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -22,29 +24,21 @@
                 <select id="filter-kc-result-category" class="form-select form-select-sm">
                     <option value="">Alle Kategorien</option>
                 </select>
-                <select id="filter-kc-result-test" class="form-select form-select-sm">
-                    <option value="">Alle Tests</option>
-                </select>
-                <select id="filter-kc-result-user" class="form-select form-select-sm">
-                    <option value="">Alle Benutzer</option>
-                </select>
-                <input type="date" id="filter-kc-result-start" class="form-input form-input-sm" placeholder="Von">
-                <input type="date" id="filter-kc-result-end" class="form-input form-input-sm" placeholder="Bis">
             </div>
         </div>
     </div>
     <div class="kc-results-overview" id="kc-results-overview">
         <div class="quality-stat-card">
             <span class="stat-value" id="kc-results-avg-score">--</span>
-            <span class="stat-label">Durchschnitt</span>
+            <span class="stat-label">Ø Ergebnis</span>
         </div>
         <div class="quality-stat-card">
             <span class="stat-value" id="kc-results-passing-rate">--</span>
-            <span class="stat-label">Bestanden</span>
+            <span class="stat-label">Abschlussrate</span>
         </div>
         <div class="quality-stat-card">
             <span class="stat-value" id="kc-results-total">--</span>
-            <span class="stat-label">Gesamt</span>
+            <span class="stat-label">Tests</span>
         </div>
     </div>
     <div class="table-container">
@@ -53,10 +47,10 @@
                 <tr>
                     <th>Test #</th>
                     <th>Test Name</th>
-                    <th>Benutzer</th>
-                    <th>Ergebnis</th>
+                    <th>Zuweisungen</th>
+                    <th>Ø Ergebnis</th>
                     <th>Status</th>
-                    <th>Datum</th>
+                    <th>Erstellt</th>
                     <th>Aktionen</th>
                 </tr>
             </thead>

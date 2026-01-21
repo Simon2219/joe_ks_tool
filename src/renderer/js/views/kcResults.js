@@ -1,19 +1,14 @@
 /**
  * KC Results View (Test Ergebnisse)
- * Shows test results
+ * Shows all tests with their assignment and completion statistics
  */
 
 const KCResultsView = {
-    results: [],
-    tests: [],
+    testsWithStats: [],
     testCategories: [],
     users: [],
     filters: {
-        categoryId: '',
-        testId: '',
-        userId: '',
-        startDate: '',
-        endDate: ''
+        categoryId: ''
     },
     eventsBound: false,
 
@@ -26,10 +21,8 @@ const KCResultsView = {
             this.eventsBound = true;
         }
         await this.loadTestCategories();
-        await this.loadTests();
         await this.loadUsers();
-        await this.loadResults();
-        await this.loadStatistics();
+        await this.loadTestsWithStats();
     },
 
     /**
@@ -46,30 +39,9 @@ const KCResultsView = {
             this.exportResults();
         });
 
-        // Filters
+        // Category filter
         document.getElementById('filter-kc-result-category')?.addEventListener('change', (e) => {
             this.filters.categoryId = e.target.value;
-            this.populateTestFilter(); // Re-populate tests based on category
-            this.applyFilters();
-        });
-
-        document.getElementById('filter-kc-result-test')?.addEventListener('change', (e) => {
-            this.filters.testId = e.target.value;
-            this.applyFilters();
-        });
-
-        document.getElementById('filter-kc-result-user')?.addEventListener('change', (e) => {
-            this.filters.userId = e.target.value;
-            this.applyFilters();
-        });
-
-        document.getElementById('filter-kc-result-start')?.addEventListener('change', (e) => {
-            this.filters.startDate = e.target.value;
-            this.applyFilters();
-        });
-
-        document.getElementById('filter-kc-result-end')?.addEventListener('change', (e) => {
-            this.filters.endDate = e.target.value;
             this.applyFilters();
         });
     },
@@ -90,29 +62,13 @@ const KCResultsView = {
     },
 
     /**
-     * Loads all tests for filter
-     */
-    async loadTests() {
-        try {
-            const result = await window.api.knowledgeCheck.getTests();
-            if (result.success) {
-                this.tests = result.tests;
-                this.populateTestFilter();
-            }
-        } catch (error) {
-            console.error('Failed to load tests:', error);
-        }
-    },
-
-    /**
-     * Loads all users for filter
+     * Loads all users for assignment form
      */
     async loadUsers() {
         try {
             const result = await window.api.users.getAll();
             if (result.success) {
                 this.users = result.users.filter(u => u.isActive);
-                this.populateUserFilter();
             }
         } catch (error) {
             console.error('Failed to load users:', error);
@@ -120,36 +76,35 @@ const KCResultsView = {
     },
 
     /**
-     * Loads all results
+     * Loads all tests with their statistics
      */
-    async loadResults() {
+    async loadTestsWithStats() {
         try {
-            const result = await window.api.knowledgeCheck.getResults(this.filters);
+            const result = await window.api.knowledgeCheck.getTestsWithStats(this.filters);
             if (result.success) {
-                this.results = result.results;
+                this.testsWithStats = result.tests;
                 this.renderTable();
+                this.updateStatistics();
             }
         } catch (error) {
-            console.error('Failed to load KC results:', error);
-            Toast.error('Ergebnisse konnten nicht geladen werden');
+            console.error('Failed to load tests with stats:', error);
+            Toast.error('Tests konnten nicht geladen werden');
         }
     },
 
     /**
-     * Loads statistics
+     * Updates the statistics cards
      */
-    async loadStatistics() {
-        try {
-            const result = await window.api.knowledgeCheck.getStatistics();
-            if (result.success) {
-                const stats = result.statistics;
-                document.getElementById('kc-results-avg-score').textContent = `${stats.averageScore}%`;
-                document.getElementById('kc-results-passing-rate').textContent = `${stats.passingRate}%`;
-                document.getElementById('kc-results-total').textContent = stats.totalResults;
-            }
-        } catch (error) {
-            console.error('Failed to load statistics:', error);
-        }
+    updateStatistics() {
+        const tests = this.testsWithStats;
+        const totalAssigned = tests.reduce((sum, t) => sum + t.assignedCount, 0);
+        const totalCompleted = tests.reduce((sum, t) => sum + t.completedCount, 0);
+        const avgScores = tests.filter(t => t.avgScore !== null).map(t => t.avgScore);
+        const avgScore = avgScores.length > 0 ? Math.round(avgScores.reduce((a, b) => a + b, 0) / avgScores.length) : 0;
+
+        document.getElementById('kc-results-avg-score').textContent = `${avgScore}%`;
+        document.getElementById('kc-results-passing-rate').textContent = totalAssigned > 0 ? `${Math.round((totalCompleted / totalAssigned) * 100)}%` : '0%';
+        document.getElementById('kc-results-total').textContent = tests.length;
     },
 
     /**
@@ -169,81 +124,304 @@ const KCResultsView = {
     },
 
     /**
-     * Populates the test filter dropdown
-     */
-    populateTestFilter() {
-        const select = document.getElementById('filter-kc-result-test');
-        if (!select) return;
-
-        select.innerHTML = '<option value="">Alle Tests</option>';
-        
-        // Filter tests by category if a category is selected
-        let filteredTests = this.tests;
-        if (this.filters.categoryId) {
-            filteredTests = this.tests.filter(t => t.categoryId === this.filters.categoryId);
-        }
-        
-        filteredTests.forEach(test => {
-            const option = document.createElement('option');
-            option.value = test.id;
-            option.textContent = `${test.testNumber} - ${test.name}`;
-            select.appendChild(option);
-        });
-    },
-
-    /**
-     * Populates the user filter dropdown
-     */
-    populateUserFilter() {
-        const select = document.getElementById('filter-kc-result-user');
-        if (!select) return;
-
-        select.innerHTML = '<option value="">Alle Benutzer</option>';
-        this.users.forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.id;
-            option.textContent = `${user.firstName} ${user.lastName}`;
-            select.appendChild(option);
-        });
-    },
-
-    /**
      * Applies filters
      */
     applyFilters() {
-        this.loadResults();
+        this.loadTestsWithStats();
     },
 
     /**
-     * Renders the results table
+     * Renders the tests table
      */
     renderTable() {
         const tbody = document.getElementById('kc-results-tbody');
         if (!tbody) return;
 
-        if (this.results.length === 0) {
+        if (this.testsWithStats.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="empty-state">Keine Ergebnisse gefunden</td>
+                    <td colspan="7" class="empty-state">Keine Tests gefunden</td>
                 </tr>
             `;
             return;
         }
 
-        tbody.innerHTML = this.results.map(result => this.renderResultRow(result)).join('');
+        tbody.innerHTML = this.testsWithStats.map(test => this.renderTestRow(test)).join('');
 
         // Bind click handlers
         tbody.querySelectorAll('.btn-view').forEach(btn => {
-            btn.addEventListener('click', () => this.viewResult(btn.dataset.id));
+            btn.addEventListener('click', () => this.viewTestResults(btn.dataset.id));
         });
 
-        tbody.querySelectorAll('.btn-delete').forEach(btn => {
-            btn.addEventListener('click', () => this.deleteResult(btn.dataset.id));
+        tbody.querySelectorAll('.btn-assign').forEach(btn => {
+            btn.addEventListener('click', () => this.assignTest(btn.dataset.id));
         });
     },
 
     /**
-     * Renders a single result row
+     * Renders a single test row
+     */
+    renderTestRow(test) {
+        const hasCompletions = test.completedCount > 0;
+        const avgScoreDisplay = test.avgScore !== null ? `${test.avgScore}%` : '-';
+        const passRate = test.totalResults > 0 ? `${Math.round((test.passedCount / test.totalResults) * 100)}%` : '-';
+        
+        // Determine status
+        let status, statusClass;
+        if (test.assignedCount === 0) {
+            status = 'Nicht zugewiesen';
+            statusClass = 'badge-secondary';
+        } else if (test.pendingCount > 0 && test.completedCount === 0) {
+            status = 'Ausstehend';
+            statusClass = 'badge-warning';
+        } else if (test.pendingCount > 0) {
+            status = 'In Bearbeitung';
+            statusClass = 'badge-info';
+        } else {
+            status = 'Abgeschlossen';
+            statusClass = 'badge-success';
+        }
+
+        const canAssign = Permissions.has('kc_assign_tests');
+
+        return `
+            <tr>
+                <td><strong>${Helpers.escapeHtml(test.testNumber)}</strong></td>
+                <td>${Helpers.escapeHtml(test.name)}</td>
+                <td>
+                    <span class="assignment-count">
+                        <strong>${test.assignedCount}</strong> zugewiesen
+                        ${test.pendingCount > 0 ? `<span class="text-muted">(${test.pendingCount} ausstehend)</span>` : ''}
+                    </span>
+                </td>
+                <td>${avgScoreDisplay}</td>
+                <td><span class="badge ${statusClass}">${status}</span></td>
+                <td>${Helpers.formatDate(test.createdAt)}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-icon btn-view" data-id="${test.id}" title="Ergebnisse anzeigen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        ${canAssign ? `
+                            <button class="btn-icon btn-assign" data-id="${test.id}" title="Test zuweisen">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="8.5" cy="7" r="4"></circle>
+                                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    },
+
+    /**
+     * Shows results for a specific test
+     */
+    async viewTestResults(testId) {
+        const test = this.testsWithStats.find(t => t.id === testId);
+        if (!test) return;
+
+        try {
+            // Load results for this test
+            const result = await window.api.knowledgeCheck.getResults({ testId });
+            if (!result.success) {
+                Toast.error('Ergebnisse konnten nicht geladen werden');
+                return;
+            }
+
+            // Load assignments for this test
+            const assignmentsResult = await window.api.knowledgeCheck.getAssignments({ testId });
+            const assignments = assignmentsResult.success ? assignmentsResult.assignments : [];
+
+            // Build content showing assignments and their status
+            let contentHtml = `
+                <div class="test-results-detail">
+                    <div class="test-detail-header">
+                        <h3>${Helpers.escapeHtml(test.testNumber)} - ${Helpers.escapeHtml(test.name)}</h3>
+                        <div class="test-stats-row">
+                            <span><strong>${test.assignedCount}</strong> zugewiesen</span>
+                            <span><strong>${test.completedCount}</strong> abgeschlossen</span>
+                            <span><strong>${test.pendingCount}</strong> ausstehend</span>
+                            ${test.avgScore !== null ? `<span>Durchschnitt: <strong>${test.avgScore}%</strong></span>` : ''}
+                        </div>
+                    </div>
+                    <div class="assignments-list">
+                        <h4>Zuweisungen</h4>
+                        ${assignments.length === 0 ? '<p class="empty-state">Keine Zuweisungen</p>' : `
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Benutzer</th>
+                                        <th>Zugewiesen am</th>
+                                        <th>Fällig</th>
+                                        <th>Status</th>
+                                        <th>Ergebnis</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${assignments.map(a => {
+                                        const matchingResult = result.results.find(r => r.userId === a.userId);
+                                        const statusClass = a.status === 'completed' ? 'badge-success' : 'badge-warning';
+                                        const statusText = a.status === 'completed' ? 'Abgeschlossen' : 'Ausstehend';
+                                        return `
+                                            <tr>
+                                                <td>${Helpers.escapeHtml(a.userName)}</td>
+                                                <td>${Helpers.formatDate(a.createdAt)}</td>
+                                                <td>${a.dueDate ? Helpers.formatDate(a.dueDate) : '-'}</td>
+                                                <td><span class="badge ${statusClass}">${statusText}</span></td>
+                                                <td>${matchingResult ? `${matchingResult.percentage}% ${matchingResult.passed ? '✓' : '✗'}` : '-'}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        `}
+                    </div>
+                </div>
+            `;
+
+            const template = document.createElement('template');
+            template.innerHTML = contentHtml.trim();
+            const content = template.content.firstElementChild;
+
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.justifyContent = 'flex-end';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.textContent = 'Schließen';
+            closeBtn.addEventListener('click', () => Modal.close());
+            footer.appendChild(closeBtn);
+
+            Modal.open({
+                title: 'Test Ergebnisse',
+                content,
+                footer,
+                size: 'lg'
+            });
+        } catch (error) {
+            console.error('View test results error:', error);
+            Toast.error('Fehler beim Laden der Ergebnisse');
+        }
+    },
+
+    /**
+     * Shows form to assign a test
+     */
+    async assignTest(testId) {
+        const test = this.testsWithStats.find(t => t.id === testId);
+        if (!test) return;
+
+        // Build assignment form with multi-user selection
+        const formHtml = `
+            <div class="assign-test-form">
+                <div class="form-group">
+                    <label>Test</label>
+                    <input type="text" class="form-input" value="${Helpers.escapeHtml(test.testNumber)} - ${Helpers.escapeHtml(test.name)}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Benutzer auswählen *</label>
+                    <div style="margin-bottom: var(--space-xs);">
+                        <button type="button" class="btn btn-sm btn-secondary" id="assign-select-all">Alle</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="assign-deselect-all">Keine</button>
+                    </div>
+                    <div class="user-checkboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: var(--space-sm);">
+                        ${this.users.map(u => `
+                            <label class="form-checkbox" style="display: flex; padding: var(--space-xs) 0;">
+                                <input type="checkbox" name="assignUserIds" value="${u.id}">
+                                <span>${Helpers.escapeHtml(u.firstName)} ${Helpers.escapeHtml(u.lastName)}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="assign-due-date">Fälligkeitsdatum (optional)</label>
+                    <input type="date" id="assign-due-date" class="form-input">
+                </div>
+            </div>
+        `;
+
+        const template = document.createElement('template');
+        template.innerHTML = formHtml.trim();
+        const content = template.content.firstElementChild;
+
+        const footer = document.createElement('div');
+        footer.style.display = 'flex';
+        footer.style.gap = 'var(--space-sm)';
+        footer.style.justifyContent = 'flex-end';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-secondary';
+        cancelBtn.textContent = 'Abbrechen';
+        cancelBtn.addEventListener('click', () => Modal.close());
+
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'btn btn-primary';
+        submitBtn.textContent = 'Zuweisen';
+
+        footer.appendChild(cancelBtn);
+        footer.appendChild(submitBtn);
+
+        Modal.open({
+            title: `Test zuweisen: ${test.testNumber}`,
+            content,
+            footer,
+            size: 'default'
+        });
+
+        // Select all / deselect all
+        document.getElementById('assign-select-all')?.addEventListener('click', () => {
+            document.querySelectorAll('input[name="assignUserIds"]').forEach(cb => cb.checked = true);
+        });
+        document.getElementById('assign-deselect-all')?.addEventListener('click', () => {
+            document.querySelectorAll('input[name="assignUserIds"]').forEach(cb => cb.checked = false);
+        });
+
+        // Submit handler
+        submitBtn.addEventListener('click', async () => {
+            const selectedUsers = Array.from(document.querySelectorAll('input[name="assignUserIds"]:checked')).map(cb => cb.value);
+            const dueDate = document.getElementById('assign-due-date')?.value || null;
+
+            if (selectedUsers.length === 0) {
+                Toast.error('Bitte wählen Sie mindestens einen Benutzer');
+                return;
+            }
+
+            let successCount = 0;
+            for (const userId of selectedUsers) {
+                try {
+                    const response = await window.api.knowledgeCheck.createAssignment({
+                        testId: test.id,
+                        userId,
+                        dueDate
+                    });
+                    if (response && response.success) successCount++;
+                } catch (error) {
+                    console.error('Assignment error:', error);
+                }
+            }
+
+            Modal.close();
+
+            if (successCount > 0) {
+                Toast.success(`Test wurde ${successCount} Benutzer(n) zugewiesen`);
+                await this.loadTestsWithStats();
+            } else {
+                Toast.error('Fehler beim Zuweisen');
+            }
+        });
+    },
+
+    /**
+     * Legacy: Renders a single result row (kept for compatibility)
      */
     renderResultRow(result) {
         const scoreClass = result.passed ? 'score-pass' : 'score-fail';
@@ -283,27 +461,26 @@ const KCResultsView = {
     },
 
     /**
-     * Shows form to create a new test result
+     * Shows form to assign a test to users
      */
     async showNewResultForm() {
         // Check permissions
-        const canConduct = Permissions.canCreate('kcResult');
         const canAssign = Permissions.has('kc_assign_tests');
         
-        if (!canConduct && !canAssign) {
-            Toast.error('Keine Berechtigung zum Durchführen oder Zuweisen von Tests');
+        if (!canAssign) {
+            Toast.error('Keine Berechtigung zum Zuweisen von Tests');
             return;
         }
         
-        if (this.tests.length === 0) {
+        if (this.testsWithStats.length === 0) {
             Toast.error('Keine Tests verfügbar. Erstellen Sie zuerst einen Test.');
             return;
         }
 
-        const tests = this.tests.filter(t => t.isActive);
+        const tests = this.testsWithStats.filter(t => t.isActive);
         const users = this.users;
 
-        // Build custom form with mode selection and multi-user support for assign mode
+        // Build form for multi-user assignment
         const formHtml = `
             <div class="new-test-form">
                 <div class="form-group">
@@ -314,33 +491,13 @@ const KCResultsView = {
                     </select>
                 </div>
                 
-                ${canConduct && canAssign ? `
-                    <div class="form-group">
-                        <label for="new-test-mode">Aktion</label>
-                        <select id="new-test-mode" class="form-select">
-                            <option value="conduct">Jetzt durchführen (1 Benutzer)</option>
-                            <option value="assign">Benutzer zuweisen (mehrere möglich)</option>
-                        </select>
-                    </div>
-                ` : ''}
-                
-                <!-- Single user selection for conduct mode -->
-                <div id="single-user-section" class="form-group" ${!canConduct ? 'style="display:none"' : ''}>
-                    <label for="new-test-user">Benutzer *</label>
-                    <select id="new-test-user" class="form-select">
-                        <option value="">Benutzer auswählen</option>
-                        ${users.map(u => `<option value="${u.id}">${Helpers.escapeHtml(u.firstName)} ${Helpers.escapeHtml(u.lastName)}</option>`).join('')}
-                    </select>
-                </div>
-                
-                <!-- Multi-user selection for assign mode -->
-                <div id="multi-user-section" class="form-group" style="display: ${!canConduct && canAssign ? 'block' : 'none'}">
+                <div class="form-group">
                     <label>Benutzer auswählen *</label>
                     <div style="margin-bottom: var(--space-xs);">
                         <button type="button" class="btn btn-sm btn-secondary" id="new-test-select-all">Alle</button>
                         <button type="button" class="btn btn-sm btn-secondary" id="new-test-deselect-all">Keine</button>
                     </div>
-                    <div class="user-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: var(--space-sm);">
+                    <div class="user-checkboxes" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: var(--space-sm);">
                         ${users.map(u => `
                             <label class="form-checkbox" style="display: flex; padding: var(--space-xs) 0;">
                                 <input type="checkbox" name="assignUserIds" value="${u.id}">
@@ -350,8 +507,7 @@ const KCResultsView = {
                     </div>
                 </div>
                 
-                <!-- Due date for assignment -->
-                <div id="due-date-section" class="form-group" style="display: ${!canConduct && canAssign ? 'block' : 'none'}">
+                <div class="form-group">
                     <label for="new-test-due-date">Fälligkeitsdatum (optional)</label>
                     <input type="date" id="new-test-due-date" class="form-input">
                 </div>
@@ -374,33 +530,17 @@ const KCResultsView = {
 
         const submitBtn = document.createElement('button');
         submitBtn.className = 'btn btn-primary';
-        submitBtn.textContent = canConduct ? 'Weiter' : 'Zuweisen';
+        submitBtn.textContent = 'Zuweisen';
 
         footer.appendChild(cancelBtn);
         footer.appendChild(submitBtn);
 
         Modal.open({
-            title: 'Neuer Test',
+            title: 'Test zuweisen',
             content,
             footer,
             size: 'default'
         });
-
-        // Toggle visibility based on mode
-        const modeSelect = document.getElementById('new-test-mode');
-        const singleUserSection = document.getElementById('single-user-section');
-        const multiUserSection = document.getElementById('multi-user-section');
-        const dueDateSection = document.getElementById('due-date-section');
-
-        if (modeSelect) {
-            modeSelect.addEventListener('change', () => {
-                const isAssign = modeSelect.value === 'assign';
-                singleUserSection.style.display = isAssign ? 'none' : 'block';
-                multiUserSection.style.display = isAssign ? 'block' : 'none';
-                dueDateSection.style.display = isAssign ? 'block' : 'none';
-                submitBtn.textContent = isAssign ? 'Zuweisen' : 'Test starten';
-            });
-        }
 
         // Select all / deselect all
         document.getElementById('new-test-select-all')?.addEventListener('click', () => {
@@ -418,57 +558,35 @@ const KCResultsView = {
                 return;
             }
 
-            const mode = modeSelect?.value || (canConduct ? 'conduct' : 'assign');
+            const selectedUsers = Array.from(document.querySelectorAll('input[name="assignUserIds"]:checked')).map(cb => cb.value);
+            const dueDate = document.getElementById('new-test-due-date')?.value || null;
 
-            if (mode === 'assign') {
-                // Assign to multiple users
-                const selectedUsers = Array.from(document.querySelectorAll('input[name="assignUserIds"]:checked')).map(cb => cb.value);
-                const dueDate = document.getElementById('new-test-due-date')?.value || null;
+            if (selectedUsers.length === 0) {
+                Toast.error('Bitte wählen Sie mindestens einen Benutzer');
+                return;
+            }
 
-                if (selectedUsers.length === 0) {
-                    Toast.error('Bitte wählen Sie mindestens einen Benutzer');
-                    return;
+            let successCount = 0;
+            for (const userId of selectedUsers) {
+                try {
+                    const response = await window.api.knowledgeCheck.createAssignment({
+                        testId,
+                        userId,
+                        dueDate
+                    });
+                    if (response && response.success) successCount++;
+                } catch (error) {
+                    console.error('Assignment error:', error);
                 }
+            }
 
-                let successCount = 0;
-                let errorCount = 0;
+            Modal.close();
 
-                for (const userId of selectedUsers) {
-                    try {
-                        const response = await window.api.knowledgeCheck.createAssignment({
-                            testId,
-                            userId,
-                            dueDate
-                        });
-                        if (response && response.success) {
-                            successCount++;
-                        } else {
-                            errorCount++;
-                        }
-                    } catch (error) {
-                        errorCount++;
-                    }
-                }
-
-                Modal.close();
-
-                if (successCount > 0 && errorCount === 0) {
-                    Toast.success(`Test wurde ${successCount} Benutzer(n) zugewiesen`);
-                } else if (successCount > 0) {
-                    Toast.warning(`${successCount} zugewiesen, ${errorCount} fehlgeschlagen`);
-                } else {
-                    Toast.error('Fehler beim Zuweisen');
-                }
+            if (successCount > 0) {
+                Toast.success(`Test wurde ${successCount} Benutzer(n) zugewiesen`);
+                await this.loadTestsWithStats();
             } else {
-                // Conduct immediately
-                const userId = document.getElementById('new-test-user')?.value;
-                if (!userId) {
-                    Toast.error('Bitte wählen Sie einen Benutzer');
-                    return;
-                }
-
-                Modal.close();
-                await this.startTest(testId, userId);
+                Toast.error('Fehler beim Zuweisen');
             }
         });
     },

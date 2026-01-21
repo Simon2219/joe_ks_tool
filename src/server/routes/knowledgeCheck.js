@@ -312,6 +312,20 @@ router.get('/tests', requirePermission('kc_tests_view'), (req, res) => {
 });
 
 /**
+ * GET /api/knowledge-check/tests-with-stats
+ * Gets all tests with assignment and result statistics
+ */
+router.get('/tests-with-stats', requirePermission('kc_results_view'), (req, res) => {
+    try {
+        const tests = KnowledgeCheckSystem.getTestsWithStats(req.query);
+        res.json({ success: true, tests });
+    } catch (error) {
+        console.error('Get KC tests with stats error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch tests with statistics' });
+    }
+});
+
+/**
  * GET /api/knowledge-check/tests/:id
  */
 router.get('/tests/:id', requirePermission('kc_tests_view'), (req, res) => {

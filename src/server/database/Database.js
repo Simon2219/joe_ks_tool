@@ -1788,6 +1788,59 @@ const KnowledgeCheckSystem = {
         }));
     },
 
+    /**
+     * Gets all tests with assignment and result statistics
+     */
+    getTestsWithStats(filters = {}) {
+        let sql = `
+            SELECT t.*, 
+                c.name as category_name,
+                (SELECT COUNT(*) FROM kc_test_questions WHERE test_id = t.id) as question_count,
+                (SELECT COUNT(*) FROM kc_test_assignments WHERE test_id = t.id) as assigned_count,
+                (SELECT COUNT(*) FROM kc_test_assignments WHERE test_id = t.id AND status = 'pending') as pending_count,
+                (SELECT COUNT(*) FROM kc_test_assignments WHERE test_id = t.id AND status = 'completed') as completed_count,
+                (SELECT AVG(percentage) FROM kc_test_results WHERE test_id = t.id) as avg_score,
+                (SELECT COUNT(*) FROM kc_test_results WHERE test_id = t.id AND passed = 1) as passed_count,
+                (SELECT COUNT(*) FROM kc_test_results WHERE test_id = t.id) as total_results
+            FROM kc_tests t 
+            LEFT JOIN kc_test_categories c ON t.category_id = c.id 
+            WHERE t.is_archived = 0
+        `;
+        const params = [];
+        
+        if (filters.categoryId) {
+            sql += ' AND t.category_id = ?';
+            params.push(filters.categoryId);
+        }
+        if (filters.isActive !== undefined) {
+            sql += ' AND t.is_active = ?';
+            params.push(filters.isActive ? 1 : 0);
+        }
+        
+        sql += ' ORDER BY t.created_at DESC';
+        
+        return all(sql, params).map(t => ({
+            id: t.id,
+            testNumber: t.test_number,
+            name: t.name,
+            description: t.description,
+            categoryId: t.category_id,
+            categoryName: t.category_name || 'Uncategorized',
+            timeLimitMinutes: t.time_limit_minutes,
+            passingScore: t.passing_score,
+            isActive: !!t.is_active,
+            questionCount: t.question_count || 0,
+            assignedCount: t.assigned_count || 0,
+            pendingCount: t.pending_count || 0,
+            completedCount: t.completed_count || 0,
+            avgScore: t.avg_score ? Math.round(t.avg_score) : null,
+            passedCount: t.passed_count || 0,
+            totalResults: t.total_results || 0,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at
+        }));
+    },
+
     getTestById(id) {
         const test = get(`
             SELECT t.*, c.name as category_name
