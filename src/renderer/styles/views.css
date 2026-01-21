@@ -1725,17 +1725,12 @@
     stroke: var(--danger);
 }
 
-.assignment-card-meta .meta-item .result-score {
-    font-weight: var(--font-semibold);
+.assignment-card-meta .meta-item .result-label {
     margin-left: var(--space-xs);
 }
 
-.assignment-card-meta .meta-item .result-score.passed {
-    color: var(--color-success);
-}
-
-.assignment-card-meta .meta-item .result-score.failed {
-    color: var(--color-danger);
+.assignment-card-meta .meta-item .badge {
+    margin-left: var(--space-xs);
 }
 
 .assignment-notes {

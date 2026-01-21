@@ -159,9 +159,8 @@ const KCAssignedView = {
                         </svg>
                         <span>Bestehensgrenze: ${assignment.passingScore}%</span>
                         ${!isPending && assignment.resultPercentage !== undefined ? `
-                            <span class="result-score ${assignment.resultPassed ? 'passed' : 'failed'}">
-                                · Ergebnis: ${assignment.resultPercentage}%
-                            </span>
+                            <span class="result-label">· Ergebnis:</span>
+                            <span class="badge ${assignment.resultPassed ? 'badge-success' : 'badge-danger'}">${assignment.resultPercentage}%</span>
                         ` : ''}
                     </div>
                     ${assignment.timeLimitMinutes ? `
