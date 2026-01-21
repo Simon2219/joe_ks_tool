@@ -2104,11 +2104,96 @@ const KnowledgeCheckSystem = {
     getArchiveStatistics() {
         const archivedQuestions = get('SELECT COUNT(*) as count FROM kc_questions WHERE is_archived = 1');
         const archivedTests = get('SELECT COUNT(*) as count FROM kc_tests WHERE is_archived = 1');
+        const archivedRuns = get('SELECT COUNT(*) as count FROM kc_test_runs WHERE is_archived = 1 OR status = ?', ['archived']);
         
         return {
             archivedQuestions: archivedQuestions?.count || 0,
-            archivedTests: archivedTests?.count || 0
+            archivedTests: archivedTests?.count || 0,
+            archivedRuns: archivedRuns?.count || 0
         };
+    },
+
+    /**
+     * Gets all archived test runs
+     */
+    getArchivedTestRuns() {
+        const runs = all(`
+            SELECT r.*,
+                COALESCE(cb.first_name || ' ' || cb.last_name, r.created_by) as created_by_name,
+                (SELECT COUNT(DISTINCT trt.test_id) FROM kc_test_run_tests trt WHERE trt.run_id = r.id) as test_count,
+                (SELECT COUNT(DISTINCT a.user_id) FROM kc_test_assignments a WHERE a.run_id = r.id) as user_count,
+                (SELECT COUNT(*) FROM kc_test_assignments a WHERE a.run_id = r.id) as total_assignments,
+                (SELECT COUNT(*) FROM kc_test_assignments a WHERE a.run_id = r.id AND a.status = 'completed') as completed_count
+            FROM kc_test_runs r
+            LEFT JOIN users cb ON r.created_by = cb.id
+            WHERE r.is_archived = 1 OR r.status = ?
+            ORDER BY r.archived_at DESC, r.updated_at DESC
+        `, ['archived']);
+        
+        return runs.map(r => ({
+            id: r.id,
+            runNumber: r.run_number,
+            name: r.name,
+            description: r.description,
+            dueDate: r.due_date,
+            status: r.status,
+            isArchived: true,
+            archivedAt: r.archived_at,
+            createdBy: r.created_by,
+            createdByName: r.created_by_name,
+            notes: r.notes,
+            testCount: r.test_count || 0,
+            userCount: r.user_count || 0,
+            totalAssignments: r.total_assignments || 0,
+            completedCount: r.completed_count || 0,
+            createdAt: r.created_at,
+            updatedAt: r.updated_at
+        }));
+    },
+
+    /**
+     * Restores a test run from archive
+     */
+    restoreTestRun(id) {
+        const testRun = get('SELECT * FROM kc_test_runs WHERE id = ?', [id]);
+        if (!testRun) return null;
+        
+        const now = new Date().toISOString();
+        run('UPDATE kc_test_runs SET is_archived = 0, archived_at = NULL, status = ?, updated_at = ? WHERE id = ?', 
+            ['completed', now, id]);
+        saveDb();
+        return this.getTestRunById(id);
+    },
+
+    /**
+     * Permanently deletes an archived test run and all associated data
+     */
+    permanentDeleteTestRun(id) {
+        // Only allow permanent delete for archived test runs
+        const testRun = get('SELECT is_archived, status FROM kc_test_runs WHERE id = ?', [id]);
+        if (!testRun || (!testRun.is_archived && testRun.status !== 'archived')) {
+            return { success: false, error: 'Test run must be archived before permanent deletion' };
+        }
+        
+        // Delete all results for assignments in this run
+        run(`DELETE FROM kc_test_answers WHERE result_id IN (
+            SELECT tr.id FROM kc_test_results tr 
+            INNER JOIN kc_test_assignments a ON tr.id = a.result_id 
+            WHERE a.run_id = ?
+        )`, [id]);
+        
+        run(`DELETE FROM kc_test_results WHERE id IN (
+            SELECT result_id FROM kc_test_assignments WHERE run_id = ? AND result_id IS NOT NULL
+        )`, [id]);
+        
+        // Delete assignments
+        run('DELETE FROM kc_test_assignments WHERE run_id = ?', [id]);
+        // Delete test links
+        run('DELETE FROM kc_test_run_tests WHERE run_id = ?', [id]);
+        // Delete the run
+        run('DELETE FROM kc_test_runs WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
     },
 
     // ============================================

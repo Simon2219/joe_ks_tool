@@ -1,11 +1,12 @@
 /**
  * KC Archive View
- * Shows archived questions and tests
+ * Shows archived questions, tests, and test runs
  */
 
 const KCArchiveView = {
     archivedQuestions: [],
     archivedTests: [],
+    archivedRuns: [],
     currentTab: 'questions',
 
     /**
@@ -16,6 +17,7 @@ const KCArchiveView = {
         await this.loadStats();
         await this.loadArchivedQuestions();
         await this.loadArchivedTests();
+        await this.loadArchivedRuns();
         this.renderCurrentTab();
     },
 
@@ -45,6 +47,7 @@ const KCArchiveView = {
         // Update content visibility
         document.getElementById('archive-questions-content').classList.toggle('hidden', tabName !== 'questions');
         document.getElementById('archive-tests-content').classList.toggle('hidden', tabName !== 'tests');
+        document.getElementById('archive-runs-content').classList.toggle('hidden', tabName !== 'runs');
         
         this.renderCurrentTab();
     },
@@ -58,6 +61,7 @@ const KCArchiveView = {
             if (result.success) {
                 document.getElementById('archive-questions-count').textContent = result.statistics.archivedQuestions;
                 document.getElementById('archive-tests-count').textContent = result.statistics.archivedTests;
+                document.getElementById('archive-runs-count').textContent = result.statistics.archivedRuns || 0;
             }
         } catch (error) {
             console.error('Failed to load archive stats:', error);
@@ -95,13 +99,30 @@ const KCArchiveView = {
     },
 
     /**
+     * Loads archived test runs
+     */
+    async loadArchivedRuns() {
+        try {
+            const result = await window.api.knowledgeCheck.getArchivedTestRuns();
+            if (result.success) {
+                this.archivedRuns = result.runs;
+            }
+        } catch (error) {
+            console.error('Failed to load archived test runs:', error);
+            Toast.error('Archivierte Testdurchläufe konnten nicht geladen werden');
+        }
+    },
+
+    /**
      * Renders the current tab
      */
     renderCurrentTab() {
         if (this.currentTab === 'questions') {
             this.renderArchivedQuestions();
-        } else {
+        } else if (this.currentTab === 'tests') {
             this.renderArchivedTests();
+        } else if (this.currentTab === 'runs') {
+            this.renderArchivedRuns();
         }
     },
 
@@ -266,6 +287,87 @@ const KCArchiveView = {
     },
 
     /**
+     * Renders archived test runs
+     */
+    renderArchivedRuns() {
+        const container = document.getElementById('archive-runs-list');
+        if (!container) return;
+
+        if (this.archivedRuns.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5;">
+                        <path d="M21 8v13H3V8"></path>
+                        <path d="M1 3h22v5H1z"></path>
+                        <path d="M10 12h4"></path>
+                    </svg>
+                    <h3>Keine archivierten Testdurchläufe</h3>
+                    <p>Testdurchläufe werden automatisch archiviert wenn sie gelöscht werden und Testergebnisse vorhanden sind.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const canRestore = Permissions.canRestoreFromArchive();
+        const canDelete = Permissions.canPermanentDelete();
+
+        const html = this.archivedRuns.map(r => `
+            <div class="archive-item" data-id="${r.id}">
+                <div class="archive-item-content">
+                    <div class="archive-item-header">
+                        <strong>${Helpers.escapeHtml(r.runNumber)} - ${Helpers.escapeHtml(r.name)}</strong>
+                    </div>
+                    ${r.description ? `<p class="archive-item-text">${Helpers.escapeHtml(Helpers.truncate(r.description, 150))}</p>` : ''}
+                    <div class="archive-item-meta">
+                        <span>${r.testCount} Tests</span>
+                        <span>${r.userCount} Teilnehmer</span>
+                        <span>${r.completedCount}/${r.totalAssignments} abgeschlossen</span>
+                        <span>Archiviert: ${Helpers.formatDate(r.archivedAt)}</span>
+                    </div>
+                </div>
+                <div class="archive-item-actions">
+                    ${canRestore ? `
+                        <button class="btn btn-sm btn-secondary restore-run" data-id="${r.id}" title="Wiederherstellen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                            Wiederherstellen
+                        </button>
+                    ` : ''}
+                    ${canDelete ? `
+                        <button class="btn btn-sm btn-danger delete-run-permanent" data-id="${r.id}" title="Endgültig löschen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                            Löschen
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+
+        container.innerHTML = html;
+        this.bindRunActions();
+    },
+
+    /**
+     * Binds test run action handlers
+     */
+    bindRunActions() {
+        document.querySelectorAll('.restore-run').forEach(btn => {
+            btn.addEventListener('click', () => this.restoreTestRun(btn.dataset.id));
+        });
+        
+        document.querySelectorAll('.delete-run-permanent').forEach(btn => {
+            btn.addEventListener('click', () => this.permanentDeleteTestRun(btn.dataset.id));
+        });
+    },
+
+    /**
      * Restores a question from archive
      */
     async restoreQuestion(id) {
@@ -382,12 +484,71 @@ const KCArchiveView = {
     },
 
     /**
+     * Restores a test run from archive
+     */
+    async restoreTestRun(id) {
+        const confirmed = await Modal.confirm({
+            title: 'Testdurchlauf wiederherstellen',
+            message: 'Möchten Sie diesen Testdurchlauf aus dem Archiv wiederherstellen? Er wird wieder in der Durchlauf-Liste sichtbar sein.',
+            confirmText: 'Wiederherstellen',
+            confirmClass: 'btn-primary'
+        });
+
+        if (confirmed) {
+            try {
+                const result = await window.api.knowledgeCheck.restoreTestRun(id);
+                if (result.success) {
+                    Toast.success('Testdurchlauf wiederhergestellt');
+                    await this.loadStats();
+                    await this.loadArchivedRuns();
+                    this.renderArchivedRuns();
+                } else {
+                    Toast.error(result.error || 'Fehler beim Wiederherstellen');
+                }
+            } catch (error) {
+                console.error('Restore test run error:', error);
+                Toast.error('Fehler beim Wiederherstellen');
+            }
+        }
+    },
+
+    /**
+     * Permanently deletes a test run
+     */
+    async permanentDeleteTestRun(id) {
+        const confirmed = await Modal.confirm({
+            title: 'Testdurchlauf endgültig löschen',
+            message: 'ACHTUNG: Diese Aktion kann nicht rückgängig gemacht werden! Der Testdurchlauf, alle Zuweisungen und Ergebnisse werden unwiderruflich gelöscht.',
+            confirmText: 'Endgültig löschen',
+            confirmClass: 'btn-danger'
+        });
+
+        if (confirmed) {
+            try {
+                const result = await window.api.knowledgeCheck.permanentDeleteTestRun(id);
+                if (result.success) {
+                    Toast.success('Testdurchlauf endgültig gelöscht');
+                    await this.loadStats();
+                    await this.loadArchivedRuns();
+                    this.renderArchivedRuns();
+                } else {
+                    Toast.error(result.error || 'Fehler beim Löschen');
+                }
+            } catch (error) {
+                console.error('Permanent delete test run error:', error);
+                Toast.error('Fehler beim Löschen');
+            }
+        }
+    },
+
+    /**
      * Refreshes the view
      */
     async refresh() {
         await this.loadStats();
         await this.loadArchivedQuestions();
         await this.loadArchivedTests();
+        await this.loadArchivedRuns();
         this.renderCurrentTab();
     }
 };

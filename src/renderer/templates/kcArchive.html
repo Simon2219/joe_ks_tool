@@ -7,7 +7,7 @@
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                Archivierte Elemente werden automatisch erstellt wenn Fragen oder Tests mit bestehenden Ergebnissen gelöscht werden
+                Archivierte Elemente werden automatisch erstellt wenn Fragen, Tests oder Testdurchläufe mit bestehenden Ergebnissen gelöscht werden
             </span>
         </div>
     </div>
@@ -20,12 +20,17 @@
             <span class="stat-value" id="archive-tests-count">0</span>
             <span class="stat-label">Archivierte Tests</span>
         </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="archive-runs-count">0</span>
+            <span class="stat-label">Archivierte Durchläufe</span>
+        </div>
     </div>
     
     <!-- Archive Tabs -->
     <div class="archive-tabs">
         <button class="archive-tab active" data-tab="questions">Fragen</button>
         <button class="archive-tab" data-tab="tests">Tests</button>
+        <button class="archive-tab" data-tab="runs">Testdurchläufe</button>
     </div>
     
     <!-- Archived Questions -->
@@ -39,6 +44,13 @@
     <div class="archive-content hidden" id="archive-tests-content">
         <div id="archive-tests-list" class="archive-list">
             <!-- Archived tests will be rendered here -->
+        </div>
+    </div>
+    
+    <!-- Archived Test Runs -->
+    <div class="archive-content hidden" id="archive-runs-content">
+        <div id="archive-runs-list" class="archive-list">
+            <!-- Archived test runs will be rendered here -->
         </div>
     </div>
 </section>
