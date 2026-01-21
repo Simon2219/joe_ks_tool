@@ -775,7 +775,8 @@ router.get('/assignments/:id/take-test', requirePermission('kc_assigned_view'), 
             if (question) {
                 questions.push({
                     ...question,
-                    effectiveWeighting: tq.customWeighting || question.weighting || question.categoryWeighting || 1
+                    // Use weighting override from test-question link, or fall back to question's effective weighting
+                    effectiveWeighting: tq.weightingOverride || question.effectiveWeighting || 1
                 });
             }
         }

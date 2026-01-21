@@ -564,6 +564,16 @@ function runMigrations(database) {
         database.run('ALTER TABLE kc_test_answers ADD COLUMN option_details TEXT DEFAULT \'[]\'');
     }
     
+    // Migration 6: Add is_archived and archived_at to kc_test_runs
+    if (!columnExists('kc_test_runs', 'is_archived')) {
+        console.log('Adding is_archived column to kc_test_runs...');
+        database.run('ALTER TABLE kc_test_runs ADD COLUMN is_archived INTEGER DEFAULT 0');
+    }
+    if (!columnExists('kc_test_runs', 'archived_at')) {
+        console.log('Adding archived_at column to kc_test_runs...');
+        database.run('ALTER TABLE kc_test_runs ADD COLUMN archived_at TEXT DEFAULT NULL');
+    }
+    
     // Note: Migration for orphaned assignments is now manual - run from Admin Panel
     
     console.log('Database migrations completed');
@@ -2135,7 +2145,18 @@ const KnowledgeCheckSystem = {
         `;
         const params = [];
         
-        if (filters.status) {
+        // Filter out archived runs by default
+        if (filters.includeArchived) {
+            // Include all
+        } else if (filters.archivedOnly) {
+            sql += ' AND (r.is_archived = 1 OR r.status = ?)';
+            params.push('archived');
+        } else {
+            sql += ' AND (r.is_archived = 0 OR r.is_archived IS NULL) AND r.status != ?';
+            params.push('archived');
+        }
+        
+        if (filters.status && filters.status !== 'archived') {
             sql += ' AND r.status = ?';
             params.push(filters.status);
         }
@@ -2153,6 +2174,8 @@ const KnowledgeCheckSystem = {
             description: r.description,
             dueDate: r.due_date,
             status: r.status,
+            isArchived: !!r.is_archived,
+            archivedAt: r.archived_at,
             createdBy: r.created_by,
             createdByName: r.created_by_name,
             notes: r.notes,
@@ -2215,6 +2238,8 @@ const KnowledgeCheckSystem = {
             description: run.description,
             dueDate: run.due_date,
             status: run.status,
+            isArchived: !!run.is_archived,
+            archivedAt: run.archived_at,
             createdBy: run.created_by,
             createdByName: run.created_by_name,
             notes: run.notes,
@@ -2306,14 +2331,28 @@ const KnowledgeCheckSystem = {
     },
 
     deleteTestRun(id) {
-        // Delete assignments first (due to foreign key)
-        run('DELETE FROM kc_test_assignments WHERE run_id = ?', [id]);
-        // Delete test links
-        run('DELETE FROM kc_test_run_tests WHERE run_id = ?', [id]);
-        // Delete the run
-        run('DELETE FROM kc_test_runs WHERE id = ?', [id]);
-        saveDb();
-        return { success: true };
+        // Check if test run has any results (completed assignments)
+        const hasResults = get(`
+            SELECT COUNT(*) as count 
+            FROM kc_test_assignments a 
+            WHERE a.run_id = ? AND a.result_id IS NOT NULL
+        `, [id]);
+        
+        if (hasResults && hasResults.count > 0) {
+            // Archive instead of delete - test run has results that users need to access
+            const now = new Date().toISOString();
+            run('UPDATE kc_test_runs SET is_archived = 1, archived_at = ?, status = ?, updated_at = ? WHERE id = ?', 
+                [now, 'archived', now, id]);
+            saveDb();
+            return { success: true, archived: true };
+        } else {
+            // Safe to delete permanently - no results exist
+            run('DELETE FROM kc_test_assignments WHERE run_id = ?', [id]);
+            run('DELETE FROM kc_test_run_tests WHERE run_id = ?', [id]);
+            run('DELETE FROM kc_test_runs WHERE id = ?', [id]);
+            saveDb();
+            return { success: true, deleted: true };
+        }
     },
 
     // ============================================
