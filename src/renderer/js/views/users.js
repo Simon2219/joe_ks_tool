@@ -398,28 +398,31 @@ const UsersView = {
      */
     async deleteUser(userId) {
         const user = this.users.find(u => u.id === userId);
-        if (!user) return;
+        if (!user) {
+            Toast.error('User not found');
+            return;
+        }
 
-        const confirmed = await Modal.confirm({
-            title: 'Delete User',
-            message: `Are you sure you want to delete "${user.firstName} ${user.lastName}"? This action cannot be undone.`,
-            confirmText: 'Delete',
-            confirmClass: 'btn-danger'
-        });
+        try {
+            const confirmed = await Modal.confirm({
+                title: 'Delete User',
+                message: `Are you sure you want to delete "${user.firstName} ${user.lastName}"? This action cannot be undone.`,
+                confirmText: 'Delete',
+                confirmClass: 'btn-danger'
+            });
 
-        if (confirmed) {
-            try {
+            if (confirmed) {
                 const result = await window.api.users.delete(userId);
-                if (result.success) {
+                if (result && result.success) {
                     Toast.success('User deleted successfully');
                     await this.loadUsers();
                 } else {
-                    Toast.error(result.error || 'Failed to delete user');
+                    Toast.error(result?.error || 'Failed to delete user');
                 }
-            } catch (error) {
-                console.error('Failed to delete user:', error);
-                Toast.error('Failed to delete user');
             }
+        } catch (error) {
+            console.error('Failed to delete user:', error);
+            Toast.error('Failed to delete user: ' + (error.message || 'Unknown error'));
         }
     },
 
