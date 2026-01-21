@@ -496,12 +496,26 @@ router.get('/results', requirePermission('kc_results_view'), (req, res) => {
 
 /**
  * GET /api/knowledge-check/results/:id
+ * Users can view their own results (with kc_assigned_view) or all results (with kc_results_view)
  */
-router.get('/results/:id', requirePermission('kc_results_view'), (req, res) => {
+router.get('/results/:id', (req, res) => {
     try {
         const result = KnowledgeCheckSystem.getResultById(req.params.id);
         if (!result) {
             return res.status(404).json({ success: false, error: 'Result not found' });
+        }
+        
+        // Check permissions: user can view their own results or needs kc_results_view for others
+        const isOwnResult = result.userId === req.user.id;
+        const hasAssignedView = hasPermission(req.user, 'kc_assigned_view');
+        const hasResultsView = hasPermission(req.user, 'kc_results_view');
+        
+        if (!isOwnResult && !hasResultsView) {
+            return res.status(403).json({ success: false, error: 'Permission denied - cannot view results for other users' });
+        }
+        
+        if (isOwnResult && !hasAssignedView && !hasResultsView) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
         }
         
         res.json({ success: true, result });
