@@ -2529,7 +2529,7 @@ const KnowledgeCheckSystem = {
         if (!result) return null;
         
         const answers = all(`
-            SELECT a.*, q.question_text, q.question_type, q.title
+            SELECT a.*, q.question_text, q.question_type, q.title, q.allow_partial_answer
             FROM kc_test_answers a
             JOIN kc_questions q ON a.question_id = q.id
             WHERE a.result_id = ?
@@ -2565,6 +2565,45 @@ const KnowledgeCheckSystem = {
                 } catch (e) {
                     optionDetails = {};
                 }
+                
+                // For multiple choice questions, populate allOptions from the question if missing
+                if (a.question_type === 'multiple_choice' && (!optionDetails.allOptions || optionDetails.allOptions.length === 0)) {
+                    // Fetch the question's options from the database
+                    const questionOptions = all(
+                        'SELECT id, option_text, is_correct FROM kc_question_options WHERE question_id = ? ORDER BY sort_order',
+                        [a.question_id]
+                    );
+                    
+                    if (questionOptions && questionOptions.length > 0) {
+                        // Build allOptions array with selection status
+                        const allOptions = questionOptions.map(opt => ({
+                            id: opt.id,
+                            text: opt.option_text,
+                            isCorrect: !!opt.is_correct,
+                            wasSelected: selectedOptions.includes(opt.id)
+                        }));
+                        
+                        // Calculate statistics
+                        let correctSelected = 0;
+                        let incorrectSelected = 0;
+                        let totalCorrectOptions = 0;
+                        
+                        allOptions.forEach(opt => {
+                            if (opt.isCorrect) totalCorrectOptions++;
+                            if (opt.wasSelected && opt.isCorrect) correctSelected++;
+                            if (opt.wasSelected && !opt.isCorrect) incorrectSelected++;
+                        });
+                        
+                        optionDetails = {
+                            allOptions,
+                            correctSelected,
+                            incorrectSelected,
+                            totalCorrectOptions,
+                            allowPartialAnswer: !!a.allow_partial_answer
+                        };
+                    }
+                }
+                
                 return {
                     id: a.id,
                     questionId: a.question_id,
