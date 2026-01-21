@@ -116,15 +116,20 @@ const KCAssignedView = {
                         <span class="assignment-test-number">${Helpers.escapeHtml(assignment.testNumber)}</span>
                         <h4>${Helpers.escapeHtml(assignment.testName)}</h4>
                     </div>
-                    ${isPending ? `
-                        <button class="btn btn-primary btn-start-test" data-id="${assignment.id}" data-test-id="${assignment.testId}">
-                            Test starten
-                        </button>
-                    ` : `
-                        <button class="btn btn-secondary btn-view-result" data-id="${assignment.id}" data-result-id="${assignment.resultId}">
-                            Ergebnis anzeigen
-                        </button>
-                    `}
+                    <div class="assignment-card-actions">
+                        ${isPending ? `
+                            <button class="btn btn-primary btn-start-test" data-id="${assignment.id}" data-test-id="${assignment.testId}">
+                                Test starten
+                            </button>
+                        ` : `
+                            ${assignment.resultPercentage !== undefined ? `
+                                <span class="result-badge ${assignment.resultPassed ? 'passed' : 'failed'}">${assignment.resultPercentage}%</span>
+                            ` : ''}
+                            <button class="btn btn-secondary btn-view-result" data-id="${assignment.id}" data-result-id="${assignment.resultId}">
+                                Ergebnis anzeigen
+                            </button>
+                        `}
+                    </div>
                 </div>
                 <div class="assignment-card-meta">
                     <div class="meta-item">
@@ -158,10 +163,6 @@ const KCAssignedView = {
                             <polyline points="14 2 14 8 20 8"></polyline>
                         </svg>
                         <span>Bestehensgrenze: ${assignment.passingScore}%</span>
-                        ${!isPending && assignment.resultPercentage !== undefined ? `
-                            <span class="result-label">· Ergebnis:</span>
-                            <span class="badge ${assignment.resultPassed ? 'badge-success' : 'badge-danger'}">${assignment.resultPercentage}%</span>
-                        ` : ''}
                     </div>
                     ${assignment.timeLimitMinutes ? `
                         <div class="meta-item">

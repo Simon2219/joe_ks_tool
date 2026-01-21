@@ -302,13 +302,13 @@ const KCQuestionsView = {
             });
         });
 
-        // Click on question to edit
+        // Click on question to view preview
         document.querySelectorAll('.kc-question-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 // Don't trigger if clicking on action buttons
                 if (e.target.closest('.kc-question-actions')) return;
                 const questionId = item.dataset.questionId;
-                if (questionId) this.editQuestion(questionId);
+                if (questionId) this.viewQuestion(questionId);
             });
             item.classList.add('clickable-row');
         });
@@ -402,17 +402,55 @@ const KCQuestionsView = {
     /**
      * Shows the category menu
      */
-    async showCategoryMenu(categoryId, buttonEl) {
+    showCategoryMenu(categoryId, buttonEl) {
         const category = this.categories.find(c => c.id === categoryId);
         if (!category) return;
+
+        const menuItems = [];
         
-        // Check if user has delete permission
-        if (!Permissions.canDelete('kcCategory')) {
-            Toast.error('Keine Berechtigung zum Löschen von Kategorien');
+        // Edit category
+        if (Permissions.canEdit('kcCategory')) {
+            menuItems.push({
+                label: 'Bearbeiten',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>`,
+                action: () => this.showCategoryForm(category)
+            });
+        }
+
+        // Delete category
+        if (Permissions.canDelete('kcCategory')) {
+            if (menuItems.length > 0) {
+                menuItems.push({ divider: true });
+            }
+            menuItems.push({
+                label: 'Löschen',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>`,
+                danger: true,
+                action: () => this.deleteCategory(categoryId)
+            });
+        }
+
+        if (menuItems.length === 0) {
+            Toast.error('Keine verfügbaren Aktionen');
             return;
         }
 
-        // Simple confirmation for delete
+        Helpers.showDropdownMenu(buttonEl, menuItems);
+    },
+
+    /**
+     * Deletes a category after confirmation
+     */
+    async deleteCategory(categoryId) {
+        const category = this.categories.find(c => c.id === categoryId);
+        if (!category) return;
+
         const confirmed = await Modal.confirm({
             title: 'Kategorie löschen',
             message: `Möchten Sie die Kategorie "${category.name}" wirklich löschen? Die Fragen werden in "Unkategorisiert" verschoben.`,
@@ -715,6 +753,110 @@ const KCQuestionsView = {
     },
 
     /**
+     * Views a question's details (preview)
+     */
+    async viewQuestion(questionId) {
+        const question = this.questions.find(q => q.id === questionId);
+        if (!question) return;
+
+        const canEdit = Permissions.canEdit('kcQuestion');
+        const typeLabels = {
+            'multiple_choice': 'Multiple Choice',
+            'open_question': 'Offene Frage'
+        };
+
+        let answerSection = '';
+        if (question.questionType === 'multiple_choice' && question.options && question.options.length > 0) {
+            answerSection = `
+                <div class="question-detail-section">
+                    <h5>Antwortmöglichkeiten</h5>
+                    <ul class="question-options-list">
+                        ${question.options.map(o => `
+                            <li class="${o.isCorrect ? 'correct' : ''}">
+                                ${o.isCorrect ? '<span class="badge badge-success">✓</span>' : '<span class="badge badge-outline">○</span>'}
+                                ${Helpers.escapeHtml(o.text)}
+                            </li>
+                        `).join('')}
+                    </ul>
+                    ${question.allowPartialAnswer ? '<p class="text-muted"><small>Teilweise Antworten erlaubt</small></p>' : ''}
+                </div>
+            `;
+        } else if (question.questionType === 'open_question') {
+            answerSection = `
+                <div class="question-detail-section">
+                    <h5>Erwartete Antwort</h5>
+                    ${question.exactAnswer ? `<p><strong>Exakte Antwort:</strong> ${Helpers.escapeHtml(question.exactAnswer)}</p>` : ''}
+                    ${question.triggerWords && question.triggerWords.length > 0 ? `
+                        <p><strong>Schlüsselwörter:</strong></p>
+                        <div class="trigger-words-display">
+                            ${question.triggerWords.map(tw => `<span class="badge badge-info">${Helpers.escapeHtml(tw)}</span>`).join(' ')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        const contentHtml = `
+            <div class="question-detail">
+                <div class="question-detail-header">
+                    ${question.title ? `<h4>${Helpers.escapeHtml(question.title)}</h4>` : ''}
+                    <p class="question-detail-text">${Helpers.escapeHtml(question.questionText)}</p>
+                </div>
+                <div class="question-detail-meta">
+                    <span class="badge badge-secondary">${typeLabels[question.questionType] || question.questionType}</span>
+                    ${question.weighting ? `<span class="badge badge-info">Gewichtung: ${question.weighting}</span>` : ''}
+                    <span class="badge badge-outline">${question.categoryName}</span>
+                </div>
+                ${answerSection}
+            </div>
+        `;
+
+        const template = document.createElement('template');
+        template.innerHTML = contentHtml.trim();
+        const content = template.content.firstElementChild;
+
+        const footer = document.createElement('div');
+        footer.style.display = 'flex';
+        footer.style.gap = 'var(--space-sm)';
+        footer.style.justifyContent = 'space-between';
+
+        const leftBtns = document.createElement('div');
+        leftBtns.style.display = 'flex';
+        leftBtns.style.gap = 'var(--space-sm)';
+
+        if (canEdit) {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn btn-primary';
+            editBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 6px;">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                Bearbeiten
+            `;
+            editBtn.addEventListener('click', () => {
+                Modal.close();
+                setTimeout(() => this.editQuestion(questionId), 250);
+            });
+            leftBtns.appendChild(editBtn);
+        }
+        footer.appendChild(leftBtns);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn btn-secondary';
+        closeBtn.textContent = 'Schließen';
+        closeBtn.addEventListener('click', () => Modal.close());
+        footer.appendChild(closeBtn);
+
+        Modal.open({
+            title: 'Frage Details',
+            content,
+            footer,
+            size: 'lg'
+        });
+    },
+
+    /**
      * Edits a question
      */
     async editQuestion(questionId) {
@@ -732,45 +874,28 @@ const KCQuestionsView = {
         if (!question) return;
 
         const currentCat = this.categories.find(c => c.id === question.categoryId);
+        const currentCategoryName = currentCat ? currentCat.name : 'Keine Kategorie';
+        const questionTitle = question.title || Helpers.truncate(question.questionText, 50);
 
-        const options = [
-            { value: '', label: 'Unkategorisiert' },
-            ...this.categories.map(c => ({ value: c.id, label: c.name }))
-        ];
-
-        const result = await Modal.form({
+        await Helpers.showMoveDialog({
             title: 'Frage verschieben',
-            fields: [
-                {
-                    name: 'info',
-                    label: `Aktuelle Kategorie: ${currentCat?.name || 'Unkategorisiert'}`,
-                    type: 'text',
-                    readonly: true,
-                    default: ''
-                },
-                {
-                    name: 'categoryId',
-                    label: 'Neue Kategorie',
-                    type: 'select',
-                    options,
-                    default: question.categoryId || ''
+            itemLabel: 'Frage',
+            itemName: questionTitle,
+            currentCategoryName,
+            categories: this.categories,
+            currentCategoryId: question.categoryId,
+            onSubmit: async (newCategoryId) => {
+                try {
+                    await window.api.knowledgeCheck.moveQuestion(questionId, newCategoryId);
+                    Toast.success('Frage verschoben');
+                    await this.loadQuestions();
+                    this.renderCatalog();
+                } catch (error) {
+                    console.error('Move question error:', error);
+                    Toast.error('Fehler beim Verschieben');
                 }
-            ],
-            submitText: 'Verschieben',
-            size: 'sm'
-        });
-
-        if (result) {
-            try {
-                await window.api.knowledgeCheck.moveQuestion(questionId, result.categoryId || null);
-                Toast.success('Frage verschoben');
-                await this.loadQuestions();
-                this.renderCatalog();
-            } catch (error) {
-                console.error('Move question error:', error);
-                Toast.error('Fehler beim Verschieben');
             }
-        }
+        });
     },
 
     /**

@@ -267,6 +267,184 @@ const Helpers = {
         span.className = 'icon';
         span.innerHTML = icons[iconName] || '';
         return span;
+    },
+
+    /**
+     * Shows a dropdown menu near an element
+     * @param {HTMLElement} anchorEl - Element to position the dropdown near
+     * @param {Array} items - Menu items [{label, icon, action, danger}]
+     * @returns {Function} - Function to close the dropdown
+     */
+    showDropdownMenu(anchorEl, items) {
+        // Remove any existing dropdown
+        const existingDropdown = document.querySelector('.dropdown-menu');
+        if (existingDropdown) {
+            existingDropdown.remove();
+        }
+
+        // Create dropdown
+        const dropdown = document.createElement('div');
+        dropdown.className = 'dropdown-menu';
+        
+        items.forEach(item => {
+            if (item.divider) {
+                const divider = document.createElement('div');
+                divider.className = 'dropdown-menu-divider';
+                dropdown.appendChild(divider);
+                return;
+            }
+
+            const btn = document.createElement('button');
+            btn.className = `dropdown-menu-item${item.danger ? ' danger' : ''}`;
+            btn.innerHTML = `
+                ${item.icon || ''}
+                <span>${item.label}</span>
+            `;
+            btn.addEventListener('click', () => {
+                closeDropdown();
+                if (item.action) item.action();
+            });
+            dropdown.appendChild(btn);
+        });
+
+        document.body.appendChild(dropdown);
+
+        // Position dropdown
+        const rect = anchorEl.getBoundingClientRect();
+        dropdown.style.top = `${rect.bottom + 4}px`;
+        dropdown.style.left = `${rect.left}px`;
+
+        // Adjust if off screen
+        setTimeout(() => {
+            const dropdownRect = dropdown.getBoundingClientRect();
+            if (dropdownRect.right > window.innerWidth) {
+                dropdown.style.left = `${rect.right - dropdownRect.width}px`;
+            }
+            if (dropdownRect.bottom > window.innerHeight) {
+                dropdown.style.top = `${rect.top - dropdownRect.height - 4}px`;
+            }
+        }, 0);
+
+        // Show dropdown with animation
+        requestAnimationFrame(() => {
+            dropdown.classList.add('show');
+        });
+
+        // Close on click outside
+        const closeDropdown = () => {
+            dropdown.classList.remove('show');
+            setTimeout(() => dropdown.remove(), 150);
+            document.removeEventListener('click', handleOutsideClick);
+        };
+
+        const handleOutsideClick = (e) => {
+            if (!dropdown.contains(e.target) && e.target !== anchorEl) {
+                closeDropdown();
+            }
+        };
+
+        // Delay attaching click listener to avoid immediate close
+        setTimeout(() => {
+            document.addEventListener('click', handleOutsideClick);
+        }, 0);
+
+        return closeDropdown;
+    },
+
+    /**
+     * Shows a reusable move dialog for moving items between categories
+     * @param {Object} options - Dialog options
+     * @param {string} options.title - Dialog title
+     * @param {string} options.itemLabel - Label for the item (e.g., "Test", "Frage")
+     * @param {string} options.itemName - Name of the item being moved
+     * @param {string} options.currentCategoryName - Current category name
+     * @param {Array} options.categories - Available categories [{id, name}]
+     * @param {string} options.currentCategoryId - Current category ID
+     * @param {Function} options.onSubmit - Callback with new category ID
+     */
+    async showMoveDialog(options) {
+        const {
+            title = 'Verschieben',
+            itemLabel = 'Element',
+            itemName = '',
+            currentCategoryName = 'Keine Kategorie',
+            categories = [],
+            currentCategoryId = null,
+            onSubmit
+        } = options;
+
+        return new Promise((resolve) => {
+            const formHtml = `
+                <div class="move-dialog">
+                    <div class="move-dialog-item">
+                        <span class="move-dialog-label">${this.escapeHtml(itemLabel)}:</span>
+                        <strong>${this.escapeHtml(itemName)}</strong>
+                    </div>
+                    <div class="move-dialog-content">
+                        <div class="move-dialog-from">
+                            <span class="move-dialog-label">Von:</span>
+                            <div class="move-dialog-category">${this.escapeHtml(currentCategoryName)}</div>
+                        </div>
+                        <div class="move-dialog-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </div>
+                        <div class="move-dialog-to">
+                            <span class="move-dialog-label">Nach:</span>
+                            <select id="move-dialog-select" class="form-select">
+                                <option value="">Keine Kategorie</option>
+                                ${categories.map(c => `
+                                    <option value="${c.id}" ${c.id === currentCategoryId ? 'disabled' : ''}>
+                                        ${this.escapeHtml(c.name)}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const template = document.createElement('template');
+            template.innerHTML = formHtml.trim();
+            const content = template.content.firstElementChild;
+
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.gap = 'var(--space-sm)';
+            footer.style.justifyContent = 'flex-end';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn btn-secondary';
+            cancelBtn.textContent = 'Abbrechen';
+            cancelBtn.addEventListener('click', () => {
+                Modal.close();
+                resolve(null);
+            });
+
+            const submitBtn = document.createElement('button');
+            submitBtn.className = 'btn btn-primary';
+            submitBtn.textContent = 'Verschieben';
+            submitBtn.addEventListener('click', async () => {
+                const newCategoryId = document.getElementById('move-dialog-select')?.value || null;
+                Modal.close();
+                if (onSubmit) {
+                    await onSubmit(newCategoryId);
+                }
+                resolve(newCategoryId);
+            });
+
+            footer.appendChild(cancelBtn);
+            footer.appendChild(submitBtn);
+
+            Modal.open({
+                title,
+                content,
+                footer,
+                size: 'default'
+            });
+        });
     }
 };
 

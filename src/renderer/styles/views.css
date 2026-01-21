@@ -908,43 +908,69 @@
     margin-bottom: var(--space-md);
 }
 
-/* Move Form */
-.move-form {
+/* Move Dialog (Reusable) */
+.move-dialog {
     display: flex;
     flex-direction: column;
     gap: var(--space-lg);
+    min-width: 400px;
 }
 
-.move-form > p {
-    margin: 0;
-    color: var(--text-secondary);
-}
-
-.move-arrow-container {
+.move-dialog-item {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-lg);
+    gap: var(--space-sm);
+    padding: var(--space-md);
     background: var(--bg-tertiary);
     border-radius: var(--radius-md);
 }
 
-.move-from,
-.move-to {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-}
-
-.move-from strong,
-.move-to strong {
+.move-dialog-item strong {
     color: var(--text-primary);
 }
 
-.move-arrow {
+.move-dialog-label {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+.move-dialog-content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.move-dialog-from,
+.move-dialog-to {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: 140px;
+}
+
+.move-dialog-category {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+}
+
+.move-dialog-arrow {
     flex-shrink: 0;
     color: var(--brand-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.move-dialog-to .form-select {
+    width: 100%;
 }
 
 .test-questions-list {
@@ -1725,12 +1751,32 @@
     stroke: var(--danger);
 }
 
-.assignment-card-meta .meta-item .result-label {
-    margin-left: var(--space-xs);
+/* Assignment card actions */
+.assignment-card-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
 }
 
-.assignment-card-meta .meta-item .badge {
-    margin-left: var(--space-xs);
+.result-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--radius-full);
+    font-size: var(--text-body);
+    font-weight: var(--font-bold);
+    min-width: 60px;
+}
+
+.result-badge.passed {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+}
+
+.result-badge.failed {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
 }
 
 .assignment-notes {

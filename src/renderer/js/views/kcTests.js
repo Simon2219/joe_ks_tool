@@ -316,7 +316,7 @@ const KCTestsView = {
         document.querySelectorAll('.kc-test-category-menu').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.showTestCategoryMenu(btn.dataset.categoryId);
+                this.showTestCategoryMenu(btn.dataset.categoryId, btn);
             });
         });
 
@@ -419,14 +419,54 @@ const KCTestsView = {
     /**
      * Shows the test category menu (delete option)
      */
-    async showTestCategoryMenu(categoryId) {
+    showTestCategoryMenu(categoryId, buttonEl) {
         const category = this.testCategories.find(c => c.id === categoryId);
         if (!category) return;
+
+        const menuItems = [];
         
-        if (!Permissions.canDelete('kcTest')) {
-            Toast.error('Keine Berechtigung zum Löschen von Kategorien');
+        // Edit category
+        if (Permissions.canEdit('kcTest')) {
+            menuItems.push({
+                label: 'Bearbeiten',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>`,
+                action: () => this.showCategoryForm(category)
+            });
+        }
+
+        // Delete category
+        if (Permissions.canDelete('kcTest')) {
+            if (menuItems.length > 0) {
+                menuItems.push({ divider: true });
+            }
+            menuItems.push({
+                label: 'Löschen',
+                icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>`,
+                danger: true,
+                action: () => this.deleteTestCategory(categoryId)
+            });
+        }
+
+        if (menuItems.length === 0) {
+            Toast.error('Keine verfügbaren Aktionen');
             return;
         }
+
+        Helpers.showDropdownMenu(buttonEl, menuItems);
+    },
+
+    /**
+     * Deletes a test category after confirmation
+     */
+    async deleteTestCategory(categoryId) {
+        const category = this.testCategories.find(c => c.id === categoryId);
+        if (!category) return;
 
         const confirmed = await Modal.confirm({
             title: 'Kategorie löschen',
@@ -1023,82 +1063,31 @@ const KCTestsView = {
         const currentCategory = this.testCategories.find(c => c.id === currentCategoryId);
         const currentCategoryName = currentCategory ? currentCategory.name : 'Keine Kategorie';
 
-        const formHtml = `
-            <div class="move-form">
-                <p>Test: <strong>${Helpers.escapeHtml(test.testNumber)} - ${Helpers.escapeHtml(test.name)}</strong></p>
-                <div class="move-arrow-container">
-                    <div class="move-from">
-                        <span class="text-muted">Von:</span>
-                        <strong>${Helpers.escapeHtml(currentCategoryName)}</strong>
-                    </div>
-                    <div class="move-arrow">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                            <polyline points="12 5 19 12 12 19"></polyline>
-                        </svg>
-                    </div>
-                    <div class="move-to">
-                        <span class="text-muted">Nach:</span>
-                        <select id="move-category-select" class="form-select">
-                            <option value="">Keine Kategorie</option>
-                            ${this.testCategories.map(c => `
-                                <option value="${c.id}" ${c.id === currentCategoryId ? 'disabled' : ''}>
-                                    ${Helpers.escapeHtml(c.name)}
-                                </option>
-                            `).join('')}
-                        </select>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const template = document.createElement('template');
-        template.innerHTML = formHtml.trim();
-        const content = template.content.firstElementChild;
-
-        const footer = document.createElement('div');
-        footer.style.display = 'flex';
-        footer.style.gap = 'var(--space-sm)';
-        footer.style.justifyContent = 'flex-end';
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'btn btn-secondary';
-        cancelBtn.textContent = 'Abbrechen';
-        cancelBtn.addEventListener('click', () => Modal.close());
-
-        const submitBtn = document.createElement('button');
-        submitBtn.className = 'btn btn-primary';
-        submitBtn.textContent = 'Verschieben';
-        submitBtn.addEventListener('click', async () => {
-            const newCategoryId = document.getElementById('move-category-select')?.value || null;
-            
-            try {
-                const response = await window.api.knowledgeCheck.updateTest(testId, {
-                    categoryId: newCategoryId
-                });
-                
-                if (response && response.success) {
-                    Toast.success('Test verschoben');
-                    Modal.close();
-                    await this.loadTests();
-                    this.renderTestList();
-                } else {
-                    Toast.error(response?.error || 'Fehler beim Verschieben');
-                }
-            } catch (error) {
-                console.error('Move test error:', error);
-                Toast.error('Fehler beim Verschieben');
-            }
-        });
-
-        footer.appendChild(cancelBtn);
-        footer.appendChild(submitBtn);
-
-        Modal.open({
+        await Helpers.showMoveDialog({
             title: 'Test verschieben',
-            content,
-            footer,
-            size: 'sm'
+            itemLabel: 'Test',
+            itemName: `${test.testNumber} - ${test.name}`,
+            currentCategoryName,
+            categories: this.testCategories,
+            currentCategoryId,
+            onSubmit: async (newCategoryId) => {
+                try {
+                    const response = await window.api.knowledgeCheck.updateTest(testId, {
+                        categoryId: newCategoryId
+                    });
+                    
+                    if (response && response.success) {
+                        Toast.success('Test verschoben');
+                        await this.loadTests();
+                        this.renderTestList();
+                    } else {
+                        Toast.error(response?.error || 'Fehler beim Verschieben');
+                    }
+                } catch (error) {
+                    console.error('Move test error:', error);
+                    Toast.error('Fehler beim Verschieben');
+                }
+            }
         });
     },
 
