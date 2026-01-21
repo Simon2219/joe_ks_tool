@@ -344,6 +344,13 @@ const App = {
             }
         });
 
+        // Admin-only view access check
+        if (viewName === 'admin' && !Permissions.isAdmin()) {
+            Toast.error('Admin access required');
+            await this.navigateTo('dashboard');
+            return;
+        }
+
         // Load template if needed
         await this.loadViewTemplate(viewName);
 
@@ -373,7 +380,8 @@ const App = {
             kcAssigned: 'Zugewiesene Tests',
             roles: 'RoleSystem',
             integrations: 'IntegrationSystem',
-            settings: 'Settings'
+            settings: 'Settings',
+            admin: 'Admin Panel'
         };
         document.getElementById('page-title').textContent = titles[viewName] || viewName;
 
@@ -430,6 +438,9 @@ const App = {
                 case 'settings':
                     await SettingsView.init();
                     break;
+                case 'admin':
+                    await AdminPanelView.init();
+                    break;
             }
         } catch (error) {
             console.error(`Failed to initialize ${viewName} view:`, error);
@@ -455,7 +466,8 @@ const App = {
             kcAssigned: KCAssignedView,
             roles: RolesView,
             integrations: IntegrationsView,
-            settings: SettingsView
+            settings: SettingsView,
+            admin: AdminPanelView
         };
 
         const view = viewMap[this.currentView];
