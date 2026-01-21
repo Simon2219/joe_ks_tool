@@ -491,7 +491,7 @@ function initSchema() {
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_user ON kc_test_results(user_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_user ON kc_test_assignments(user_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_test ON kc_test_assignments(test_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
+    // Note: idx_kc_test_assignments_run is created in migrations after run_id column exists
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_run_tests_run ON kc_test_run_tests(run_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
     database.run('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)');
@@ -546,6 +546,8 @@ function runMigrations(database) {
     if (!columnExists('kc_test_assignments', 'run_id')) {
         console.log('Adding run_id column to kc_test_assignments...');
         database.run('ALTER TABLE kc_test_assignments ADD COLUMN run_id TEXT DEFAULT NULL');
+        // Create index after column exists
+        database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
     }
     
     console.log('Database migrations completed');
