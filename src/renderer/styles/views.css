@@ -2012,6 +2012,95 @@
     color: var(--text-secondary);
 }
 
+.result-question-text {
+    margin: var(--space-sm) 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    font-style: italic;
+}
+
+/* Result Options Display */
+.result-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: var(--space-sm) 0;
+}
+
+.result-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    font-size: var(--text-sm);
+}
+
+.result-option .option-status {
+    width: 20px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.result-option .option-text {
+    flex: 1;
+}
+
+.result-option .option-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-weight: var(--font-semibold);
+}
+
+.result-option .option-badge.correct {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+}
+
+.result-option .option-badge.selected {
+    background: var(--brand-primary-light);
+    color: var(--brand-primary);
+}
+
+/* Option status colors */
+.result-option.option-correct-selected {
+    background: var(--color-success-bg);
+    border-left: 3px solid var(--color-success);
+}
+
+.result-option.option-correct-selected .option-status {
+    color: var(--color-success);
+}
+
+.result-option.option-incorrect-selected {
+    background: var(--color-danger-bg);
+    border-left: 3px solid var(--color-danger);
+}
+
+.result-option.option-incorrect-selected .option-status {
+    color: var(--color-danger);
+}
+
+.result-option.option-correct-missed {
+    background: var(--color-warning-bg);
+    border-left: 3px solid var(--color-warning);
+}
+
+.result-option.option-correct-missed .option-status {
+    color: var(--color-warning);
+}
+
+.result-option.option-not-selected {
+    opacity: 0.7;
+}
+
+.result-scoring-info {
+    margin: var(--space-xs) 0 0 0;
+    color: var(--text-muted);
+}
+
 /* Progress Bar for tables */
 .progress-bar-container {
     position: relative;
