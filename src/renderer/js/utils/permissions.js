@@ -131,7 +131,6 @@ const Permissions = {
         this.toggleElement('add-kc-question-btn', 'kc_questions_create');
         this.toggleElement('add-kc-category-btn', 'kc_categories_create');
         this.toggleElement('add-kc-test-btn', 'kc_tests_create');
-        this.toggleElement('add-kc-result-btn', 'kc_results_create');
         this.toggleElement('export-kc-results-btn', 'kc_results_view');
     },
 
@@ -174,8 +173,7 @@ const Permissions = {
             role: 'role_create',
             kcQuestion: 'kc_questions_create',
             kcCategory: 'kc_categories_create',
-            kcTest: 'kc_tests_create',
-            kcResult: 'kc_results_create'
+            kcTest: 'kc_tests_create'
         };
         return this.hasPermission(createPermissions[entityType]);
     },
@@ -256,15 +254,15 @@ const Permissions = {
     },
 
     canAccessKCArchive() {
-        return this.hasPermission('kc_archive_view');
+        return this.hasPermission('kc_archive_access');
     },
 
     canRestoreFromArchive() {
-        return this.hasPermission('kc_archive_restore');
+        return this.hasPermission('kc_archive_access');
     },
 
     canPermanentDelete() {
-        return this.hasPermission('kc_archive_delete');
+        return this.hasPermission('kc_archive_access');
     },
 
     canAccessAssignedTests() {
@@ -367,6 +365,7 @@ const Permissions = {
             'quality_edit': 'Edit Evaluations',
             'quality_delete': 'Delete Evaluations',
             'quality_manage_categories': 'Manage Categories',
+            'quality_manage': 'Manage Categories',
             'quality_export': 'Export Quality Data',
             'role_view': 'View Roles',
             'role_create': 'Create Roles',
@@ -377,34 +376,38 @@ const Permissions = {
             'admin_access': 'Admin Panel Access',
             'integration_sharepoint': 'SharePoint Integration',
             'integration_jira': 'JIRA Integration',
-            // Knowledge Check permissions
-            'kc_view': 'View Knowledge Check Tab',
-            'kc_questions_view': 'View Question Catalog',
-            'kc_questions_create': 'Create Questions',
-            'kc_questions_edit': 'Edit Questions',
-            'kc_questions_delete': 'Delete Questions',
+            'integration_access': 'Integration Access',
+            // Knowledge Check permissions - Categories
+            'kc_categories_delete': 'Delete Categories',
             'kc_categories_create': 'Create Categories',
             'kc_categories_edit': 'Edit Categories',
-            'kc_categories_delete': 'Delete Categories',
-            'kc_tests_view': 'View Test Catalog',
+            // Knowledge Check permissions - Questions
+            'kc_questions_delete': 'Delete Questions',
+            'kc_questions_create': 'Create Questions',
+            'kc_questions_edit': 'Edit Questions',
+            'kc_questions_view': 'View Question Catalog',
+            // Knowledge Check permissions - Tests
+            'kc_tests_delete': 'Delete Tests',
             'kc_tests_create': 'Create Tests',
             'kc_tests_edit': 'Edit Tests',
-            'kc_tests_delete': 'Delete Tests',
-            'kc_results_view': 'View Test Results',
-            'kc_results_create': 'Conduct Tests',
+            'kc_tests_view': 'View Test Catalog',
+            // Knowledge Check permissions - Results
             'kc_results_delete': 'Delete Test Results',
-            'kc_assign_tests': 'Assign Tests to Users',
+            'kc_results_view': 'View Test Results',
+            // Knowledge Check permissions - Test Runs & Assignments
+            'kc_assign_tests': 'Create Test Run',
             'kc_assigned_view': 'View Assigned Tests',
-            'kc_archive_view': 'View Archive',
-            'kc_archive_restore': 'Restore from Archive',
-            'kc_archive_delete': 'Permanently Delete Archived'
+            // Knowledge Check permissions - Archive
+            'kc_archive_access': 'Archive Access',
+            // Knowledge Check permissions - Tab
+            'kc_view': 'View Knowledge Check Tab'
         };
         
         return permissionNames[permissionId] || permissionId;
     },
 
     /**
-     * Groups permissions by module
+     * Groups permissions by module and sorts them in the proper order
      */
     getPermissionsByModule(permissions) {
         const modules = {
@@ -428,6 +431,33 @@ const Permissions = {
             else if (perm.startsWith('integration_')) modules.integrations.push(perm);
             else if (perm.startsWith('admin_')) modules.admin.push(perm);
         }
+
+        // Sort Knowledge Check permissions in the proper order (by importance/group)
+        const kcOrder = [
+            // Categories (Delete > Create > Edit)
+            'kc_categories_delete', 'kc_categories_create', 'kc_categories_edit',
+            // Questions (Delete > Create > Edit > View)
+            'kc_questions_delete', 'kc_questions_create', 'kc_questions_edit', 'kc_questions_view',
+            // Tests (Delete > Create > Edit > View)
+            'kc_tests_delete', 'kc_tests_create', 'kc_tests_edit', 'kc_tests_view',
+            // Results (Delete > View)
+            'kc_results_delete', 'kc_results_view',
+            // Test Runs & Assignments
+            'kc_assign_tests', 'kc_assigned_view',
+            // Archive
+            'kc_archive_access',
+            // Tab Access
+            'kc_view'
+        ];
+        
+        modules.knowledgeCheck.sort((a, b) => {
+            const indexA = kcOrder.indexOf(a);
+            const indexB = kcOrder.indexOf(b);
+            // If not found in order array, put at end
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+        });
 
         return modules;
     }

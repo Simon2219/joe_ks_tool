@@ -513,8 +513,10 @@ router.get('/results/:id', requirePermission('kc_results_view'), (req, res) => {
 
 /**
  * POST /api/knowledge-check/results
+ * Create a test result. Users can create results for themselves when taking assigned tests
+ * (requires kc_assigned_view), or managers can create results for anyone (requires kc_results_view)
  */
-router.post('/results', requirePermission('kc_results_create'), (req, res) => {
+router.post('/results', (req, res) => {
     try {
         const { testId, userId, answers } = req.body;
         
@@ -524,6 +526,20 @@ router.post('/results', requirePermission('kc_results_create'), (req, res) => {
         
         if (!UserSystem.getById(userId)) {
             return res.status(400).json({ success: false, error: 'Invalid user' });
+        }
+        
+        // Check permissions: either user is submitting for themselves (with kc_assigned_view)
+        // or has kc_results_view to create results for others
+        const isOwnResult = userId === req.user.id;
+        const hasAssignedView = hasPermission(req.user, 'kc_assigned_view');
+        const hasResultsView = hasPermission(req.user, 'kc_results_view');
+        
+        if (!isOwnResult && !hasResultsView) {
+            return res.status(403).json({ success: false, error: 'Permission denied - cannot create results for other users' });
+        }
+        
+        if (isOwnResult && !hasAssignedView && !hasResultsView) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
         }
         
         const result = KnowledgeCheckSystem.createResult(req.body, req.user.id);
@@ -708,6 +724,69 @@ router.delete('/assignments/:id', requirePermission('kc_assign_tests'), (req, re
     }
 });
 
+/**
+ * GET /api/knowledge-check/assignments/:id/take-test
+ * Get full test data for taking an assigned test
+ * Only the assigned user can access this
+ */
+router.get('/assignments/:id/take-test', requirePermission('kc_assigned_view'), (req, res) => {
+    try {
+        const assignment = KnowledgeCheckSystem.getAssignmentById(req.params.id);
+        if (!assignment) {
+            return res.status(404).json({ success: false, error: 'Assignment not found' });
+        }
+        
+        // Only the assigned user can take the test
+        if (assignment.userId !== req.user.id) {
+            return res.status(403).json({ success: false, error: 'Access denied - not your assignment' });
+        }
+        
+        // Check assignment status
+        if (assignment.status === 'completed') {
+            return res.status(400).json({ success: false, error: 'Test already completed' });
+        }
+        
+        // Get the full test with questions
+        const test = KnowledgeCheckSystem.getTestById(assignment.testId);
+        if (!test) {
+            return res.status(404).json({ success: false, error: 'Test not found' });
+        }
+        
+        // Get all questions with their options for this test
+        const questions = [];
+        for (const tq of test.questions || []) {
+            const question = KnowledgeCheckSystem.getQuestionById(tq.questionId);
+            if (question) {
+                questions.push({
+                    ...question,
+                    effectiveWeighting: tq.customWeighting || question.weighting || question.categoryWeighting || 1
+                });
+            }
+        }
+        
+        res.json({ 
+            success: true, 
+            test: {
+                id: test.id,
+                testNumber: test.testNumber,
+                name: test.name,
+                description: test.description,
+                passingScore: test.passingScore,
+                timeLimitMinutes: test.timeLimitMinutes
+            },
+            questions,
+            assignment: {
+                id: assignment.id,
+                dueDate: assignment.dueDate,
+                notes: assignment.notes
+            }
+        });
+    } catch (error) {
+        console.error('Get take-test data error:', error);
+        res.status(500).json({ success: false, error: 'Failed to load test data' });
+    }
+});
+
 // ============================================
 // STATISTICS & EXPORT
 // ============================================
@@ -761,8 +840,9 @@ router.get('/export/results', requirePermission('kc_results_view'), (req, res) =
 /**
  * POST /api/knowledge-check/check-answer
  * Helper endpoint to check an open-ended answer
+ * Users with kc_assigned_view can check answers while taking their tests
  */
-router.post('/check-answer', requirePermission('kc_results_create'), (req, res) => {
+router.post('/check-answer', requirePermission('kc_assigned_view'), (req, res) => {
     try {
         const { answer, exactAnswer, triggerWords } = req.body;
         
@@ -781,7 +861,7 @@ router.post('/check-answer', requirePermission('kc_results_create'), (req, res) 
 /**
  * GET /api/knowledge-check/archive/stats
  */
-router.get('/archive/stats', requirePermission('kc_archive_view'), (req, res) => {
+router.get('/archive/stats', requirePermission('kc_archive_access'), (req, res) => {
     try {
         const stats = KnowledgeCheckSystem.getArchiveStatistics();
         res.json({ success: true, statistics: stats });
@@ -794,7 +874,7 @@ router.get('/archive/stats', requirePermission('kc_archive_view'), (req, res) =>
 /**
  * GET /api/knowledge-check/archive/questions
  */
-router.get('/archive/questions', requirePermission('kc_archive_view'), (req, res) => {
+router.get('/archive/questions', requirePermission('kc_archive_access'), (req, res) => {
     try {
         const questions = KnowledgeCheckSystem.getAllQuestions({ archivedOnly: true });
         res.json({ success: true, questions });
@@ -807,7 +887,7 @@ router.get('/archive/questions', requirePermission('kc_archive_view'), (req, res
 /**
  * GET /api/knowledge-check/archive/tests
  */
-router.get('/archive/tests', requirePermission('kc_archive_view'), (req, res) => {
+router.get('/archive/tests', requirePermission('kc_archive_access'), (req, res) => {
     try {
         const tests = KnowledgeCheckSystem.getAllTests({ archivedOnly: true });
         res.json({ success: true, tests });
@@ -820,7 +900,7 @@ router.get('/archive/tests', requirePermission('kc_archive_view'), (req, res) =>
 /**
  * PUT /api/knowledge-check/archive/questions/:id/restore
  */
-router.put('/archive/questions/:id/restore', requirePermission('kc_archive_restore'), (req, res) => {
+router.put('/archive/questions/:id/restore', requirePermission('kc_archive_access'), (req, res) => {
     try {
         const question = KnowledgeCheckSystem.restoreQuestion(req.params.id);
         if (!question) {
@@ -836,7 +916,7 @@ router.put('/archive/questions/:id/restore', requirePermission('kc_archive_resto
 /**
  * PUT /api/knowledge-check/archive/tests/:id/restore
  */
-router.put('/archive/tests/:id/restore', requirePermission('kc_archive_restore'), (req, res) => {
+router.put('/archive/tests/:id/restore', requirePermission('kc_archive_access'), (req, res) => {
     try {
         const test = KnowledgeCheckSystem.restoreTest(req.params.id);
         if (!test) {
@@ -852,7 +932,7 @@ router.put('/archive/tests/:id/restore', requirePermission('kc_archive_restore')
 /**
  * DELETE /api/knowledge-check/archive/questions/:id
  */
-router.delete('/archive/questions/:id', requirePermission('kc_archive_delete'), (req, res) => {
+router.delete('/archive/questions/:id', requirePermission('kc_archive_access'), (req, res) => {
     try {
         const result = KnowledgeCheckSystem.permanentDeleteQuestion(req.params.id);
         res.json(result);
@@ -865,7 +945,7 @@ router.delete('/archive/questions/:id', requirePermission('kc_archive_delete'), 
 /**
  * DELETE /api/knowledge-check/archive/tests/:id
  */
-router.delete('/archive/tests/:id', requirePermission('kc_archive_delete'), (req, res) => {
+router.delete('/archive/tests/:id', requirePermission('kc_archive_access'), (req, res) => {
     try {
         const result = KnowledgeCheckSystem.permanentDeleteTest(req.params.id);
         res.json(result);

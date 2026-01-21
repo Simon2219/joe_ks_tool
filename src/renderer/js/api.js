@@ -330,6 +330,7 @@ window.api = {
         createAssignment: (data) => API.post('/knowledge-check/assignments', data),
         updateAssignment: (id, data) => API.put(`/knowledge-check/assignments/${id}`, data),
         deleteAssignment: (id) => API.delete(`/knowledge-check/assignments/${id}`),
+        getTakeTestData: (assignmentId) => API.get(`/knowledge-check/assignments/${assignmentId}/take-test`),
 
         // Statistics & Export
         getStatistics: () => API.get('/knowledge-check/stats'),
