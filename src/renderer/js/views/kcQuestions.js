@@ -302,19 +302,37 @@ const KCQuestionsView = {
             });
         });
 
+        // Double-click on question to edit
+        document.querySelectorAll('.kc-question-item').forEach(item => {
+            item.addEventListener('dblclick', () => {
+                const questionId = item.dataset.questionId;
+                if (questionId) this.editQuestion(questionId);
+            });
+            item.classList.add('clickable-row');
+        });
+
         // Edit question
         document.querySelectorAll('.kc-edit-question').forEach(btn => {
-            btn.addEventListener('click', () => this.editQuestion(btn.dataset.id));
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.editQuestion(btn.dataset.id);
+            });
         });
 
         // Move question
         document.querySelectorAll('.kc-move-question').forEach(btn => {
-            btn.addEventListener('click', () => this.showMoveDialog(btn.dataset.id));
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showMoveDialog(btn.dataset.id);
+            });
         });
 
         // Delete question
         document.querySelectorAll('.kc-delete-question').forEach(btn => {
-            btn.addEventListener('click', () => this.deleteQuestion(btn.dataset.id));
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteQuestion(btn.dataset.id);
+            });
         });
     },
 

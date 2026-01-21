@@ -182,16 +182,32 @@ const KCAssignedView = {
      * Binds actions for assignment cards
      */
     bindCardActions() {
+        // Double-click on card to start test or view result
+        document.querySelectorAll('.assignment-card').forEach(card => {
+            card.addEventListener('dblclick', () => {
+                const startBtn = card.querySelector('.btn-start-test');
+                const viewBtn = card.querySelector('.btn-view-result');
+                if (startBtn) {
+                    this.startAssignedTest(startBtn.dataset.id, startBtn.dataset.testId);
+                } else if (viewBtn) {
+                    this.viewResult(viewBtn.dataset.resultId);
+                }
+            });
+            card.style.cursor = 'pointer';
+        });
+
         // Start test buttons
         document.querySelectorAll('.btn-start-test').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 this.startAssignedTest(btn.dataset.id, btn.dataset.testId);
             });
         });
 
         // View result buttons
         document.querySelectorAll('.btn-view-result').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 this.viewResult(btn.dataset.resultId);
             });
         });

@@ -310,7 +310,7 @@ const App = {
     async navigateTo(viewName) {
         // Define which views belong to which submenu groups
         const submenuGroups = {
-            knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcResults', 'kcArchive', 'kcAssigned']
+            knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcTestRuns', 'kcResults', 'kcArchive', 'kcAssigned']
         };
         
         // Update active nav item
@@ -367,6 +367,7 @@ const App = {
             knowledgeCheck: 'Knowledge Check',
             kcQuestions: 'Fragen Katalog',
             kcTests: 'Test Katalog',
+            kcTestRuns: 'Testdurchläufe',
             kcResults: 'Test Ergebnisse',
             kcArchive: 'Archiv',
             kcAssigned: 'Zugewiesene Tests',
@@ -411,6 +412,9 @@ const App = {
                 case 'kcResults':
                     await KCResultsView.init();
                     break;
+                case 'kcTestRuns':
+                    await KCTestRunsView.init();
+                    break;
                 case 'kcArchive':
                     await KCArchiveView.init();
                     break;
@@ -446,6 +450,7 @@ const App = {
             kcQuestions: KCQuestionsView,
             kcTests: KCTestsView,
             kcResults: KCResultsView,
+            kcTestRuns: KCTestRunsView,
             kcArchive: KCArchiveView,
             kcAssigned: KCAssignedView,
             roles: RolesView,

@@ -295,6 +295,92 @@ router.put('/questions/:id/move', requirePermission('kc_questions_edit'), (req, 
 });
 
 // ============================================
+// TEST RUNS (Testdurchläufe)
+// ============================================
+
+/**
+ * GET /api/knowledge-check/test-runs
+ */
+router.get('/test-runs', requirePermission('kc_results_view'), (req, res) => {
+    try {
+        const runs = KnowledgeCheckSystem.getAllTestRuns(req.query);
+        res.json({ success: true, runs });
+    } catch (error) {
+        console.error('Get test runs error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch test runs' });
+    }
+});
+
+/**
+ * GET /api/knowledge-check/test-runs/:id
+ */
+router.get('/test-runs/:id', requirePermission('kc_results_view'), (req, res) => {
+    try {
+        const run = KnowledgeCheckSystem.getTestRunById(req.params.id);
+        if (!run) {
+            return res.status(404).json({ success: false, error: 'Test run not found' });
+        }
+        res.json({ success: true, run });
+    } catch (error) {
+        console.error('Get test run error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch test run' });
+    }
+});
+
+/**
+ * POST /api/knowledge-check/test-runs
+ */
+router.post('/test-runs', requirePermission('kc_assign_tests'), (req, res) => {
+    try {
+        const { name, description, testIds, userIds, dueDate, notes } = req.body;
+        
+        if (!name || !testIds || testIds.length === 0 || !userIds || userIds.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Name, at least one test, and at least one user are required' 
+            });
+        }
+        
+        const run = KnowledgeCheckSystem.createTestRun(req.body, req.user.id);
+        res.status(201).json({ success: true, run });
+    } catch (error) {
+        console.error('Create test run error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create test run' });
+    }
+});
+
+/**
+ * PUT /api/knowledge-check/test-runs/:id
+ */
+router.put('/test-runs/:id', requirePermission('kc_assign_tests'), (req, res) => {
+    try {
+        const run = KnowledgeCheckSystem.getTestRunById(req.params.id);
+        if (!run) {
+            return res.status(404).json({ success: false, error: 'Test run not found' });
+        }
+        
+        const updated = KnowledgeCheckSystem.updateTestRun(req.params.id, req.body);
+        res.json({ success: true, run: updated });
+    } catch (error) {
+        console.error('Update test run error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update test run' });
+    }
+});
+
+/**
+ * DELETE /api/knowledge-check/test-runs/:id
+ */
+router.delete('/test-runs/:id', requirePermission('kc_assign_tests'), (req, res) => {
+    try {
+        const result = KnowledgeCheckSystem.deleteTestRun(req.params.id);
+        res.json(result);
+    } catch (error) {
+        console.error('Delete test run error:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete test run' });
+    }
+});
+
+// ============================================
 // TESTS
 // ============================================
 

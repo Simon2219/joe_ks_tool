@@ -299,6 +299,16 @@ window.api = {
         updateTest: (id, data) => API.put(`/knowledge-check/tests/${id}`, data),
         deleteTest: (id) => API.delete(`/knowledge-check/tests/${id}`),
 
+        // Test Runs
+        getTestRuns: (filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/knowledge-check/test-runs${params ? '?' + params : ''}`);
+        },
+        getTestRunById: (id) => API.get(`/knowledge-check/test-runs/${id}`),
+        createTestRun: (data) => API.post('/knowledge-check/test-runs', data),
+        updateTestRun: (id, data) => API.put(`/knowledge-check/test-runs/${id}`, data),
+        deleteTestRun: (id) => API.delete(`/knowledge-check/test-runs/${id}`),
+
         // Results
         getResults: (filters = {}) => {
             const params = new URLSearchParams(filters).toString();

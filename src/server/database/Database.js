@@ -433,10 +433,40 @@ function initSchema() {
         )
     `);
 
-    // Test assignments - assign tests to users
+    // Test Runs - groups tests and users together
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_test_runs (
+            id TEXT PRIMARY KEY,
+            run_number TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            due_date TEXT,
+            status TEXT DEFAULT 'pending',
+            created_by TEXT NOT NULL,
+            notes TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+    `);
+
+    // Tests included in a test run
+    database.run(`
+        CREATE TABLE IF NOT EXISTS kc_test_run_tests (
+            id TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            test_id TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            FOREIGN KEY (run_id) REFERENCES kc_test_runs(id) ON DELETE CASCADE,
+            FOREIGN KEY (test_id) REFERENCES kc_tests(id)
+        )
+    `);
+
+    // Test assignments - assign tests to users (now linked to a test run)
     database.run(`
         CREATE TABLE IF NOT EXISTS kc_test_assignments (
             id TEXT PRIMARY KEY,
+            run_id TEXT,
             test_id TEXT NOT NULL,
             user_id TEXT NOT NULL,
             assigned_by TEXT NOT NULL,
@@ -446,6 +476,7 @@ function initSchema() {
             notes TEXT DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            FOREIGN KEY (run_id) REFERENCES kc_test_runs(id),
             FOREIGN KEY (test_id) REFERENCES kc_tests(id),
             FOREIGN KEY (user_id) REFERENCES users(id),
             FOREIGN KEY (assigned_by) REFERENCES users(id),
@@ -460,6 +491,8 @@ function initSchema() {
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_user ON kc_test_results(user_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_user ON kc_test_assignments(user_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_test ON kc_test_assignments(test_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_run_tests_run ON kc_test_run_tests(run_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
     database.run('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)');
@@ -507,6 +540,12 @@ function runMigrations(database) {
     if (!columnExists('kc_tests', 'archived_at')) {
         console.log('Adding archived_at column to kc_tests...');
         database.run('ALTER TABLE kc_tests ADD COLUMN archived_at TEXT DEFAULT NULL');
+    }
+    
+    // Migration 3: Add run_id to kc_test_assignments
+    if (!columnExists('kc_test_assignments', 'run_id')) {
+        console.log('Adding run_id column to kc_test_assignments...');
+        database.run('ALTER TABLE kc_test_assignments ADD COLUMN run_id TEXT DEFAULT NULL');
     }
     
     console.log('Database migrations completed');
@@ -2018,6 +2057,221 @@ const KnowledgeCheckSystem = {
     },
 
     // ============================================
+    // TEST RUNS (Testdurchläufe)
+    // ============================================
+
+    generateRunNumber() {
+        // Generate a unique run number like "TR-0001"
+        const lastRun = get('SELECT run_number FROM kc_test_runs ORDER BY created_at DESC LIMIT 1');
+        if (!lastRun) return 'TR-0001';
+        
+        const match = lastRun.run_number.match(/TR-(\d+)/);
+        if (!match) return 'TR-0001';
+        
+        const nextNum = parseInt(match[1], 10) + 1;
+        return `TR-${String(nextNum).padStart(4, '0')}`;
+    },
+
+    getAllTestRuns(filters = {}) {
+        let sql = `
+            SELECT r.*,
+                cb.first_name || ' ' || cb.last_name as created_by_name,
+                (SELECT COUNT(DISTINCT trt.test_id) FROM kc_test_run_tests trt WHERE trt.run_id = r.id) as test_count,
+                (SELECT COUNT(DISTINCT a.user_id) FROM kc_test_assignments a WHERE a.run_id = r.id) as user_count,
+                (SELECT COUNT(*) FROM kc_test_assignments a WHERE a.run_id = r.id) as total_assignments,
+                (SELECT COUNT(*) FROM kc_test_assignments a WHERE a.run_id = r.id AND a.status = 'pending') as pending_count,
+                (SELECT COUNT(*) FROM kc_test_assignments a WHERE a.run_id = r.id AND a.status = 'completed') as completed_count,
+                (SELECT AVG(tr.percentage) FROM kc_test_results tr 
+                    INNER JOIN kc_test_assignments a ON tr.id = a.result_id 
+                    WHERE a.run_id = r.id) as avg_score
+            FROM kc_test_runs r
+            JOIN users cb ON r.created_by = cb.id
+            WHERE 1=1
+        `;
+        const params = [];
+        
+        if (filters.status) {
+            sql += ' AND r.status = ?';
+            params.push(filters.status);
+        }
+        if (filters.createdBy) {
+            sql += ' AND r.created_by = ?';
+            params.push(filters.createdBy);
+        }
+        
+        sql += ' ORDER BY r.created_at DESC';
+        
+        return all(sql, params).map(r => ({
+            id: r.id,
+            runNumber: r.run_number,
+            name: r.name,
+            description: r.description,
+            dueDate: r.due_date,
+            status: r.status,
+            createdBy: r.created_by,
+            createdByName: r.created_by_name,
+            notes: r.notes,
+            testCount: r.test_count || 0,
+            userCount: r.user_count || 0,
+            totalAssignments: r.total_assignments || 0,
+            pendingCount: r.pending_count || 0,
+            completedCount: r.completed_count || 0,
+            avgScore: r.avg_score ? Math.round(r.avg_score) : null,
+            createdAt: r.created_at,
+            updatedAt: r.updated_at
+        }));
+    },
+
+    getTestRunById(id) {
+        const run = get(`
+            SELECT r.*,
+                cb.first_name || ' ' || cb.last_name as created_by_name
+            FROM kc_test_runs r
+            JOIN users cb ON r.created_by = cb.id
+            WHERE r.id = ?
+        `, [id]);
+        
+        if (!run) return null;
+        
+        // Get tests in this run
+        const tests = all(`
+            SELECT trt.*, t.test_number, t.name, t.description, t.passing_score
+            FROM kc_test_run_tests trt
+            JOIN kc_tests t ON trt.test_id = t.id
+            WHERE trt.run_id = ?
+            ORDER BY trt.sort_order
+        `, [id]);
+        
+        // Get assignments with user info and results
+        const assignments = all(`
+            SELECT a.*, 
+                t.test_number, t.name as test_name,
+                u.first_name || ' ' || u.last_name as user_name,
+                tr.percentage, tr.passed, tr.completed_at as result_completed_at
+            FROM kc_test_assignments a
+            JOIN kc_tests t ON a.test_id = t.id
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN kc_test_results tr ON a.result_id = tr.id
+            WHERE a.run_id = ?
+            ORDER BY u.last_name, u.first_name, t.test_number
+        `, [id]);
+        
+        // Calculate stats
+        const totalAssignments = assignments.length;
+        const completedCount = assignments.filter(a => a.status === 'completed').length;
+        const pendingCount = totalAssignments - completedCount;
+        const scores = assignments.filter(a => a.percentage !== null).map(a => a.percentage);
+        const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+        
+        return {
+            id: run.id,
+            runNumber: run.run_number,
+            name: run.name,
+            description: run.description,
+            dueDate: run.due_date,
+            status: run.status,
+            createdBy: run.created_by,
+            createdByName: run.created_by_name,
+            notes: run.notes,
+            createdAt: run.created_at,
+            updatedAt: run.updated_at,
+            tests: tests.map(t => ({
+                id: t.id,
+                testId: t.test_id,
+                testNumber: t.test_number,
+                name: t.name,
+                description: t.description,
+                passingScore: t.passing_score,
+                sortOrder: t.sort_order
+            })),
+            assignments: assignments.map(a => ({
+                id: a.id,
+                testId: a.test_id,
+                testNumber: a.test_number,
+                testName: a.test_name,
+                userId: a.user_id,
+                userName: a.user_name,
+                status: a.status,
+                resultId: a.result_id,
+                percentage: a.percentage,
+                passed: a.passed !== null ? !!a.passed : null,
+                completedAt: a.result_completed_at,
+                dueDate: a.due_date
+            })),
+            stats: {
+                testCount: tests.length,
+                userCount: [...new Set(assignments.map(a => a.user_id))].length,
+                totalAssignments,
+                completedCount,
+                pendingCount,
+                avgScore
+            }
+        };
+    },
+
+    createTestRun(data, createdBy) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const runNumber = this.generateRunNumber();
+        
+        run(`INSERT INTO kc_test_runs (id, run_number, name, description, due_date, status, created_by, notes, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, runNumber, data.name, data.description || '', data.dueDate || null, 'pending', createdBy, data.notes || '', now, now]);
+        
+        // Add tests to the run
+        if (data.testIds && data.testIds.length > 0) {
+            data.testIds.forEach((testId, index) => {
+                run('INSERT INTO kc_test_run_tests (id, run_id, test_id, sort_order) VALUES (?, ?, ?, ?)',
+                    [uuidv4(), id, testId, index]);
+            });
+        }
+        
+        // Create assignments for each user and each test
+        if (data.userIds && data.userIds.length > 0 && data.testIds && data.testIds.length > 0) {
+            for (const userId of data.userIds) {
+                for (const testId of data.testIds) {
+                    run(`INSERT INTO kc_test_assignments (id, run_id, test_id, user_id, assigned_by, due_date, status, notes, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [uuidv4(), id, testId, userId, createdBy, data.dueDate || null, 'pending', '', now, now]);
+                }
+            }
+        }
+        
+        saveDb();
+        return this.getTestRunById(id);
+    },
+
+    updateTestRun(id, data) {
+        const now = new Date().toISOString();
+        let sql = 'UPDATE kc_test_runs SET updated_at = ?';
+        let params = [now];
+        
+        if (data.name !== undefined) { sql += ', name = ?'; params.push(data.name); }
+        if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
+        if (data.dueDate !== undefined) { sql += ', due_date = ?'; params.push(data.dueDate); }
+        if (data.status !== undefined) { sql += ', status = ?'; params.push(data.status); }
+        if (data.notes !== undefined) { sql += ', notes = ?'; params.push(data.notes); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        run(sql, params);
+        
+        saveDb();
+        return this.getTestRunById(id);
+    },
+
+    deleteTestRun(id) {
+        // Delete assignments first (due to foreign key)
+        run('DELETE FROM kc_test_assignments WHERE run_id = ?', [id]);
+        // Delete test links
+        run('DELETE FROM kc_test_run_tests WHERE run_id = ?', [id]);
+        // Delete the run
+        run('DELETE FROM kc_test_runs WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
     // TEST ASSIGNMENTS
     // ============================================
 
@@ -2026,12 +2280,14 @@ const KnowledgeCheckSystem = {
             SELECT a.*, t.name as test_name, t.test_number, t.passing_score, t.time_limit_minutes,
                 u.first_name || ' ' || u.last_name as user_name,
                 ab.first_name || ' ' || ab.last_name as assigned_by_name,
-                tc.name as category_name
+                tc.name as category_name,
+                r.run_number, r.name as run_name
             FROM kc_test_assignments a
             JOIN kc_tests t ON a.test_id = t.id
             LEFT JOIN kc_test_categories tc ON t.category_id = tc.id
             JOIN users u ON a.user_id = u.id
             JOIN users ab ON a.assigned_by = ab.id
+            LEFT JOIN kc_test_runs r ON a.run_id = r.id
             WHERE 1=1
         `;
         const params = [];
@@ -2055,8 +2311,19 @@ const KnowledgeCheckSystem = {
         
         sql += ' ORDER BY a.created_at DESC';
         
+        // Add run_id filter
+        if (filters.runId) {
+            sql += ' AND a.run_id = ?';
+            params.push(filters.runId);
+        }
+        
+        sql += ' ORDER BY a.created_at DESC';
+        
         return all(sql, params).map(a => ({
             id: a.id,
+            runId: a.run_id,
+            runNumber: a.run_number,
+            runName: a.run_name,
             testId: a.test_id,
             testNumber: a.test_number,
             testName: a.test_name,

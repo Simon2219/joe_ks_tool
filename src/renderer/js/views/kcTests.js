@@ -316,19 +316,37 @@ const KCTestsView = {
             });
         });
 
+        // Double-click on test to view
+        document.querySelectorAll('.kc-test-item').forEach(item => {
+            item.addEventListener('dblclick', () => {
+                const testId = item.dataset.testId;
+                if (testId) this.viewTest(testId);
+            });
+            item.classList.add('clickable-row');
+        });
+
         // View test
         document.querySelectorAll('.kc-view-test').forEach(btn => {
-            btn.addEventListener('click', () => this.viewTest(btn.dataset.id));
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.viewTest(btn.dataset.id);
+            });
         });
 
         // Edit test
         document.querySelectorAll('.kc-edit-test').forEach(btn => {
-            btn.addEventListener('click', () => this.editTest(btn.dataset.id));
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.editTest(btn.dataset.id);
+            });
         });
 
         // Delete test
         document.querySelectorAll('.kc-delete-test').forEach(btn => {
-            btn.addEventListener('click', () => this.deleteTest(btn.dataset.id));
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteTest(btn.dataset.id);
+            });
         });
     },
 

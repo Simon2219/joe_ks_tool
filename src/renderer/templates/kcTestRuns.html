@@ -1,0 +1,70 @@
+<section id="view-kcTestRuns" class="view">
+    <div class="view-header">
+        <div class="view-actions-row">
+            <div class="view-actions">
+                <button class="btn btn-primary" id="add-test-run-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Neuer Testdurchlauf
+                </button>
+                <button class="btn btn-secondary" id="export-test-runs-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export
+                </button>
+            </div>
+            <div class="view-filters view-filters-inline">
+                <select id="filter-run-status" class="form-select form-select-sm">
+                    <option value="">Alle Status</option>
+                    <option value="pending">Ausstehend</option>
+                    <option value="in_progress">In Bearbeitung</option>
+                    <option value="completed">Abgeschlossen</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <div class="kc-results-overview" id="test-runs-overview">
+        <div class="quality-stat-card">
+            <span class="stat-value" id="runs-total">--</span>
+            <span class="stat-label">Testdurchläufe</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="runs-pending">--</span>
+            <span class="stat-label">Ausstehend</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="runs-completed">--</span>
+            <span class="stat-label">Abgeschlossen</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="runs-avg-score">--</span>
+            <span class="stat-label">Ø Ergebnis</span>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table class="data-table" id="test-runs-table">
+            <thead>
+                <tr>
+                    <th>Durchlauf #</th>
+                    <th>Name</th>
+                    <th>Tests</th>
+                    <th>Teilnehmer</th>
+                    <th>Fortschritt</th>
+                    <th>Ø Ergebnis</th>
+                    <th>Status</th>
+                    <th>Erstellt</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody id="test-runs-tbody">
+            </tbody>
+        </table>
+    </div>
+</section>
