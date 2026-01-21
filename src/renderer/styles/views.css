@@ -1725,6 +1725,19 @@
     stroke: var(--danger);
 }
 
+.assignment-card-meta .meta-item .result-score {
+    font-weight: var(--font-semibold);
+    margin-left: var(--space-xs);
+}
+
+.assignment-card-meta .meta-item .result-score.passed {
+    color: var(--color-success);
+}
+
+.assignment-card-meta .meta-item .result-score.failed {
+    color: var(--color-danger);
+}
+
 .assignment-notes {
     padding-top: var(--space-sm);
     border-top: 1px solid var(--border-color);

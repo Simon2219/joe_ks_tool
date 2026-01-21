@@ -158,6 +158,11 @@ const KCAssignedView = {
                             <polyline points="14 2 14 8 20 8"></polyline>
                         </svg>
                         <span>Bestehensgrenze: ${assignment.passingScore}%</span>
+                        ${!isPending && assignment.resultPercentage !== undefined ? `
+                            <span class="result-score ${assignment.resultPassed ? 'passed' : 'failed'}">
+                                · Ergebnis: ${assignment.resultPercentage}%
+                            </span>
+                        ` : ''}
                     </div>
                     ${assignment.timeLimitMinutes ? `
                         <div class="meta-item">
@@ -341,33 +346,51 @@ const KCAssignedView = {
                 if (q.questionType === 'multiple_choice') {
                     const checkboxes = document.querySelectorAll(`input[name="q_${q.id}"]`);
                     const selectedOptions = [];
-                    let questionCorrect = true;
-                    let correctCount = 0;
-                    let totalCorrect = 0;
+                    let correctSelected = 0;
+                    let incorrectSelected = 0;
+                    let totalCorrectOptions = 0;
+                    let allCorrect = true;
 
                     checkboxes.forEach(cb => {
                         const isCorrectOption = cb.dataset.correct === 'true';
-                        if (isCorrectOption) totalCorrect++;
+                        if (isCorrectOption) totalCorrectOptions++;
                         
                         if (cb.checked) {
                             selectedOptions.push(cb.value);
-                            if (!isCorrectOption) questionCorrect = false;
+                            if (isCorrectOption) {
+                                correctSelected++;
+                            } else {
+                                incorrectSelected++;
+                                allCorrect = false;
+                            }
                         } else if (isCorrectOption) {
-                            questionCorrect = false;
+                            allCorrect = false;
                         }
-
-                        if (cb.checked && isCorrectOption) correctCount++;
                     });
 
-                    // Partial scoring for MC
-                    const mcScore = totalCorrect > 0 ? (correctCount / totalCorrect) * weighting : 0;
-                    totalScore += questionCorrect ? weighting : mcScore;
+                    let score = 0;
+                    let isCorrect = allCorrect;
+
+                    if (q.allowPartialAnswer) {
+                        // Partial scoring: award points based on correct selections minus wrong selections
+                        // Formula: (correct - wrong) / totalCorrect * weighting, minimum 0
+                        const partialRatio = totalCorrectOptions > 0 
+                            ? Math.max(0, (correctSelected - incorrectSelected) / totalCorrectOptions)
+                            : 0;
+                        score = partialRatio * weighting;
+                        isCorrect = correctSelected > 0 && incorrectSelected === 0 && correctSelected === totalCorrectOptions;
+                    } else {
+                        // All-or-nothing scoring: must have all correct selected and no wrong selected
+                        score = allCorrect ? weighting : 0;
+                    }
+
+                    totalScore += score;
 
                     answers.push({
                         questionId: q.id,
                         selectedOptions,
-                        isCorrect: questionCorrect,
-                        score: questionCorrect ? weighting : mcScore,
+                        isCorrect: isCorrect,
+                        score: score,
                         maxScore: weighting
                     });
                 } else {

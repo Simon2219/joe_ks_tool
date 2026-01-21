@@ -239,7 +239,7 @@ const KCQuestionsView = {
                     <div class="kc-question-text">${Helpers.escapeHtml(Helpers.truncate(question.questionText, 100))}</div>
                     <div class="kc-question-meta">
                         <span class="badge badge-secondary">${typeLabel}</span>
-                        ${question.weighting ? `<span class="badge badge-info">Gewichtung: ${question.weighting}</span>` : `<span class="badge badge-outline">Gewichtung: Standard</span>`}
+                        ${question.weighting ? `<span class="badge badge-info">Gewichtung: ${question.weighting}</span>` : ''}
                     </div>
                 </div>
                 <div class="kc-question-actions">
@@ -508,6 +508,15 @@ const KCQuestionsView = {
                 <!-- Multiple Choice Options -->
                 <div id="mc-options-section" class="${question?.questionType === 'open_question' ? 'hidden' : ''}">
                     <div class="form-group">
+                        <label class="form-checkbox" style="display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-md);">
+                            <input type="checkbox" id="q-partial-answer" name="allowPartialAnswer" ${question?.allowPartialAnswer ? 'checked' : ''}>
+                            <span>Teilweise Antwort erlauben</span>
+                        </label>
+                        <small class="form-hint" style="display: block; margin-top: calc(-1 * var(--space-sm)); margin-bottom: var(--space-md); color: var(--text-muted);">
+                            Wenn aktiviert, werden Punkte anteilig vergeben. Wenn deaktiviert, muss alles richtig sein.
+                        </small>
+                    </div>
+                    <div class="form-group">
                         <label>Antwortmöglichkeiten</label>
                         <div id="mc-options-list">
                             ${(question?.options || [{ text: '', isCorrect: false }]).map((opt, i) => `
@@ -654,6 +663,7 @@ const KCQuestionsView = {
             };
 
             if (data.questionType === 'multiple_choice') {
+                data.allowPartialAnswer = document.getElementById('q-partial-answer')?.checked || false;
                 data.options = [];
                 document.querySelectorAll('.mc-option-row').forEach(row => {
                     const text = row.querySelector('.mc-text').value.trim();

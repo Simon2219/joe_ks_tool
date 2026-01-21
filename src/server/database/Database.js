@@ -324,6 +324,7 @@ function initSchema() {
             question_text TEXT NOT NULL,
             question_type TEXT DEFAULT 'multiple_choice',
             weighting INTEGER DEFAULT NULL,
+            allow_partial_answer INTEGER DEFAULT 0,
             exact_answer TEXT DEFAULT '',
             trigger_words TEXT DEFAULT '[]',
             is_active INTEGER DEFAULT 1,
@@ -548,6 +549,12 @@ function runMigrations(database) {
         database.run('ALTER TABLE kc_test_assignments ADD COLUMN run_id TEXT DEFAULT NULL');
         // Create index after column exists
         database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
+    }
+    
+    // Migration 4: Add allow_partial_answer to kc_questions
+    if (!columnExists('kc_questions', 'allow_partial_answer')) {
+        console.log('Adding allow_partial_answer column to kc_questions...');
+        database.run('ALTER TABLE kc_questions ADD COLUMN allow_partial_answer INTEGER DEFAULT 0');
     }
     
     // Note: Migration for orphaned assignments is now manual - run from Admin Panel
@@ -1655,6 +1662,7 @@ const KnowledgeCheckSystem = {
             questionType: question.question_type,
             weighting: question.weighting,
             effectiveWeighting: question.weighting || question.category_weighting || 1,
+            allowPartialAnswer: !!question.allow_partial_answer,
             exactAnswer: question.exact_answer || '',
             triggerWords: triggerWords,
             isActive: !!question.is_active,
@@ -1677,10 +1685,10 @@ const KnowledgeCheckSystem = {
         const id = uuidv4();
         const maxOrder = get('SELECT MAX(sort_order) as max FROM kc_questions WHERE category_id = ?', [data.categoryId])?.max || 0;
         
-        run(`INSERT INTO kc_questions (id, category_id, title, question_text, question_type, weighting, exact_answer, trigger_words, is_active, sort_order, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        run(`INSERT INTO kc_questions (id, category_id, title, question_text, question_type, weighting, allow_partial_answer, exact_answer, trigger_words, is_active, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, data.categoryId || null, data.title || '', data.questionText, data.questionType || 'multiple_choice',
-             data.weighting || null, data.exactAnswer || '', JSON.stringify(data.triggerWords || []), 1, maxOrder + 1, now, now]);
+             data.weighting || null, data.allowPartialAnswer ? 1 : 0, data.exactAnswer || '', JSON.stringify(data.triggerWords || []), 1, maxOrder + 1, now, now]);
         
         // Add options if multiple choice
         if (data.options && data.options.length > 0) {
@@ -1704,6 +1712,7 @@ const KnowledgeCheckSystem = {
         if (data.questionText !== undefined) { sql += ', question_text = ?'; params.push(data.questionText); }
         if (data.questionType !== undefined) { sql += ', question_type = ?'; params.push(data.questionType); }
         if (data.weighting !== undefined) { sql += ', weighting = ?'; params.push(data.weighting); }
+        if (data.allowPartialAnswer !== undefined) { sql += ', allow_partial_answer = ?'; params.push(data.allowPartialAnswer ? 1 : 0); }
         if (data.exactAnswer !== undefined) { sql += ', exact_answer = ?'; params.push(data.exactAnswer); }
         if (data.triggerWords !== undefined) { sql += ', trigger_words = ?'; params.push(JSON.stringify(data.triggerWords)); }
         if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
@@ -2286,13 +2295,17 @@ const KnowledgeCheckSystem = {
                 u.first_name || ' ' || u.last_name as user_name,
                 ab.first_name || ' ' || ab.last_name as assigned_by_name,
                 tc.name as category_name,
-                r.run_number, r.name as run_name
+                r.run_number, r.name as run_name,
+                tr.percentage as result_percentage, tr.passed as result_passed, 
+                tr.total_score as result_total_score, tr.max_score as result_max_score,
+                tr.completed_at as result_completed_at
             FROM kc_test_assignments a
             JOIN kc_tests t ON a.test_id = t.id
             LEFT JOIN kc_test_categories tc ON t.category_id = tc.id
             JOIN users u ON a.user_id = u.id
             JOIN users ab ON a.assigned_by = ab.id
             LEFT JOIN kc_test_runs r ON a.run_id = r.id
+            LEFT JOIN kc_test_results tr ON a.result_id = tr.id
             WHERE 1=1
         `;
         const params = [];
@@ -2339,6 +2352,11 @@ const KnowledgeCheckSystem = {
             dueDate: a.due_date,
             status: a.status,
             resultId: a.result_id,
+            resultPercentage: a.result_percentage,
+            resultPassed: a.result_passed === 1,
+            resultTotalScore: a.result_total_score,
+            resultMaxScore: a.result_max_score,
+            resultCompletedAt: a.result_completed_at,
             notes: a.notes,
             createdAt: a.created_at,
             updatedAt: a.updated_at
