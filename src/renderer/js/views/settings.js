@@ -14,6 +14,7 @@ const SettingsView = {
         this.bindEvents();
         await this.loadSettings();
         this.populateAccountSettings();
+        this.checkMigrations();
     },
 
     /**
@@ -75,6 +76,63 @@ const SettingsView = {
         document.getElementById('db-view-btn')?.addEventListener('click', () => {
             this.viewDatabaseTable();
         });
+
+        // Migration button
+        document.getElementById('migrate-orphaned-btn')?.addEventListener('click', () => {
+            this.runOrphanedAssignmentsMigration();
+        });
+    },
+
+    /**
+     * Checks migration status (for admin users)
+     */
+    async checkMigrations() {
+        const migrationsSection = document.getElementById('migrations-section');
+        if (!migrationsSection) return;
+
+        // Only show for admins
+        if (!Permissions.isAdmin) {
+            migrationsSection.style.display = 'none';
+            return;
+        }
+
+        try {
+            const result = await window.api.admin.getOrphanedAssignmentsCount();
+            const badge = document.getElementById('orphaned-count-badge');
+            if (badge && result.success) {
+                badge.textContent = `${result.count} verwaist`;
+                badge.className = result.count > 0 ? 'badge badge-warning' : 'badge badge-success';
+            }
+        } catch (error) {
+            console.error('Failed to check migrations:', error);
+        }
+    },
+
+    /**
+     * Runs the orphaned assignments migration
+     */
+    async runOrphanedAssignmentsMigration() {
+        const btn = document.getElementById('migrate-orphaned-btn');
+        if (!btn) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Migration läuft...';
+
+        try {
+            const result = await window.api.admin.migrateOrphanedAssignments();
+            if (result.success) {
+                Toast.success(result.message);
+                this.checkMigrations(); // Refresh count
+            } else {
+                Toast.error(result.error || 'Migration fehlgeschlagen');
+            }
+        } catch (error) {
+            console.error('Migration error:', error);
+            Toast.error('Migration fehlgeschlagen: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Migration ausführen';
+        }
     },
 
     /**

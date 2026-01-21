@@ -302,9 +302,11 @@ const KCQuestionsView = {
             });
         });
 
-        // Double-click on question to edit
+        // Click on question to edit
         document.querySelectorAll('.kc-question-item').forEach(item => {
-            item.addEventListener('dblclick', () => {
+            item.addEventListener('click', (e) => {
+                // Don't trigger if clicking on action buttons
+                if (e.target.closest('.kc-question-actions')) return;
                 const questionId = item.dataset.questionId;
                 if (questionId) this.editQuestion(questionId);
             });

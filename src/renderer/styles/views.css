@@ -272,6 +272,33 @@
 
 .settings-label small {
     font-size: var(--text-caption);
+}
+
+/* Migration Item */
+.migration-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    gap: var(--space-lg);
+}
+
+.migration-info {
+    flex: 1;
+}
+
+.migration-info strong {
+    display: block;
+    margin-bottom: var(--space-xs);
+    color: var(--text-primary);
+}
+
+.migration-info p {
+    margin: 0 0 var(--space-sm) 0;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
     color: var(--text-muted);
 }
 
@@ -558,6 +585,8 @@
     grid-template-columns: repeat(3, 1fr);
     gap: var(--space-xl);
     max-width: 1200px;
+    margin: 0 auto;
+    justify-content: center;
 }
 
 .kc-tile {
@@ -877,6 +906,45 @@
 
 .test-detail-questions h4 {
     margin-bottom: var(--space-md);
+}
+
+/* Move Form */
+.move-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.move-form > p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.move-arrow-container {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+}
+
+.move-from,
+.move-to {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.move-from strong,
+.move-to strong {
+    color: var(--text-primary);
+}
+
+.move-arrow {
+    flex-shrink: 0;
+    color: var(--brand-primary);
 }
 
 .test-questions-list {

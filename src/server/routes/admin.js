@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { UserSystem, RoleSystem, TicketSystem, QualitySystem, SettingsSystem, getDb } = require('../database');
+const { UserSystem, RoleSystem, TicketSystem, QualitySystem, KnowledgeCheckSystem, SettingsSystem, getDb } = require('../database');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 
 router.use(authenticate);
@@ -132,6 +132,38 @@ router.get('/database/tables', (req, res) => {
         
         res.json({ success: true, tables });
     } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// MIGRATION UTILITIES
+// ============================================
+
+/**
+ * GET /api/admin/migrations/orphaned-assignments
+ * Get count of orphaned test assignments
+ */
+router.get('/migrations/orphaned-assignments', (req, res) => {
+    try {
+        const count = KnowledgeCheckSystem.getOrphanedAssignmentsCount();
+        res.json({ success: true, count });
+    } catch (error) {
+        console.error('Get orphaned assignments count error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/admin/migrations/orphaned-assignments
+ * Run migration to assign orphaned assignments to default test run
+ */
+router.post('/migrations/orphaned-assignments', (req, res) => {
+    try {
+        const result = KnowledgeCheckSystem.migrateOrphanedAssignments();
+        res.json(result);
+    } catch (error) {
+        console.error('Migration error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

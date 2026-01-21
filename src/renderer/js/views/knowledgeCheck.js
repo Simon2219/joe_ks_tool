@@ -81,7 +81,7 @@ const KnowledgeCheckView = {
                     document.getElementById('kc-stat-tests').textContent = `${stats.totalTests} Tests`;
                 }
                 if (Permissions.hasPermission('kc_results_view')) {
-                    document.getElementById('kc-stat-results').textContent = `${stats.totalResults} Ergebnisse`;
+                    document.getElementById('kc-stat-runs').textContent = `${stats.totalRuns || 0} Durchläufe`;
                 }
             }
         } catch (error) {

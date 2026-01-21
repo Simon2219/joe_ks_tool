@@ -397,6 +397,11 @@ window.api = {
         addComment: (issueKey, body) => API.post(`/jira/issues/${issueKey}/comments`, { body }),
         search: (jql, options = {}) => API.post('/jira/search', { jql, ...options }),
         syncWithTickets: (projectKey) => API.post('/jira/sync', { projectKey })
+    },
+
+    admin: {
+        getOrphanedAssignmentsCount: () => API.get('/admin/migrations/orphaned-assignments'),
+        migrateOrphanedAssignments: () => API.post('/admin/migrations/orphaned-assignments')
     }
 };
 

@@ -550,54 +550,11 @@ function runMigrations(database) {
         database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
     }
     
-    // Migration 4: Create default test run for orphaned assignments/results
-    migrateOrphanedAssignments(database);
+    // Note: Migration for orphaned assignments is now manual - run from Admin Panel
     
     console.log('Database migrations completed');
 }
 
-/**
- * Creates a "Nicht Zugeteilt" test run for any assignments without a run_id
- */
-function migrateOrphanedAssignments(database) {
-    // Check for orphaned assignments (those without a run_id)
-    const orphanedAssignments = all('SELECT * FROM kc_test_assignments WHERE run_id IS NULL');
-    
-    if (orphanedAssignments.length === 0) {
-        return; // No orphaned assignments
-    }
-    
-    console.log(`Found ${orphanedAssignments.length} orphaned assignments, creating default test run...`);
-    
-    const now = new Date().toISOString();
-    const defaultRunId = 'default-unassigned-run';
-    
-    // Check if default run already exists
-    const existingRun = get('SELECT id FROM kc_test_runs WHERE id = ?', [defaultRunId]);
-    
-    if (!existingRun) {
-        // Create the default test run
-        run(`INSERT INTO kc_test_runs (id, run_number, name, description, due_date, status, created_by, notes, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [defaultRunId, 'TR-0000', 'Nicht Zugeteilt', 'Automatisch erstellter Testdurchlauf für bestehende Tests ohne Zuweisung', 
-             null, 'completed', 'system', 'Dieser Testdurchlauf wurde automatisch erstellt für Tests, die vor der Einführung des Testdurchlauf-Systems erstellt wurden.', 
-             now, now]);
-        
-        // Get unique test IDs from orphaned assignments
-        const uniqueTestIds = [...new Set(orphanedAssignments.map(a => a.test_id))];
-        
-        // Add tests to the run
-        uniqueTestIds.forEach((testId, index) => {
-            run('INSERT OR IGNORE INTO kc_test_run_tests (id, run_id, test_id, sort_order) VALUES (?, ?, ?, ?)',
-                [uuidv4(), defaultRunId, testId, index]);
-        });
-    }
-    
-    // Update all orphaned assignments to belong to the default run
-    run('UPDATE kc_test_assignments SET run_id = ? WHERE run_id IS NULL', [defaultRunId]);
-    
-    console.log('Orphaned assignments migrated to default test run');
-}
 
 // ============================================
 // SEED DEFAULT DATA
@@ -2123,7 +2080,7 @@ const KnowledgeCheckSystem = {
     getAllTestRuns(filters = {}) {
         let sql = `
             SELECT r.*,
-                cb.first_name || ' ' || cb.last_name as created_by_name,
+                COALESCE(cb.first_name || ' ' || cb.last_name, r.created_by) as created_by_name,
                 (SELECT COUNT(DISTINCT trt.test_id) FROM kc_test_run_tests trt WHERE trt.run_id = r.id) as test_count,
                 (SELECT COUNT(DISTINCT a.user_id) FROM kc_test_assignments a WHERE a.run_id = r.id) as user_count,
                 (SELECT COUNT(*) FROM kc_test_assignments a WHERE a.run_id = r.id) as total_assignments,
@@ -2133,7 +2090,7 @@ const KnowledgeCheckSystem = {
                     INNER JOIN kc_test_assignments a ON tr.id = a.result_id 
                     WHERE a.run_id = r.id) as avg_score
             FROM kc_test_runs r
-            JOIN users cb ON r.created_by = cb.id
+            LEFT JOIN users cb ON r.created_by = cb.id
             WHERE 1=1
         `;
         const params = [];
@@ -2173,9 +2130,9 @@ const KnowledgeCheckSystem = {
     getTestRunById(id) {
         const run = get(`
             SELECT r.*,
-                cb.first_name || ' ' || cb.last_name as created_by_name
+                COALESCE(cb.first_name || ' ' || cb.last_name, r.created_by) as created_by_name
             FROM kc_test_runs r
-            JOIN users cb ON r.created_by = cb.id
+            LEFT JOIN users cb ON r.created_by = cb.id
             WHERE r.id = ?
         `, [id]);
         
@@ -2656,6 +2613,7 @@ const KnowledgeCheckSystem = {
         const totalTests = get('SELECT COUNT(*) as count FROM kc_tests WHERE is_active = 1')?.count || 0;
         const totalQuestions = get('SELECT COUNT(*) as count FROM kc_questions WHERE is_active = 1')?.count || 0;
         const totalResults = get('SELECT COUNT(*) as count FROM kc_test_results')?.count || 0;
+        const totalRuns = get('SELECT COUNT(*) as count FROM kc_test_runs')?.count || 0;
         const passedResults = get('SELECT COUNT(*) as count FROM kc_test_results WHERE passed = 1')?.count || 0;
         const avgScore = get('SELECT AVG(percentage) as avg FROM kc_test_results')?.avg || 0;
         
@@ -2663,6 +2621,7 @@ const KnowledgeCheckSystem = {
             totalTests,
             totalQuestions,
             totalResults,
+            totalRuns,
             passedResults,
             passingRate: totalResults > 0 ? Math.round((passedResults / totalResults) * 100) : 0,
             averageScore: Math.round(avgScore)
@@ -2733,6 +2692,68 @@ const KnowledgeCheckSystem = {
             }
         }
         return false;
+    },
+
+    // ============================================
+    // ADMIN MIGRATIONS (Manual trigger only)
+    // ============================================
+
+    /**
+     * Migrate orphaned assignments to a default "Nicht Zugeteilt" test run
+     * This should only be run manually from the Admin Panel
+     */
+    migrateOrphanedAssignments() {
+        // Check for orphaned assignments (those without a run_id)
+        const orphanedAssignments = all('SELECT * FROM kc_test_assignments WHERE run_id IS NULL');
+        
+        if (orphanedAssignments.length === 0) {
+            return { success: true, message: 'Keine verwaisten Zuweisungen gefunden', count: 0 };
+        }
+        
+        console.log(`Found ${orphanedAssignments.length} orphaned assignments, creating default test run...`);
+        
+        const now = new Date().toISOString();
+        const defaultRunId = 'default-unassigned-run';
+        
+        // Check if default run already exists
+        const existingRun = get('SELECT id FROM kc_test_runs WHERE id = ?', [defaultRunId]);
+        
+        if (!existingRun) {
+            // Create the default test run
+            run(`INSERT INTO kc_test_runs (id, run_number, name, description, due_date, status, created_by, notes, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [defaultRunId, 'TR-0000', 'Nicht Zugeteilt', 'Automatisch erstellter Testdurchlauf für bestehende Tests ohne Zuweisung', 
+                 null, 'completed', 'system', 'Dieser Testdurchlauf wurde automatisch erstellt für Tests, die vor der Einführung des Testdurchlauf-Systems erstellt wurden.', 
+                 now, now]);
+            
+            // Get unique test IDs from orphaned assignments
+            const uniqueTestIds = [...new Set(orphanedAssignments.map(a => a.test_id))];
+            
+            // Add tests to the run
+            uniqueTestIds.forEach((testId, index) => {
+                run('INSERT OR IGNORE INTO kc_test_run_tests (id, run_id, test_id, sort_order) VALUES (?, ?, ?, ?)',
+                    [uuidv4(), defaultRunId, testId, index]);
+            });
+        }
+        
+        // Update all orphaned assignments to belong to the default run
+        run('UPDATE kc_test_assignments SET run_id = ? WHERE run_id IS NULL', [defaultRunId]);
+        saveDb();
+        
+        console.log('Orphaned assignments migrated to default test run');
+        return { 
+            success: true, 
+            message: `${orphanedAssignments.length} verwaiste Zuweisungen wurden dem Standard-Testdurchlauf zugewiesen`, 
+            count: orphanedAssignments.length 
+        };
+    },
+
+    /**
+     * Get count of orphaned assignments
+     */
+    getOrphanedAssignmentsCount() {
+        const result = get('SELECT COUNT(*) as count FROM kc_test_assignments WHERE run_id IS NULL');
+        return result?.count || 0;
     }
 };
 

@@ -261,13 +261,17 @@ const KCTestsView = {
                     </div>
                 </div>
                 <div class="kc-question-actions">
-                    <button class="btn-icon kc-view-test" data-id="${test.id}" title="Anzeigen">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
                     ${canEdit ? `
+                        <button class="btn-icon kc-move-test" data-id="${test.id}" data-category-id="${test.categoryId || ''}" title="Verschieben">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="5 9 2 12 5 15"></polyline>
+                                <polyline points="9 5 12 2 15 5"></polyline>
+                                <polyline points="15 19 12 22 9 19"></polyline>
+                                <polyline points="19 9 22 12 19 15"></polyline>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <line x1="12" y1="2" x2="12" y2="22"></line>
+                            </svg>
+                        </button>
                         <button class="btn-icon kc-edit-test" data-id="${test.id}" title="Bearbeiten">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -316,20 +320,22 @@ const KCTestsView = {
             });
         });
 
-        // Double-click on test to view
+        // Click on test to view
         document.querySelectorAll('.kc-test-item').forEach(item => {
-            item.addEventListener('dblclick', () => {
+            item.addEventListener('click', (e) => {
+                // Don't trigger if clicking on action buttons
+                if (e.target.closest('.kc-question-actions')) return;
                 const testId = item.dataset.testId;
                 if (testId) this.viewTest(testId);
             });
             item.classList.add('clickable-row');
         });
 
-        // View test
-        document.querySelectorAll('.kc-view-test').forEach(btn => {
+        // Move test
+        document.querySelectorAll('.kc-move-test').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.viewTest(btn.dataset.id);
+                this.showMoveTestForm(btn.dataset.id, btn.dataset.categoryId);
             });
         });
 
@@ -1005,6 +1011,95 @@ const KCTestsView = {
             console.error('Edit test error:', error);
             Toast.error('Test konnte nicht geladen werden');
         }
+    },
+
+    /**
+     * Shows form to move a test to another category
+     */
+    async showMoveTestForm(testId, currentCategoryId) {
+        const test = this.tests.find(t => t.id === testId);
+        if (!test) return;
+
+        const currentCategory = this.testCategories.find(c => c.id === currentCategoryId);
+        const currentCategoryName = currentCategory ? currentCategory.name : 'Keine Kategorie';
+
+        const formHtml = `
+            <div class="move-form">
+                <p>Test: <strong>${Helpers.escapeHtml(test.testNumber)} - ${Helpers.escapeHtml(test.name)}</strong></p>
+                <div class="move-arrow-container">
+                    <div class="move-from">
+                        <span class="text-muted">Von:</span>
+                        <strong>${Helpers.escapeHtml(currentCategoryName)}</strong>
+                    </div>
+                    <div class="move-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </div>
+                    <div class="move-to">
+                        <span class="text-muted">Nach:</span>
+                        <select id="move-category-select" class="form-select">
+                            <option value="">Keine Kategorie</option>
+                            ${this.testCategories.map(c => `
+                                <option value="${c.id}" ${c.id === currentCategoryId ? 'disabled' : ''}>
+                                    ${Helpers.escapeHtml(c.name)}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const template = document.createElement('template');
+        template.innerHTML = formHtml.trim();
+        const content = template.content.firstElementChild;
+
+        const footer = document.createElement('div');
+        footer.style.display = 'flex';
+        footer.style.gap = 'var(--space-sm)';
+        footer.style.justifyContent = 'flex-end';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-secondary';
+        cancelBtn.textContent = 'Abbrechen';
+        cancelBtn.addEventListener('click', () => Modal.close());
+
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'btn btn-primary';
+        submitBtn.textContent = 'Verschieben';
+        submitBtn.addEventListener('click', async () => {
+            const newCategoryId = document.getElementById('move-category-select')?.value || null;
+            
+            try {
+                const response = await window.api.knowledgeCheck.updateTest(testId, {
+                    categoryId: newCategoryId
+                });
+                
+                if (response && response.success) {
+                    Toast.success('Test verschoben');
+                    Modal.close();
+                    await this.loadTests();
+                    this.renderTestList();
+                } else {
+                    Toast.error(response?.error || 'Fehler beim Verschieben');
+                }
+            } catch (error) {
+                console.error('Move test error:', error);
+                Toast.error('Fehler beim Verschieben');
+            }
+        });
+
+        footer.appendChild(cancelBtn);
+        footer.appendChild(submitBtn);
+
+        Modal.open({
+            title: 'Test verschieben',
+            content,
+            footer,
+            size: 'sm'
+        });
     },
 
     /**

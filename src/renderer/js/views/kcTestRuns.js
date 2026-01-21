@@ -129,9 +129,13 @@ const KCTestRunsView = {
 
         tbody.innerHTML = this.runs.map(run => this.renderRunRow(run)).join('');
 
-        // Bind click handlers
+        // Bind click handlers - single click to view
         tbody.querySelectorAll('tr[data-id]').forEach(row => {
-            row.addEventListener('dblclick', () => this.viewRun(row.dataset.id));
+            row.addEventListener('click', (e) => {
+                // Don't trigger if clicking on action buttons
+                if (e.target.closest('.action-buttons')) return;
+                this.viewRun(row.dataset.id);
+            });
         });
 
         tbody.querySelectorAll('.btn-view').forEach(btn => {
@@ -506,10 +510,14 @@ const KCTestRunsView = {
                 });
             });
 
-            // Bind double-click on rows with results
+            // Bind click on rows with results
             content.querySelectorAll('tr[data-result-id]').forEach(row => {
                 if (row.dataset.resultId) {
-                    row.addEventListener('dblclick', () => this.viewResult(row.dataset.resultId));
+                    row.addEventListener('click', (e) => {
+                        // Don't trigger if clicking on action buttons
+                        if (e.target.closest('button')) return;
+                        this.viewResult(row.dataset.resultId);
+                    });
                 }
             });
         } catch (error) {
