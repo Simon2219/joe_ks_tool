@@ -90,7 +90,7 @@ const KnowledgeCheckView = {
                     const runsEl = document.getElementById('kc-stat-runs');
                     if (runsEl) runsEl.textContent = `${stats.totalRuns || 0} Durchläufe`;
                 }
-                if (Permissions.hasPermission('kc_archive_view')) {
+                if (Permissions.hasPermission('kc_archive_access')) {
                     const archivedEl = document.getElementById('kc-stat-archived');
                     if (archivedEl) archivedEl.textContent = `${stats.totalArchived || 0} Archiviert`;
                 }

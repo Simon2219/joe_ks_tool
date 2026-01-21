@@ -223,25 +223,17 @@ const KCAssignedView = {
      */
     async startAssignedTest(assignmentId, testId) {
         try {
-            // Load the test
-            const testResult = await window.api.knowledgeCheck.getTestById(testId);
-            if (!testResult.success) {
-                Toast.error('Test konnte nicht geladen werden');
+            // Load test data using the special take-test endpoint
+            // This only requires kc_assigned_view permission
+            const result = await window.api.knowledgeCheck.getTakeTestData(assignmentId);
+            if (!result.success) {
+                Toast.error(result.error || 'Test konnte nicht geladen werden');
                 return;
             }
 
-            const test = testResult.test;
-            
-            // Load questions with their options
-            const questionsWithOptions = [];
-            for (const tq of test.questions) {
-                const qResult = await window.api.knowledgeCheck.getQuestionById(tq.questionId);
-                if (qResult.success) {
-                    questionsWithOptions.push(qResult.question);
-                }
-            }
+            const { test, questions } = result;
 
-            if (questionsWithOptions.length === 0) {
+            if (!questions || questions.length === 0) {
                 Toast.error('Der Test enthält keine Fragen');
                 return;
             }
@@ -254,7 +246,7 @@ const KCAssignedView = {
             }
 
             // Show test taking modal
-            this.showTestTakingModal(test, questionsWithOptions, userResult.user.id, assignmentId);
+            this.showTestTakingModal(test, questions, userResult.user.id, assignmentId);
         } catch (error) {
             console.error('Start assigned test error:', error);
             Toast.error('Fehler beim Starten des Tests');

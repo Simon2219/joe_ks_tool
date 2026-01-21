@@ -590,26 +590,30 @@ function ensurePermissions() {
         { id: 'quality_edit', name: 'Edit Evaluations', module: 'quality' },
         { id: 'quality_delete', name: 'Delete Evaluations', module: 'quality' },
         { id: 'quality_manage', name: 'Manage Categories', module: 'quality' },
-        { id: 'kc_view', name: 'View Knowledge Check Tab', module: 'knowledge_check' },
-        { id: 'kc_questions_view', name: 'View Question Catalog', module: 'knowledge_check' },
-        { id: 'kc_questions_create', name: 'Create Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_edit', name: 'Edit Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_delete', name: 'Delete Questions', module: 'knowledge_check' },
+        // Knowledge Check - Categories (Delete > Create > Edit)
+        { id: 'kc_categories_delete', name: 'Delete Categories', module: 'knowledge_check' },
         { id: 'kc_categories_create', name: 'Create Categories', module: 'knowledge_check' },
         { id: 'kc_categories_edit', name: 'Edit Categories', module: 'knowledge_check' },
-        { id: 'kc_categories_delete', name: 'Delete Categories', module: 'knowledge_check' },
-        { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
+        // Knowledge Check - Questions (Delete > Create > Edit > View)
+        { id: 'kc_questions_delete', name: 'Delete Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_create', name: 'Create Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_edit', name: 'Edit Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_view', name: 'View Question Catalog', module: 'knowledge_check' },
+        // Knowledge Check - Tests (Delete > Create > Edit > View)
+        { id: 'kc_tests_delete', name: 'Delete Tests', module: 'knowledge_check' },
         { id: 'kc_tests_create', name: 'Create Tests', module: 'knowledge_check' },
         { id: 'kc_tests_edit', name: 'Edit Tests', module: 'knowledge_check' },
-        { id: 'kc_tests_delete', name: 'Delete Tests', module: 'knowledge_check' },
-        { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
-        { id: 'kc_results_create', name: 'Conduct Tests', module: 'knowledge_check' },
+        { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
+        // Knowledge Check - Results (Delete > View)
         { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
-        { id: 'kc_assign_tests', name: 'Assign Tests to Users', module: 'knowledge_check' },
+        { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
+        // Knowledge Check - Test Runs & Assignments
+        { id: 'kc_assign_tests', name: 'Create Test Run', module: 'knowledge_check' },
         { id: 'kc_assigned_view', name: 'View Assigned Tests', module: 'knowledge_check' },
-        { id: 'kc_archive_view', name: 'View Archive', module: 'knowledge_check' },
-        { id: 'kc_archive_restore', name: 'Restore from Archive', module: 'knowledge_check' },
-        { id: 'kc_archive_delete', name: 'Permanently Delete Archived', module: 'knowledge_check' },
+        // Knowledge Check - Archive (combined permission)
+        { id: 'kc_archive_access', name: 'Archive Access', module: 'knowledge_check' },
+        // Knowledge Check - Tab Access
+        { id: 'kc_view', name: 'View Knowledge Check Tab', module: 'knowledge_check' },
         { id: 'role_view', name: 'View Roles', module: 'roles' },
         { id: 'role_create', name: 'Create Roles', module: 'roles' },
         { id: 'role_edit', name: 'Edit Roles', module: 'roles' },
@@ -677,26 +681,30 @@ async function seedData() {
         { id: 'quality_edit', name: 'Edit Evaluations', module: 'quality' },
         { id: 'quality_delete', name: 'Delete Evaluations', module: 'quality' },
         { id: 'quality_manage', name: 'Manage Categories', module: 'quality' },
-        { id: 'kc_view', name: 'View Knowledge Check Tab', module: 'knowledge_check' },
-        { id: 'kc_questions_view', name: 'View Question Catalog', module: 'knowledge_check' },
-        { id: 'kc_questions_create', name: 'Create Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_edit', name: 'Edit Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_delete', name: 'Delete Questions', module: 'knowledge_check' },
+        // Knowledge Check - Categories (Delete > Create > Edit)
+        { id: 'kc_categories_delete', name: 'Delete Categories', module: 'knowledge_check' },
         { id: 'kc_categories_create', name: 'Create Categories', module: 'knowledge_check' },
         { id: 'kc_categories_edit', name: 'Edit Categories', module: 'knowledge_check' },
-        { id: 'kc_categories_delete', name: 'Delete Categories', module: 'knowledge_check' },
-        { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
+        // Knowledge Check - Questions (Delete > Create > Edit > View)
+        { id: 'kc_questions_delete', name: 'Delete Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_create', name: 'Create Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_edit', name: 'Edit Questions', module: 'knowledge_check' },
+        { id: 'kc_questions_view', name: 'View Question Catalog', module: 'knowledge_check' },
+        // Knowledge Check - Tests (Delete > Create > Edit > View)
+        { id: 'kc_tests_delete', name: 'Delete Tests', module: 'knowledge_check' },
         { id: 'kc_tests_create', name: 'Create Tests', module: 'knowledge_check' },
         { id: 'kc_tests_edit', name: 'Edit Tests', module: 'knowledge_check' },
-        { id: 'kc_tests_delete', name: 'Delete Tests', module: 'knowledge_check' },
-        { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
-        { id: 'kc_results_create', name: 'Conduct Tests', module: 'knowledge_check' },
+        { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
+        // Knowledge Check - Results (Delete > View)
         { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
-        { id: 'kc_assign_tests', name: 'Assign Tests to Users', module: 'knowledge_check' },
+        { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
+        // Knowledge Check - Test Runs & Assignments
+        { id: 'kc_assign_tests', name: 'Create Test Run', module: 'knowledge_check' },
         { id: 'kc_assigned_view', name: 'View Assigned Tests', module: 'knowledge_check' },
-        { id: 'kc_archive_view', name: 'View Archive', module: 'knowledge_check' },
-        { id: 'kc_archive_restore', name: 'Restore from Archive', module: 'knowledge_check' },
-        { id: 'kc_archive_delete', name: 'Permanently Delete Archived', module: 'knowledge_check' },
+        // Knowledge Check - Archive (combined permission)
+        { id: 'kc_archive_access', name: 'Archive Access', module: 'knowledge_check' },
+        // Knowledge Check - Tab Access
+        { id: 'kc_view', name: 'View Knowledge Check Tab', module: 'knowledge_check' },
         { id: 'role_view', name: 'View Roles', module: 'roles' },
         { id: 'role_create', name: 'Create Roles', module: 'roles' },
         { id: 'role_edit', name: 'Edit Roles', module: 'roles' },
@@ -718,15 +726,14 @@ async function seedData() {
     const kcManagerPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit', 'kc_questions_delete', 
                            'kc_categories_create', 'kc_categories_edit', 'kc_categories_delete',
                            'kc_tests_view', 'kc_tests_create', 'kc_tests_edit', 'kc_tests_delete',
-                           'kc_results_view', 'kc_results_create', 'kc_results_delete',
+                           'kc_results_view', 'kc_results_delete',
                            'kc_assign_tests', 'kc_assigned_view',
-                           'kc_archive_view', 'kc_archive_restore', 'kc_archive_delete'];
+                           'kc_archive_access'];
     const kcEditorPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit',
                           'kc_categories_create', 'kc_categories_edit',
                           'kc_tests_view', 'kc_tests_create', 'kc_tests_edit',
-                          'kc_results_view', 'kc_results_create',
-                          'kc_assign_tests', 'kc_assigned_view',
-                          'kc_archive_view']; // Editors can view archive but not restore or delete
+                          'kc_results_view',
+                          'kc_assign_tests', 'kc_assigned_view'];
     const kcUserPerms = ['kc_view', 'kc_assigned_view']; // Can see the tab and their assigned tests
     
     const roles = [
