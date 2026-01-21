@@ -497,6 +497,7 @@ router.get('/results', requirePermission('kc_results_view'), (req, res) => {
 /**
  * GET /api/knowledge-check/results/:id
  * Users can view their own results (with kc_assigned_view) or all results (with kc_results_view)
+ * Users with kc_results_evaluate can see which answers are correct
  */
 router.get('/results/:id', (req, res) => {
     try {
@@ -509,6 +510,7 @@ router.get('/results/:id', (req, res) => {
         const isOwnResult = result.userId === req.user.id;
         const hasAssignedView = hasPermission(req.user, 'kc_assigned_view');
         const hasResultsView = hasPermission(req.user, 'kc_results_view');
+        const canEvaluate = hasPermission(req.user, 'kc_results_evaluate');
         
         if (!isOwnResult && !hasResultsView) {
             return res.status(403).json({ success: false, error: 'Permission denied - cannot view results for other users' });
@@ -518,7 +520,7 @@ router.get('/results/:id', (req, res) => {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
         
-        res.json({ success: true, result });
+        res.json({ success: true, result, canEvaluate });
     } catch (error) {
         console.error('Get KC result error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch result' });

@@ -2096,6 +2096,15 @@
     opacity: 0.7;
 }
 
+.result-option.option-selected-only {
+    background: var(--brand-primary-light);
+    border-left: 3px solid var(--brand-primary);
+}
+
+.result-option.option-selected-only .option-status {
+    color: var(--brand-primary);
+}
+
 .result-scoring-info {
     margin: var(--space-xs) 0 0 0;
     color: var(--text-muted);

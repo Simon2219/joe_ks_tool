@@ -393,6 +393,7 @@ const Permissions = {
             'kc_tests_view': 'View Test Catalog',
             // Knowledge Check permissions - Results
             'kc_results_delete': 'Delete Test Results',
+            'kc_results_evaluate': 'Evaluate Test Results',
             'kc_results_view': 'View Test Results',
             // Knowledge Check permissions - Test Runs & Assignments
             'kc_assign_tests': 'Create Test Run',
@@ -440,8 +441,8 @@ const Permissions = {
             'kc_questions_delete', 'kc_questions_create', 'kc_questions_edit', 'kc_questions_view',
             // Tests (Delete > Create > Edit > View)
             'kc_tests_delete', 'kc_tests_create', 'kc_tests_edit', 'kc_tests_view',
-            // Results (Delete > View)
-            'kc_results_delete', 'kc_results_view',
+            // Results (Delete > Evaluate > View)
+            'kc_results_delete', 'kc_results_evaluate', 'kc_results_view',
             // Test Runs & Assignments
             'kc_assign_tests', 'kc_assigned_view',
             // Archive
