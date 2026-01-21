@@ -170,8 +170,8 @@ const Modal = {
             cancelBtn.type = 'button';
             cancelBtn.textContent = cancelText;
             cancelBtn.addEventListener('click', () => {
-                this.close();
                 done(false);
+                this.close();
             });
     
             const confirmBtn = document.createElement('button');
@@ -179,8 +179,8 @@ const Modal = {
             confirmBtn.type = 'button';
             confirmBtn.textContent = confirmText;
             confirmBtn.addEventListener('click', () => {
-                this.close();
                 done(true);
+                this.close();
             });
     
             footer.append(cancelBtn, confirmBtn);
@@ -239,8 +239,8 @@ const Modal = {
             cancelBtn.type = 'button';
             cancelBtn.textContent = cancelText;
             cancelBtn.addEventListener('click', () => {
-                this.close();
                 done(null);
+                this.close();
             });
     
             const submitBtn = document.createElement('button');
