@@ -1301,3 +1301,136 @@
         max-width: none;
     }
 }
+
+/* ============================================
+   SETTINGS VIEW v2 - EXPANDABLE SECTIONS
+   ============================================ */
+
+.settings-divider {
+    margin: var(--space-xl) 0;
+    border: none;
+    border-top: 1px solid var(--border);
+}
+
+.qs-settings-section-expandable {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: var(--space-md);
+}
+
+.qs-settings-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.qs-settings-section-header:hover {
+    background: var(--bg-hover);
+}
+
+.qs-settings-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.qs-settings-section-title h3 {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 600;
+}
+
+.qs-settings-team-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+}
+
+.qs-settings-section-chevron {
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.qs-settings-section-expandable.expanded .qs-settings-section-chevron {
+    transform: rotate(180deg);
+}
+
+.qs-settings-section-content {
+    padding: 0 var(--space-lg) var(--space-lg);
+    display: none;
+}
+
+.qs-settings-section-expandable.expanded .qs-settings-section-content {
+    display: block;
+}
+
+/* Team-specific settings card */
+.qs-team-settings-card {
+    background: var(--bg-muted);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-md);
+}
+
+.qs-team-settings-card:last-child {
+    margin-bottom: 0;
+}
+
+.qs-team-settings-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.qs-team-settings-card-header h4 {
+    margin: 0;
+}
+
+/* Settings subsections within team card */
+.qs-settings-subsection {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--border);
+}
+
+.qs-settings-subsection:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.qs-settings-subsection h5 {
+    margin: 0 0 var(--space-md);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Access denied message */
+.qs-settings-no-access {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--text-muted);
+}
+
+.qs-settings-no-access svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: var(--space-md);
+    opacity: 0.5;
+}

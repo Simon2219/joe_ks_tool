@@ -152,8 +152,20 @@ function runMigrations(db, all) {
         migrationsRun++;
     }
     
-    // Migration 13: Ensure teams table exists (for very old databases)
-    // This is a no-op if the table exists - just ensures the structure
+    // Migration 13: Add is_supervisor to users
+    if (tableExists('users') && !columnExists('users', 'is_supervisor')) {
+        console.log('  [Migration 13] Adding is_supervisor to users...');
+        db.run('ALTER TABLE users ADD COLUMN is_supervisor INTEGER DEFAULT 0');
+        migrationsRun++;
+    }
+    
+    // Migration 14: Add is_supervisor and is_management to roles
+    if (tableExists('roles') && !columnExists('roles', 'is_supervisor')) {
+        console.log('  [Migration 14] Adding is_supervisor/is_management to roles...');
+        db.run('ALTER TABLE roles ADD COLUMN is_supervisor INTEGER DEFAULT 0');
+        db.run('ALTER TABLE roles ADD COLUMN is_management INTEGER DEFAULT 0');
+        migrationsRun++;
+    }
     
     if (migrationsRun > 0) {
         console.log(`Migrations completed: ${migrationsRun} migration(s) applied`);

@@ -228,10 +228,10 @@ const UserSystem = {
         const hashedPw = await bcrypt.hash(data.password, bcryptRounds);
         const defaultRole = Config.get('users.defaultRole', 'agent');
         
-        run(`INSERT INTO users (id, username, email, password, first_name, last_name, role_id, team_id, phone, is_active, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        run(`INSERT INTO users (id, username, email, password, first_name, last_name, role_id, team_id, is_supervisor, phone, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, data.username.toLowerCase(), data.email.toLowerCase(), hashedPw, data.firstName, data.lastName,
-             data.roleId || defaultRole, data.teamId || null, data.phone || '', data.isActive !== false ? 1 : 0, now, now]);
+             data.roleId || defaultRole, data.teamId || null, data.isSupervisor ? 1 : 0, data.phone || '', data.isActive !== false ? 1 : 0, now, now]);
         
         saveDb();
         return this.getById(id);
@@ -256,6 +256,7 @@ const UserSystem = {
         if (data.lastName) { sql += ', last_name = ?'; params.push(data.lastName); }
         if (data.roleId) { sql += ', role_id = ?'; params.push(data.roleId); }
         if (data.teamId !== undefined) { sql += ', team_id = ?'; params.push(data.teamId || null); }
+        if (data.isSupervisor !== undefined) { sql += ', is_supervisor = ?'; params.push(data.isSupervisor ? 1 : 0); }
         if (data.phone !== undefined) { sql += ', phone = ?'; params.push(data.phone); }
         if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
         if (data.lastLogin) { sql += ', last_login = ?'; params.push(data.lastLogin); }
@@ -304,6 +305,8 @@ const RoleSystem = {
         return roles.map(r => ({
             ...r,
             is_admin: !!r.is_admin,
+            is_supervisor: !!r.is_supervisor,
+            is_management: !!r.is_management,
             is_system: !!r.is_system,
             permissions: this.getPermissions(r.id),
             userCount: get('SELECT COUNT(*) as c FROM users WHERE role_id = ?', [r.id]).c
@@ -313,7 +316,14 @@ const RoleSystem = {
     getById(id) {
         const role = get('SELECT * FROM roles WHERE id = ?', [id]);
         if (!role) return null;
-        return { ...role, is_admin: !!role.is_admin, is_system: !!role.is_system, permissions: this.getPermissions(id) };
+        return { 
+            ...role, 
+            is_admin: !!role.is_admin, 
+            is_supervisor: !!role.is_supervisor,
+            is_management: !!role.is_management,
+            is_system: !!role.is_system, 
+            permissions: this.getPermissions(id) 
+        };
     },
     
     getPermissions(roleId) {
@@ -328,8 +338,8 @@ const RoleSystem = {
         const now = new Date().toISOString();
         const id = uuidv4();
         
-        run('INSERT INTO roles (id, name, description, is_admin, is_system, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [id, data.name, data.description || '', data.isAdmin ? 1 : 0, 0, now, now]);
+        run('INSERT INTO roles (id, name, description, is_admin, is_supervisor, is_management, is_system, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, data.name, data.description || '', data.isAdmin ? 1 : 0, data.isSupervisor ? 1 : 0, data.isManagement ? 1 : 0, 0, now, now]);
         
         (data.permissions || []).forEach(p => {
             run('INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [id, p]);
@@ -350,6 +360,8 @@ const RoleSystem = {
         if (data.name) { sql += ', name = ?'; params.push(data.name); }
         if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
         if (data.isAdmin !== undefined && !existing.is_system) { sql += ', is_admin = ?'; params.push(data.isAdmin ? 1 : 0); }
+        if (data.isSupervisor !== undefined && !existing.is_system) { sql += ', is_supervisor = ?'; params.push(data.isSupervisor ? 1 : 0); }
+        if (data.isManagement !== undefined && !existing.is_system) { sql += ', is_management = ?'; params.push(data.isManagement ? 1 : 0); }
         
         sql += ' WHERE id = ?';
         params.push(id);
@@ -509,8 +521,56 @@ const TeamsSystem = {
             memberCount: this.getMemberCount(teamId),
             activeUsers: get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId])?.count || 0
         };
+    },
+    
+    getSupervisors(teamId) {
+        return all(`
+            SELECT u.*, r.name as role_name, r.is_admin, r.is_supervisor as role_is_supervisor, r.is_management as role_is_management
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            WHERE u.team_id = ? AND u.is_active = 1 AND u.is_supervisor = 1
+            ORDER BY u.last_name, u.first_name
+        `, [teamId]);
+    },
+    
+    isUserSupervisorForTeam(userId, teamId) {
+        const user = get(`
+            SELECT u.is_supervisor, r.is_admin, r.is_supervisor as role_is_supervisor, r.is_management as role_is_management
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            WHERE u.id = ? AND u.team_id = ?
+        `, [userId, teamId]);
+        
+        if (!user) return false;
+        
+        // User is supervisor if: is_admin, user.is_supervisor, role.is_supervisor, or role.is_management
+        return !!user.is_admin || !!user.is_supervisor || !!user.role_is_supervisor || !!user.role_is_management;
+    },
+    
+    getTeamsForSupervisor(userId) {
+        // Get all teams where the user is a supervisor (either by user flag or role)
+        const user = UserSystem.getById(userId);
+        if (!user) return [];
+        
+        const role = RoleSystem.getById(user.role_id);
+        
+        // Admins see all teams
+        if (role && role.is_admin) {
+            return this.getAll();
+        }
+        
+        // Get teams where the user is assigned and is a supervisor
+        if (user.is_supervisor || (role && (role.is_supervisor || role.is_management))) {
+            if (user.team_id) {
+                const team = this.getById(user.team_id);
+                return team ? [team] : [];
+            }
+        }
+        
+        return [];
     }
 };
+
 // TICKET SYSTEM
 // ============================================
 

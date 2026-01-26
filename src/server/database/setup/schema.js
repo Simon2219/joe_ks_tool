@@ -53,6 +53,7 @@ function createTables(db) {
             last_name TEXT NOT NULL,
             role_id TEXT NOT NULL,
             team_id TEXT DEFAULT NULL,
+            is_supervisor INTEGER DEFAULT 0,
             phone TEXT DEFAULT '',
             is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL,
@@ -68,6 +69,8 @@ function createTables(db) {
             name TEXT UNIQUE NOT NULL,
             description TEXT DEFAULT '',
             is_admin INTEGER DEFAULT 0,
+            is_supervisor INTEGER DEFAULT 0,
+            is_management INTEGER DEFAULT 0,
             is_system INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL

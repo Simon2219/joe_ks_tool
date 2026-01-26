@@ -91,6 +91,12 @@ const RolesView = {
     renderRoleCard(role) {
         const canEdit = Permissions.canEdit('role');
         const canDelete = Permissions.canDelete('role') && !role.isSystem;
+        
+        // Handle both camelCase and snake_case
+        const isAdmin = role.isAdmin || role.is_admin;
+        const isSupervisor = role.isSupervisor || role.is_supervisor;
+        const isManagement = role.isManagement || role.is_management;
+        const isSystem = role.isSystem || role.is_system;
 
         return `
             <div class="role-card" data-id="${role.id}">
@@ -100,8 +106,10 @@ const RolesView = {
                         <p>${Helpers.escapeHtml(role.description || 'No description')}</p>
                     </div>
                     <div class="role-meta">
-                        ${role.isAdmin ? '<span class="badge badge-warning">Admin</span>' : ''}
-                        ${role.isSystem ? '<span class="badge badge-secondary">System</span>' : ''}
+                        ${isAdmin ? '<span class="badge badge-warning">Admin</span>' : ''}
+                        ${isSupervisor ? '<span class="badge badge-info">Supervisor</span>' : ''}
+                        ${isManagement ? '<span class="badge badge-purple">Management</span>' : ''}
+                        ${isSystem ? '<span class="badge badge-secondary">System</span>' : ''}
                     </div>
                 </div>
                 <div class="role-card-body">
@@ -185,8 +193,20 @@ const RolesView = {
                 ${!role?.isSystem ? `
                     <div class="form-group">
                         <label class="form-checkbox">
-                            <input type="checkbox" name="isAdmin" ${role?.isAdmin ? 'checked' : ''}>
+                            <input type="checkbox" name="isAdmin" ${role?.isAdmin || role?.is_admin ? 'checked' : ''}>
                             <span>Administrator Role (full access)</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-checkbox">
+                            <input type="checkbox" name="isSupervisor" ${role?.isSupervisor || role?.is_supervisor ? 'checked' : ''}>
+                            <span>Supervisor Role (can evaluate team members)</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-checkbox">
+                            <input type="checkbox" name="isManagement" ${role?.isManagement || role?.is_management ? 'checked' : ''}>
+                            <span>Management Role (overview across teams)</span>
                         </label>
                     </div>
                 ` : ''}
@@ -249,6 +269,8 @@ const RolesView = {
                 name: formData.get('name'),
                 description: formData.get('description'),
                 isAdmin: formData.get('isAdmin') === 'on',
+                isSupervisor: formData.get('isSupervisor') === 'on',
+                isManagement: formData.get('isManagement') === 'on',
                 permissions
             };
 

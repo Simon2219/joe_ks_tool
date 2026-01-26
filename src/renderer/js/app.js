@@ -377,7 +377,7 @@ const App = {
             qsTeamSocial: 'Social Media',
             qsTracking: 'Quality Tracking',
             qsMyResults: 'Meine Ergebnisse',
-            qsSettings: 'QS Einstellungen',
+            qsSettings: 'Quality Check Settings',
             qsTasks: 'Aufgaben Katalog',
             qsChecks: 'Check Katalog',
             qsEvaluation: 'Quality Check',

@@ -8,65 +8,99 @@
                 </svg>
                 Zurück
             </button>
-            <h1>Quality System Einstellungen</h1>
         </div>
     </div>
 
-    <div class="settings-container">
-        <!-- General Settings -->
-        <div class="settings-section">
-            <h3>Allgemeine Einstellungen</h3>
-            <div class="settings-grid">
-                <div class="form-group">
-                    <label for="qs-settings-passing-score">Mindest-Score zum Bestehen (%)</label>
-                    <input type="number" id="qs-settings-passing-score" class="form-input" min="0" max="100" value="80">
+    <div class="settings-container" id="qs-settings-container">
+        <!-- Team-specific settings will be loaded here dynamically -->
+        <div id="qs-team-settings-sections">
+            <p class="text-muted">Lade Team-Einstellungen...</p>
+        </div>
+
+        <hr class="settings-divider">
+
+        <!-- General Settings (visible to all supervisors/managers) -->
+        <div class="settings-section qs-settings-section-expandable" id="qs-general-settings-section">
+            <div class="qs-settings-section-header" onclick="QualitySystemViews.toggleSettingsSection('general')">
+                <div class="qs-settings-section-title">
+                    <span class="qs-settings-team-pill" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">Allgemein</span>
+                    <h3>Globale Einstellungen</h3>
                 </div>
-                <div class="form-group">
-                    <label for="qs-settings-default-scoring">Standard Scoring-Typ</label>
-                    <select id="qs-settings-default-scoring" class="form-select">
-                        <option value="points">Punkte</option>
-                        <option value="scale">Skala</option>
-                        <option value="checkbox">Checkbox</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="qs-settings-default-scale">Standard Skala-Größe</label>
-                    <select id="qs-settings-default-scale" class="form-select">
-                        <option value="5">1-5</option>
-                        <option value="10">1-10</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="qs-settings-default-channel">Standard Interaktionskanal</label>
-                    <select id="qs-settings-default-channel" class="form-select">
-                        <option value="ticket">Ticket</option>
-                        <option value="call">Anruf</option>
-                        <option value="chat">Chat</option>
-                        <option value="email">E-Mail</option>
-                        <option value="social">Social Media</option>
-                        <option value="other">Sonstige</option>
-                    </select>
+                <svg class="qs-settings-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="qs-settings-section-content" id="qs-settings-section-general-content">
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label for="qs-settings-passing-score">Mindest-Score zum Bestehen (%)</label>
+                        <input type="number" id="qs-settings-passing-score" class="form-input" min="0" max="100" value="80">
+                    </div>
+                    <div class="form-group">
+                        <label for="qs-settings-default-scoring">Standard Scoring-Typ</label>
+                        <select id="qs-settings-default-scoring" class="form-select">
+                            <option value="points">Punkte</option>
+                            <option value="scale">Skala</option>
+                            <option value="checkbox">Checkbox</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="qs-settings-default-scale">Standard Skala-Größe</label>
+                        <select id="qs-settings-default-scale" class="form-select">
+                            <option value="5">1-5</option>
+                            <option value="10">1-10</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="qs-settings-default-channel">Standard Interaktionskanal</label>
+                        <select id="qs-settings-default-channel" class="form-select">
+                            <option value="ticket">Ticket</option>
+                            <option value="call">Anruf</option>
+                            <option value="chat">Chat</option>
+                            <option value="email">E-Mail</option>
+                            <option value="social">Social Media</option>
+                            <option value="other">Sonstige</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Quota Settings -->
-        <div class="settings-section" data-permission="qs_quotas_manage">
-            <h3>Evaluierungs-Quoten</h3>
-            <p class="text-muted">Legen Sie fest, wie viele Evaluierungen pro Zeitraum durchgeführt werden sollen.</p>
-            
-            <div class="qs-quotas-list" id="qs-quotas-list">
-                <!-- Populated by JS for each team -->
+        <!-- Quota Settings (Global) -->
+        <div class="settings-section qs-settings-section-expandable" id="qs-quota-settings-section" data-permission="qs_quotas_manage">
+            <div class="qs-settings-section-header" onclick="QualitySystemViews.toggleSettingsSection('quotas')">
+                <div class="qs-settings-section-title">
+                    <span class="qs-settings-team-pill" style="background: linear-gradient(135deg, #f59e0b, #d97706);">Quoten</span>
+                    <h3>Evaluierungs-Quoten</h3>
+                </div>
+                <svg class="qs-settings-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="qs-settings-section-content" id="qs-settings-section-quotas-content">
+                <p class="text-muted">Legen Sie fest, wie viele Evaluierungen pro Zeitraum durchgeführt werden sollen.</p>
+                <div class="qs-quotas-list" id="qs-quotas-list">
+                    <!-- Populated by JS for each team -->
+                </div>
             </div>
         </div>
 
-        <!-- Team Role Mappings -->
-        <div class="settings-section" data-permission="qs_team_config_manage">
-            <h3>Team-Rollen Zuordnung</h3>
-            <p class="text-muted">Legen Sie fest, welche Rollen zu welchem Team gehören.</p>
-            
-            <div class="qs-team-roles-list" id="qs-team-roles-list">
-                <!-- Populated by JS for each team -->
+        <!-- Team Role Mappings (Global) -->
+        <div class="settings-section qs-settings-section-expandable" id="qs-roles-settings-section" data-permission="qs_team_config_manage">
+            <div class="qs-settings-section-header" onclick="QualitySystemViews.toggleSettingsSection('roles')">
+                <div class="qs-settings-section-title">
+                    <span class="qs-settings-team-pill" style="background: linear-gradient(135deg, #10b981, #059669);">Rollen</span>
+                    <h3>Team-Rollen Zuordnung</h3>
+                </div>
+                <svg class="qs-settings-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="qs-settings-section-content" id="qs-settings-section-roles-content">
+                <p class="text-muted">Legen Sie fest, welche Rollen zu welchem Team gehören.</p>
+                <div class="qs-team-roles-list" id="qs-team-roles-list">
+                    <!-- Populated by JS for each team -->
+                </div>
             </div>
         </div>
 
