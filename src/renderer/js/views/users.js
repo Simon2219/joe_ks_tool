@@ -6,8 +6,10 @@
 const UsersView = {
     users: [],
     roles: [],
+    teams: [],
     filters: {
         role: '',
+        team: '',
         status: ''
     },
     eventsBound: false,
@@ -20,7 +22,7 @@ const UsersView = {
             this.bindEvents();
             this.eventsBound = true;
         }
-        await this.loadRoles();
+        await Promise.all([this.loadRoles(), this.loadTeams()]);
         await this.loadUsers();
     },
 
@@ -41,6 +43,11 @@ const UsersView = {
         // Filters
         document.getElementById('filter-user-role')?.addEventListener('change', (e) => {
             this.filters.role = e.target.value;
+            this.applyFilters();
+        });
+
+        document.getElementById('filter-user-team')?.addEventListener('change', (e) => {
+            this.filters.team = e.target.value;
             this.applyFilters();
         });
 
@@ -66,6 +73,21 @@ const UsersView = {
     },
 
     /**
+     * Loads teams for dropdown
+     */
+    async loadTeams() {
+        try {
+            const result = await window.api.teams.getAll();
+            if (result.success) {
+                this.teams = result.teams;
+                this.populateTeamFilter();
+            }
+        } catch (error) {
+            console.error('Failed to load teams:', error);
+        }
+    },
+
+    /**
      * Populates the role filter dropdown
      */
     populateRoleFilter() {
@@ -77,6 +99,22 @@ const UsersView = {
             const option = document.createElement('option');
             option.value = role.id;
             option.textContent = role.name;
+            select.appendChild(option);
+        });
+    },
+
+    /**
+     * Populates the team filter dropdown
+     */
+    populateTeamFilter() {
+        const select = document.getElementById('filter-user-team');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">All Teams</option>';
+        this.teams.forEach(team => {
+            const option = document.createElement('option');
+            option.value = team.id;
+            option.textContent = team.name;
             select.appendChild(option);
         });
     },
@@ -112,6 +150,9 @@ const UsersView = {
     getFilteredUsers() {
         return this.users.filter(user => {
             if (this.filters.role && user.roleId !== this.filters.role && user.role_id !== this.filters.role) {
+                return false;
+            }
+            if (this.filters.team && user.teamId !== this.filters.team && user.team_id !== this.filters.team) {
                 return false;
             }
             if (this.filters.status) {
@@ -166,6 +207,7 @@ const UsersView = {
         const statusText = isActive ? 'Active' : 'Inactive';
         const lastLogin = (user.lastLogin || user.last_login) ? Helpers.timeAgo(user.lastLogin || user.last_login) : 'Never';
         const roleName = user.roleName || user.role_name || '';
+        const teamName = user.teamName || user.team_name || '';
 
         const canEdit = Permissions.canEdit('user');
         const canDelete = Permissions.canDelete('user');
@@ -183,7 +225,7 @@ const UsersView = {
                 </td>
                 <td>${Helpers.escapeHtml(user.email)}</td>
                 <td>${Helpers.escapeHtml(roleName)}</td>
-                <td>${Helpers.escapeHtml(user.department || '-')}</td>
+                <td>${Helpers.escapeHtml(teamName || '-')}</td>
                 <td><span class="badge ${statusClass}">${statusText}</span></td>
                 <td>${lastLogin}</td>
                 <td>
@@ -263,10 +305,11 @@ const UsersView = {
                 placeholder: 'Select role'
             },
             { 
-                name: 'department', 
-                label: 'Department', 
-                type: 'text',
-                placeholder: 'e.g., Customer Support'
+                name: 'teamId', 
+                label: 'Team', 
+                type: 'select',
+                options: [{ value: '', label: 'No Team' }, ...this.teams.map(t => ({ value: t.id, label: t.name }))],
+                placeholder: 'Select team'
             },
             { 
                 name: 'phone', 
@@ -367,7 +410,7 @@ const UsersView = {
                 firstName: user.firstName || user.first_name,
                 lastName: user.lastName || user.last_name,
                 roleId: user.roleId || user.role_id,
-                department: user.department || '',
+                teamId: user.teamId || user.team_id || '',
                 phone: user.phone || '',
                 isActive: user.isActive !== undefined ? user.isActive : !!user.is_active
             };
