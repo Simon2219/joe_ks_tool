@@ -306,12 +306,17 @@ const App = {
 
     /**
      * Navigates to a view
+     * @param {string} viewName - The name of the view to navigate to
+     * @param {Object} params - Optional parameters to pass to the view
      */
-    async navigateTo(viewName) {
+    async navigateTo(viewName, params = null) {
+        // Store params for view initialization
+        this.currentViewParams = params;
+        
         // Define which views belong to which submenu groups
         const submenuGroups = {
             knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcTestRuns', 'kcArchive', 'kcAssigned'],
-            qualitySystem: ['qualitySystem', 'qsTeamBilla', 'qsTeamSocial', 'qsTracking', 'qsMyResults', 'qsSettings', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult']
+            qualitySystem: ['qualitySystem', 'qsTeam', 'qsTeamBilla', 'qsTeamSocial', 'qsTracking', 'qsMyResults', 'qsSettings', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult']
         };
         
         // Update active nav item
@@ -373,6 +378,7 @@ const App = {
             tickets: 'TicketSystem',
             quality: 'QualitySystem',
             qualitySystem: 'Quality System',
+            qsTeam: params?.teamCode ? params.teamCode : 'Team',
             qsTeamBilla: 'BILLA',
             qsTeamSocial: 'Social Media',
             qsTracking: 'Quality Tracking',
@@ -443,6 +449,14 @@ const App = {
                     break;
                 case 'qualitySystem':
                     await QualitySystemViews.showMainPage();
+                    break;
+                case 'qsTeam':
+                    // Dynamic team view - team ID/code passed via params
+                    if (this.currentViewParams?.teamId) {
+                        await QualitySystemViews.showTeamView(this.currentViewParams.teamId);
+                    } else if (this.currentViewParams?.teamCode) {
+                        await QualitySystemViews.showTeamView(this.currentViewParams.teamCode);
+                    }
                     break;
                 case 'qsTeamBilla':
                     await QualitySystemViews.showTeamView('billa');

@@ -978,83 +978,66 @@ const QS = {
     },
 
     // ============================================
-    // TEAM MANAGEMENT
+    // TEAM MANAGEMENT (uses general Teams system)
     // ============================================
     getAllTeams() {
+        // Get teams from the general teams system
         const teams = all('SELECT * FROM teams WHERE is_active = 1 ORDER BY sort_order, name');
-        return teams.map(t => ({
+        return teams.map(t => this.formatTeam(t));
+    },
+    
+    formatTeam(t) {
+        if (!t) return null;
+        // Count agents (users assigned to this team)
+        const agentCount = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [t.id])?.count || 0;
+        // Count supervisors
+        const supervisorCount = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_supervisor = 1 AND is_active = 1', [t.id])?.count || 0;
+        
+        return {
             id: t.id,
             name: t.name,
-            description: t.description,
+            description: t.description || '',
             teamCode: t.team_code,
-            defaultInteractionChannel: t.default_interaction_channel,
+            color: t.color || '#3b82f6',
             isActive: !!t.is_active,
-            sortOrder: t.sort_order,
+            sortOrder: t.sort_order || 0,
             createdAt: t.created_at,
             updatedAt: t.updated_at,
-            roles: this.getTeamRoles(t.id)
-        }));
+            agentCount,
+            supervisorCount
+        };
     },
     
     getTeamById(id) {
         const t = get('SELECT * FROM teams WHERE id = ?', [id]);
-        if (!t) return null;
-        return {
-            id: t.id,
-            name: t.name,
-            description: t.description,
-            teamCode: t.team_code,
-            defaultInteractionChannel: t.default_interaction_channel,
-            isActive: !!t.is_active,
-            sortOrder: t.sort_order,
-            createdAt: t.created_at,
-            updatedAt: t.updated_at,
-            roles: this.getTeamRoles(t.id)
-        };
+        return this.formatTeam(t);
     },
     
     getTeamByCode(code) {
         const t = get('SELECT * FROM teams WHERE team_code = ?', [code]);
-        if (!t) return null;
-        return this.getTeamById(t.id);
-    },
-    
-    getTeamRoles(teamId) {
-        return all(`
-            SELECT tr.*, r.name as role_name 
-            FROM qs_team_roles tr 
-            LEFT JOIN roles r ON tr.role_id = r.id 
-            WHERE tr.team_id = ?
-        `, [teamId]);
-    },
-    
-    updateTeamRoles(teamId, roleIds, roleType = 'agent') {
-        const now = new Date().toISOString();
-        // Remove existing roles of this type
-        run('DELETE FROM qs_team_roles WHERE team_id = ? AND role_type = ?', [teamId, roleType]);
-        // Add new roles
-        roleIds.forEach(roleId => {
-            run('INSERT INTO qs_team_roles (id, team_id, role_id, role_type, created_at) VALUES (?, ?, ?, ?, ?)',
-                [uuidv4(), teamId, roleId, roleType, now]);
-        });
-        saveDb();
-        return this.getTeamRoles(teamId);
+        return this.formatTeam(t);
     },
     
     getTeamAgents(teamId) {
-        const roles = this.getTeamRoles(teamId).filter(r => r.role_type === 'agent');
-        if (roles.length === 0) return [];
-        
-        const roleIds = roles.map(r => r.role_id);
-        const placeholders = roleIds.map(() => '?').join(',');
-        
+        // Get all active users assigned to this team
         return all(`
-            SELECT u.*, r.name as role_name 
+            SELECT u.*, r.name as role_name, r.is_admin, r.is_supervisor as role_is_supervisor
             FROM users u 
             LEFT JOIN roles r ON u.role_id = r.id
-            WHERE u.role_id IN (${placeholders}) AND u.is_active = 1
+            WHERE u.team_id = ? AND u.is_active = 1
             ORDER BY u.first_name, u.last_name
-        `, roleIds);
+        `, [teamId]);
+    },
+    
+    getTeamSupervisors(teamId) {
+        // Get supervisors for this team (users with is_supervisor = 1)
+        return all(`
+            SELECT u.*, r.name as role_name
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id
+            WHERE u.team_id = ? AND u.is_supervisor = 1 AND u.is_active = 1
+            ORDER BY u.first_name, u.last_name
+        `, [teamId]);
     },
 
     // ============================================
@@ -2143,15 +2126,17 @@ const QS = {
         
         if (teamIds?.length) {
             const placeholders = teamIds.map(() => '?').join(',');
-            teamFilter = `WHERE team_id IN (${placeholders})`;
+            teamFilter = `WHERE team_id IN (${placeholders}) AND status = 'completed'`;
             params.push(...teamIds);
+        } else {
+            teamFilter = `WHERE status = 'completed'`;
         }
         
         const monthStart = new Date();
         monthStart.setDate(1);
         monthStart.setHours(0, 0, 0, 0);
         
-        const evaluations = all(`SELECT * FROM qs_evaluations ${teamFilter} AND status = 'completed'`, params);
+        const evaluations = all(`SELECT * FROM qs_evaluations ${teamFilter}`, params);
         const evalThisMonth = evaluations.filter(e => new Date(e.created_at) >= monthStart).length;
         
         const teams = teamIds ? 

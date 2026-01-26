@@ -18,17 +18,25 @@ const QualitySystemViews = {
     
     async loadTeams() {
         try {
-            const result = await api.qs.getTeams();
+            // Use the general Teams API
+            const result = await window.api.teams.getAll();
             if (result.success) {
                 this.teams = result.teams;
+            } else {
+                this.teams = [];
             }
         } catch (error) {
             console.error('Failed to load teams:', error);
+            this.teams = [];
         }
     },
     
+    getTeamById(id) {
+        return this.teams.find(t => t.id === id);
+    },
+    
     getTeamByCode(code) {
-        return this.teams.find(t => t.teamCode === code);
+        return this.teams.find(t => t.teamCode === code || t.team_code === code);
     },
 
     // ============================================
@@ -36,64 +44,146 @@ const QualitySystemViews = {
     // ============================================
     
     async showMainPage() {
+        // Load teams from the general Teams system
         await this.loadTeams();
         
-        // Update tile statistics
-        for (const team of this.teams) {
-            const agents = await api.qs.getTeamAgents(team.id);
-            if (agents.success) {
-                const statEl = document.getElementById(`qs-stat-${team.teamCode.replace('_', '-')}-agents`);
-                if (statEl) {
-                    statEl.textContent = `${agents.agents.length} Agents`;
-                }
-            }
-        }
+        // Dynamically generate team tiles
+        await this.generateTeamTiles();
         
         // Update tracking stats
-        const trackingStats = await api.qs.getTrackingStatistics();
-        if (trackingStats.success) {
-            const trackingEl = document.getElementById('qs-stat-tracking-total');
-            if (trackingEl) {
-                trackingEl.textContent = `${trackingStats.statistics.totalEvaluations} Evaluierungen`;
+        try {
+            const trackingStats = await api.qs.getTrackingStatistics();
+            if (trackingStats.success) {
+                const trackingEl = document.getElementById('qs-stat-tracking-total');
+                if (trackingEl) {
+                    trackingEl.textContent = `${trackingStats.statistics?.totalEvaluations || 0} Evaluierungen`;
+                }
             }
+        } catch (e) {
+            console.error('Failed to load tracking stats:', e);
         }
         
         // Update my results stats
         if (Permissions.canViewOwnQSResults()) {
-            const myResults = await api.qs.getMyResults();
-            if (myResults.success) {
-                const myResultsEl = document.getElementById('qs-stat-my-results');
-                if (myResultsEl) {
-                    myResultsEl.textContent = `${myResults.totalEvaluations} Checks`;
+            try {
+                const myResults = await api.qs.getMyResults();
+                if (myResults.success) {
+                    const myResultsEl = document.getElementById('qs-stat-my-results');
+                    if (myResultsEl) {
+                        myResultsEl.textContent = `${myResults.totalEvaluations || 0} Checks`;
+                    }
                 }
+            } catch (e) {
+                console.error('Failed to load my results:', e);
             }
         }
         
-        // Setup tile click handlers (using kc-tile class now for consistency)
-        document.querySelectorAll('#qs-tiles-container .kc-tile[data-navigate]').forEach(tile => {
+        // Setup tile click handlers for static tiles
+        this.setupTileHandlers();
+        
+        // Show/hide tiles based on permissions
+        this.updateTileVisibility();
+    },
+    
+    async generateTeamTiles() {
+        const container = document.getElementById('qs-team-tiles-dynamic');
+        if (!container) return;
+        
+        if (this.teams.length === 0) {
+            container.innerHTML = `
+                <div class="qs-no-teams-message">
+                    <p class="text-muted">Keine Teams gefunden. Bitte erstellen Sie zuerst Teams im Team Setup.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Generate a tile for each team
+        container.innerHTML = this.teams.map(team => {
+            const teamColor = team.color || '#3b82f6';
+            return `
+                <div class="kc-tile qs-tile qs-team-tile" 
+                     data-team-id="${team.id}" 
+                     data-team-code="${team.teamCode}"
+                     data-permission="qs_view">
+                    <div class="kc-tile-icon" style="background: linear-gradient(135deg, ${teamColor} 0%, ${this.lightenColor(teamColor, 20)} 100%);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <h3>${team.name}</h3>
+                    <p>Quality Checks für ${team.name} durchführen und verwalten</p>
+                    <span class="kc-tile-stat">${team.agentCount || 0} Mitglieder</span>
+                </div>
+            `;
+        }).join('');
+        
+        // Add click handlers for team tiles
+        container.querySelectorAll('.qs-team-tile').forEach(tile => {
+            tile.onclick = () => {
+                const teamId = tile.dataset.teamId;
+                const teamCode = tile.dataset.teamCode;
+                if (teamId) {
+                    // Navigate to the dynamic team view
+                    this.navigateToTeam(teamId, teamCode);
+                }
+            };
+        });
+    },
+    
+    // Helper to lighten a color for gradient
+    lightenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) + amt;
+        const G = (num >> 8 & 0x00FF) + amt;
+        const B = (num & 0x0000FF) + amt;
+        return '#' + (0x1000000 + 
+            (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 + 
+            (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 + 
+            (B < 255 ? (B < 1 ? 0 : B) : 255)
+        ).toString(16).slice(1);
+    },
+    
+    navigateToTeam(teamId, teamCode) {
+        // Store the team info for the team view
+        this.currentTeamId = teamId;
+        this.currentTeam = this.teams.find(t => t.id === teamId);
+        
+        // Navigate to the generic team view
+        App.navigateTo('qsTeam', { teamId, teamCode });
+    },
+    
+    setupTileHandlers() {
+        // Setup click handlers for static tiles (Tracking, My Results, Settings)
+        document.querySelectorAll('#qs-tiles-container > .kc-tile[data-navigate]').forEach(tile => {
             tile.onclick = () => {
                 const view = tile.dataset.navigate;
-                if (view && Permissions.hasPermission(tile.dataset.permission)) {
+                const perm = tile.dataset.permission;
+                if (view && (!perm || Permissions.hasPermission(perm))) {
                     App.navigateTo(view);
                 }
             };
         });
-        
-        // Show/hide tiles based on permissions
-        this.updateTileVisibility();
     },
     
     updateTileVisibility() {
         const container = document.getElementById('qs-tiles-container');
         if (!container) return;
         
+        // Show/hide static tiles based on permissions
         container.querySelectorAll('.kc-tile[data-permission]').forEach(tile => {
             const perm = tile.dataset.permission;
-            tile.style.display = Permissions.hasPermission(perm) ? '' : 'none';
+            if (perm) {
+                tile.style.display = Permissions.hasPermission(perm) ? '' : 'none';
+            }
         });
         
         // Check if any tiles are visible
-        const visibleTiles = container.querySelectorAll('.kc-tile[data-permission]:not([style*="display: none"])');
+        const visibleTiles = container.querySelectorAll('.kc-tile:not([style*="display: none"])');
         const noAccessMsg = document.getElementById('qs-no-access-message');
         if (noAccessMsg) {
             noAccessMsg.style.display = visibleTiles.length === 0 ? 'block' : 'none';
@@ -101,11 +191,19 @@ const QualitySystemViews = {
     },
 
     // ============================================
-    // TEAM VIEW (BILLA / Social Media)
+    // TEAM VIEW (Dynamic for any team)
     // ============================================
     
-    async showTeamView(teamCode) {
-        const team = this.getTeamByCode(teamCode);
+    async showTeamView(teamIdOrCode) {
+        // Try to find team by ID first, then by code
+        let team = this.getTeamById(teamIdOrCode) || this.getTeamByCode(teamIdOrCode);
+        
+        // If not found in cache, try to load from API
+        if (!team) {
+            await this.loadTeams();
+            team = this.getTeamById(teamIdOrCode) || this.getTeamByCode(teamIdOrCode);
+        }
+        
         if (!team) {
             Toast.error('Team nicht gefunden');
             App.navigateTo('qualitySystem');
@@ -1914,8 +2012,8 @@ const QualitySystemViews = {
     // SETTINGS VIEW
     // ============================================
     
-    supervisedTeams: [],
-    settingsExpandedSections: ['general'], // Default expanded sections
+    settingsTeams: [],
+    settingsExpandedSections: [], // Track expanded sections
     
     async showSettingsView() {
         // Load the template if not already loaded
@@ -1932,99 +2030,91 @@ const QualitySystemViews = {
         // Setup back button
         document.getElementById('qs-settings-back-btn').onclick = () => App.navigateTo('qualitySystem');
         
-        // Load global settings
-        const globalSettings = await api.settings.getAll();
-        if (globalSettings.success) {
-            const settings = globalSettings.settings;
-            document.getElementById('qs-settings-passing-score').value = settings['qs.passingScore'] || 80;
-            document.getElementById('qs-settings-default-scoring').value = settings['qs.defaultScoringType'] || 'points';
-            document.getElementById('qs-settings-default-scale').value = settings['qs.defaultScaleSize'] || '5';
-            document.getElementById('qs-settings-default-channel').value = settings['qs.defaultInteractionChannel'] || 'ticket';
-        }
-        
-        // Load teams the user can supervise
-        await this.loadSupervisedTeams();
+        // Load all teams (admins see all, supervisors see their team)
+        await this.loadSettingsTeams();
         
         // Build team-specific settings sections
-        await this.buildTeamSettingsSections();
-        
-        // Load quotas and team roles for global sections
-        await this.loadSettingsTeams();
+        this.buildTeamSettingsSections();
         
         // Setup save button
         document.getElementById('qs-settings-save-btn').onclick = () => this.saveSettings();
-        
-        // Expand default sections
-        this.settingsExpandedSections.forEach(section => {
-            const sectionEl = document.querySelector(`#qs-${section === 'general' ? 'general' : section}-settings-section`);
-            if (sectionEl) sectionEl.classList.add('expanded');
-        });
         
         // Update permission-based visibility
         Permissions.updateViewElements();
     },
     
-    async loadSupervisedTeams() {
-        // Get all teams first
-        const teamsResult = await api.qs.getTeams();
-        if (!teamsResult.success) {
-            this.supervisedTeams = [];
-            return;
-        }
-        
-        // Get current user info
-        const currentUser = App.currentUser;
-        if (!currentUser) {
-            this.supervisedTeams = [];
-            return;
-        }
-        
-        // Check if user is admin - can see all teams
-        const isAdmin = currentUser.is_admin || currentUser.isAdmin;
-        const isSupervisor = currentUser.is_supervisor || currentUser.isSupervisor;
-        const roleIsSupervisor = currentUser.role_is_supervisor;
-        const roleIsManagement = currentUser.role_is_management;
-        
-        if (isAdmin || roleIsManagement) {
-            // Admin/Management can see all teams
-            this.supervisedTeams = teamsResult.teams;
-        } else if (isSupervisor || roleIsSupervisor) {
-            // Supervisor can only see their own team
-            this.supervisedTeams = teamsResult.teams.filter(t => 
-                t.id === currentUser.team_id || t.id === currentUser.teamId
-            );
-        } else {
-            // Regular user - no team settings visible
-            this.supervisedTeams = [];
+    async loadSettingsTeams() {
+        // Use the general teams API to get all teams
+        try {
+            const teamsResult = await window.api.teams.getAll();
+            if (!teamsResult.success) {
+                this.settingsTeams = [];
+                return;
+            }
+            
+            // Get current user info
+            const currentUser = App.currentUser;
+            if (!currentUser) {
+                this.settingsTeams = [];
+                return;
+            }
+            
+            // Check user permissions
+            const isAdmin = currentUser.is_admin || currentUser.isAdmin;
+            const isSupervisor = currentUser.is_supervisor || currentUser.isSupervisor;
+            const roleIsSupervisor = currentUser.role_is_supervisor;
+            const roleIsManagement = currentUser.role_is_management;
+            
+            if (isAdmin || roleIsManagement) {
+                // Admin/Management can see all teams
+                this.settingsTeams = teamsResult.teams;
+            } else if (isSupervisor || roleIsSupervisor) {
+                // Supervisor can only see their own team
+                const userTeamId = currentUser.team_id || currentUser.teamId;
+                this.settingsTeams = teamsResult.teams.filter(t => t.id === userTeamId);
+            } else {
+                // Regular user - no team settings visible
+                this.settingsTeams = [];
+            }
+        } catch (error) {
+            console.error('Failed to load teams:', error);
+            this.settingsTeams = [];
         }
     },
     
-    async buildTeamSettingsSections() {
+    buildTeamSettingsSections() {
         const container = document.getElementById('qs-team-settings-sections');
+        const actionsContainer = document.getElementById('qs-settings-actions');
         
-        if (this.supervisedTeams.length === 0) {
+        if (this.settingsTeams.length === 0) {
             container.innerHTML = `
                 <div class="qs-settings-no-access">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                     </svg>
-                    <p>Sie haben keine Berechtigung, Team-Einstellungen zu verwalten.</p>
-                    <p class="text-sm">Nur Supervisoren und Manager können Team-spezifische Einstellungen bearbeiten.</p>
+                    <p>Keine Teams gefunden oder keine Berechtigung.</p>
+                    <p class="text-sm">Bitte erstellen Sie zuerst Teams im Team Setup oder kontaktieren Sie einen Administrator.</p>
                 </div>
             `;
+            if (actionsContainer) actionsContainer.style.display = 'none';
             return;
         }
         
-        // Build a section for each supervised team
-        container.innerHTML = this.supervisedTeams.map(team => {
+        // Show save button
+        if (actionsContainer) actionsContainer.style.display = 'block';
+        
+        // Build a section for each team
+        container.innerHTML = this.settingsTeams.map((team, index) => {
             const teamColor = team.color || '#3b82f6';
+            const isFirst = index === 0;
+            
             return `
-                <div class="qs-settings-section-expandable" id="qs-team-${team.id}-settings-section">
+                <div class="qs-settings-section-expandable ${isFirst ? 'expanded' : ''}" id="qs-team-${team.id}-settings-section">
                     <div class="qs-settings-section-header" onclick="QualitySystemViews.toggleSettingsSection('team-${team.id}')">
                         <div class="qs-settings-section-title">
                             <span class="qs-settings-team-pill" style="background: ${teamColor};">${team.name}</span>
-                            <h3>Team-Einstellungen</h3>
+                            <h3>Einstellungen</h3>
                         </div>
                         <svg class="qs-settings-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"></polyline>
@@ -2032,49 +2122,67 @@ const QualitySystemViews = {
                     </div>
                     <div class="qs-settings-section-content" id="qs-settings-section-team-${team.id}-content">
                         <div class="qs-team-settings-card">
+                            <!-- Team Info -->
+                            <div class="qs-settings-team-info">
+                                <div class="qs-settings-team-stats">
+                                    <span><strong>${team.memberCount || 0}</strong> Mitglieder</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Scoring Defaults -->
                             <div class="qs-settings-subsection">
-                                <h5>Bewertungs-Defaults</h5>
+                                <h5>Bewertungs-Einstellungen</h5>
                                 <div class="settings-grid">
                                     <div class="form-group">
-                                        <label for="team-${team.id}-passing-score">Mindest-Score (%)</label>
+                                        <label for="team-${team.id}-passing-score">Mindest-Score zum Bestehen (%)</label>
                                         <input type="number" id="team-${team.id}-passing-score" class="form-input" 
-                                               min="0" max="100" value="80" placeholder="Global verwenden">
+                                               min="0" max="100" value="80">
                                     </div>
                                     <div class="form-group">
-                                        <label for="team-${team.id}-default-scoring">Standard Scoring</label>
+                                        <label for="team-${team.id}-default-scoring">Standard Scoring-Typ</label>
                                         <select id="team-${team.id}-default-scoring" class="form-select">
-                                            <option value="">Global verwenden</option>
                                             <option value="points">Punkte</option>
                                             <option value="scale">Skala</option>
                                             <option value="checkbox">Checkbox</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label for="team-${team.id}-default-channel">Standard Kanal</label>
+                                        <label for="team-${team.id}-default-scale">Standard Skala-Größe</label>
+                                        <select id="team-${team.id}-default-scale" class="form-select">
+                                            <option value="5">1-5</option>
+                                            <option value="10">1-10</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="team-${team.id}-default-channel">Standard Interaktionskanal</label>
                                         <select id="team-${team.id}-default-channel" class="form-select">
-                                            <option value="">Global verwenden</option>
                                             <option value="ticket">Ticket</option>
                                             <option value="call">Anruf</option>
                                             <option value="chat">Chat</option>
                                             <option value="email">E-Mail</option>
                                             <option value="social">Social Media</option>
+                                            <option value="other">Sonstige</option>
                                         </select>
                                     </div>
                                 </div>
                             </div>
                             
+                            <!-- Quotas -->
                             <div class="qs-settings-subsection">
                                 <h5>Evaluierungs-Quoten</h5>
+                                <p class="text-muted text-sm">Legen Sie fest, wie viele Evaluierungen pro Zeitraum durchgeführt werden sollen.</p>
                                 <div class="settings-grid">
                                     <div class="form-group">
                                         <label for="team-${team.id}-quota-supervisor">Supervisor-Quote (pro Woche)</label>
                                         <input type="number" id="team-${team.id}-quota-supervisor" class="form-input" 
                                                min="0" value="0" placeholder="0 = unbegrenzt">
+                                        <small class="text-muted">Wie viele Checks ein Supervisor pro Woche durchführen soll</small>
                                     </div>
                                     <div class="form-group">
                                         <label for="team-${team.id}-quota-agent">Agent-Quote (pro Monat)</label>
                                         <input type="number" id="team-${team.id}-quota-agent" class="form-input" 
                                                min="0" value="0" placeholder="0 = unbegrenzt">
+                                        <small class="text-muted">Wie oft jeder Agent pro Monat evaluiert werden soll</small>
                                     </div>
                                 </div>
                             </div>
@@ -2084,24 +2192,25 @@ const QualitySystemViews = {
             `;
         }).join('');
         
-        // Load existing team-specific settings
-        for (const team of this.supervisedTeams) {
-            await this.loadTeamSettings(team.id);
-        }
+        // Load existing settings for each team
+        this.settingsTeams.forEach(team => this.loadTeamSettings(team.id));
     },
     
     async loadTeamSettings(teamId) {
-        // Load team-specific settings from API if available
         try {
+            // Load team-specific QS settings
             const settingsResult = await api.qs.getTeamSettings(teamId);
             if (settingsResult.success && settingsResult.settings) {
                 const settings = settingsResult.settings;
+                
                 const passingScore = document.getElementById(`team-${teamId}-passing-score`);
                 const defaultScoring = document.getElementById(`team-${teamId}-default-scoring`);
+                const defaultScale = document.getElementById(`team-${teamId}-default-scale`);
                 const defaultChannel = document.getElementById(`team-${teamId}-default-channel`);
                 
                 if (passingScore && settings.passingScore) passingScore.value = settings.passingScore;
                 if (defaultScoring && settings.defaultScoringType) defaultScoring.value = settings.defaultScoringType;
+                if (defaultScale && settings.defaultScaleSize) defaultScale.value = settings.defaultScaleSize;
                 if (defaultChannel && settings.defaultInteractionChannel) defaultChannel.value = settings.defaultInteractionChannel;
             }
             
@@ -2122,166 +2231,43 @@ const QualitySystemViews = {
         const section = document.getElementById(`qs-${sectionId}-settings-section`);
         if (section) {
             section.classList.toggle('expanded');
-            
-            // Track expanded state
-            if (section.classList.contains('expanded')) {
-                if (!this.settingsExpandedSections.includes(sectionId)) {
-                    this.settingsExpandedSections.push(sectionId);
-                }
-            } else {
-                this.settingsExpandedSections = this.settingsExpandedSections.filter(s => s !== sectionId);
-            }
-        }
-    },
-    
-    async loadSettingsTeams() {
-        const teams = await api.qs.getTeams();
-        if (!teams.success) return;
-        
-        const roles = await api.roles.getAll();
-        const allRoles = roles.success ? roles.roles : [];
-        
-        // Quotas section (global - for all teams)
-        const quotasList = document.getElementById('qs-quotas-list');
-        if (quotasList) {
-            quotasList.innerHTML = teams.teams.map(team => `
-                <div class="qs-quota-item" data-team-id="${team.id}">
-                    <div class="qs-team-settings-card-header">
-                        <span class="qs-settings-team-pill" style="background: ${team.color || '#3b82f6'};">${team.name}</span>
-                    </div>
-                    <div class="qs-quota-form">
-                        <div class="form-group">
-                            <label>Supervisor-Quote (pro Woche)</label>
-                            <input type="number" class="form-input" id="quota-supervisor-${team.id}" min="0" value="0" placeholder="0 = unbegrenzt">
-                        </div>
-                        <div class="form-group">
-                            <label>Agent-Quote (pro Monat)</label>
-                            <input type="number" class="form-input" id="quota-agent-${team.id}" min="0" value="0" placeholder="0 = unbegrenzt">
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            
-            // Load existing quotas
-            for (const team of teams.teams) {
-                const quotas = await api.qs.getQuotas(team.id);
-                if (quotas.success) {
-                    quotas.quotas.forEach(q => {
-                        const input = document.getElementById(`quota-${q.quotaType}-${team.id}`);
-                        if (input) input.value = q.targetCount;
-                    });
-                }
-            }
-        }
-        
-        // Team roles section
-        const rolesList = document.getElementById('qs-team-roles-list');
-        if (rolesList) {
-            rolesList.innerHTML = teams.teams.map(team => {
-                const teamRoles = team.roles?.filter(r => r.role_type === 'agent').map(r => r.role_id) || [];
-                
-                return `
-                    <div class="qs-team-role-item" data-team-id="${team.id}">
-                        <div class="qs-team-settings-card-header">
-                            <span class="qs-settings-team-pill" style="background: ${team.color || '#3b82f6'};">${team.name}</span>
-                            <span>- Agent-Rollen</span>
-                        </div>
-                        <p class="text-muted text-sm">Wählen Sie die Rollen, deren Mitglieder als Agents für ${team.name} gelten.</p>
-                        <div class="qs-role-form">
-                            ${allRoles.map(role => `
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="team-role-${team.id}" value="${role.id}" ${teamRoles.includes(role.id) ? 'checked' : ''}>
-                                    ${role.name}
-                                </label>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }).join('');
         }
     },
     
     async saveSettings() {
         try {
-            // Save global settings
-            const globalSettings = {
-                'qs.passingScore': document.getElementById('qs-settings-passing-score').value,
-                'qs.defaultScoringType': document.getElementById('qs-settings-default-scoring').value,
-                'qs.defaultScaleSize': document.getElementById('qs-settings-default-scale').value,
-                'qs.defaultInteractionChannel': document.getElementById('qs-settings-default-channel').value
-            };
-            
-            await api.settings.setMany(globalSettings);
-            
-            // Save team-specific settings
-            for (const team of this.supervisedTeams) {
+            // Save settings for each team
+            for (const team of this.settingsTeams) {
                 const teamSettings = {
-                    passingScore: document.getElementById(`team-${team.id}-passing-score`)?.value || null,
-                    defaultScoringType: document.getElementById(`team-${team.id}-default-scoring`)?.value || null,
-                    defaultInteractionChannel: document.getElementById(`team-${team.id}-default-channel`)?.value || null
+                    passingScore: document.getElementById(`team-${team.id}-passing-score`)?.value || '80',
+                    defaultScoringType: document.getElementById(`team-${team.id}-default-scoring`)?.value || 'points',
+                    defaultScaleSize: document.getElementById(`team-${team.id}-default-scale`)?.value || '5',
+                    defaultInteractionChannel: document.getElementById(`team-${team.id}-default-channel`)?.value || 'ticket'
                 };
                 
-                // Only save if at least one value is set
-                if (teamSettings.passingScore || teamSettings.defaultScoringType || teamSettings.defaultInteractionChannel) {
-                    await api.qs.updateTeamSettings(team.id, teamSettings);
-                }
+                await api.qs.updateTeamSettings(team.id, teamSettings);
                 
-                // Save team-specific quotas
-                const supervisorQuota = document.getElementById(`team-${team.id}-quota-supervisor`);
-                const agentQuota = document.getElementById(`team-${team.id}-quota-agent`);
+                // Save quotas
+                const supervisorQuotaVal = parseInt(document.getElementById(`team-${team.id}-quota-supervisor`)?.value) || 0;
+                const agentQuotaVal = parseInt(document.getElementById(`team-${team.id}-quota-agent`)?.value) || 0;
                 
-                if (supervisorQuota && parseInt(supervisorQuota.value) > 0) {
-                    await api.qs.setQuota(team.id, {
-                        quotaType: 'supervisor',
-                        targetCount: parseInt(supervisorQuota.value),
-                        periodType: 'week'
-                    });
-                }
+                await api.qs.setQuota(team.id, {
+                    quotaType: 'supervisor',
+                    targetCount: supervisorQuotaVal,
+                    periodType: 'week'
+                });
                 
-                if (agentQuota && parseInt(agentQuota.value) > 0) {
-                    await api.qs.setQuota(team.id, {
-                        quotaType: 'agent',
-                        targetCount: parseInt(agentQuota.value),
-                        periodType: 'month'
-                    });
-                }
-            }
-            
-            // Save global quotas and team roles
-            const teams = await api.qs.getTeams();
-            if (teams.success) {
-                for (const team of teams.teams) {
-                    // Save global quotas (from quotas section)
-                    const supervisorQuota = document.getElementById(`quota-supervisor-${team.id}`);
-                    const agentQuota = document.getElementById(`quota-agent-${team.id}`);
-                    
-                    if (supervisorQuota && parseInt(supervisorQuota.value) > 0) {
-                        await api.qs.setQuota(team.id, {
-                            quotaType: 'supervisor',
-                            targetCount: parseInt(supervisorQuota.value),
-                            periodType: 'week'
-                        });
-                    }
-                    
-                    if (agentQuota && parseInt(agentQuota.value) > 0) {
-                        await api.qs.setQuota(team.id, {
-                            quotaType: 'agent',
-                            targetCount: parseInt(agentQuota.value),
-                            periodType: 'month'
-                        });
-                    }
-                    
-                    // Save team roles
-                    const roleCheckboxes = document.querySelectorAll(`input[name="team-role-${team.id}"]:checked`);
-                    const selectedRoles = Array.from(roleCheckboxes).map(cb => cb.value);
-                    await api.qs.updateTeamRoles(team.id, selectedRoles, 'agent');
-                }
+                await api.qs.setQuota(team.id, {
+                    quotaType: 'agent',
+                    targetCount: agentQuotaVal,
+                    periodType: 'month'
+                });
             }
             
             Toast.success('Einstellungen gespeichert');
         } catch (error) {
             console.error('Save settings error:', error);
-            Toast.error('Fehler beim Speichern');
+            Toast.error('Fehler beim Speichern der Einstellungen');
         }
     },
 

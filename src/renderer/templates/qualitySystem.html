@@ -1,33 +1,11 @@
 <section id="view-qualitySystem" class="view">
     <div class="kc-tiles-container" id="qs-tiles-container">
-        <!-- BILLA Team Tile -->
-        <div class="kc-tile qs-tile" data-navigate="qsTeamBilla" data-permission="qs_team_billa_access">
-            <div class="kc-tile-icon qs-icon-billa">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
+        <!-- Team tiles will be dynamically generated here -->
+        <div id="qs-team-tiles-dynamic">
+            <!-- Loading state -->
+            <div class="qs-loading-teams">
+                <p class="text-muted">Lade Teams...</p>
             </div>
-            <h3>BILLA</h3>
-            <p>Quality Checks für das BILLA Team durchführen und verwalten</p>
-            <span class="kc-tile-stat" id="qs-stat-billa-agents">0 Agents</span>
-        </div>
-        
-        <!-- Social Media Team Tile -->
-        <div class="kc-tile qs-tile" data-navigate="qsTeamSocial" data-permission="qs_team_social_access">
-            <div class="kc-tile-icon qs-icon-social">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-            </div>
-            <h3>Social Media</h3>
-            <p>Quality Checks für das Social Media Team durchführen und verwalten</p>
-            <span class="kc-tile-stat" id="qs-stat-social-agents">0 Agents</span>
         </div>
         
         <!-- Quality Tracking Tile -->
