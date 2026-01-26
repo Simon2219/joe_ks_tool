@@ -127,6 +127,33 @@ function get(sql, params = []) {
 function initSchema() {
     const database = getDb();
     
+    // Teams table - unified team management for the entire application
+    database.run(`
+        CREATE TABLE IF NOT EXISTS teams (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            team_code TEXT UNIQUE NOT NULL,
+            description TEXT DEFAULT '',
+            color TEXT DEFAULT '#3b82f6',
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    `);
+
+    // Team-specific permissions - override default permissions per team
+    database.run(`
+        CREATE TABLE IF NOT EXISTS team_permissions (
+            id TEXT PRIMARY KEY,
+            team_id TEXT NOT NULL,
+            permission_id TEXT NOT NULL,
+            granted INTEGER DEFAULT 1,
+            FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+            UNIQUE(team_id, permission_id)
+        )
+    `);
+
     database.run(`
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
@@ -136,12 +163,13 @@ function initSchema() {
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
             role_id TEXT NOT NULL,
-            department TEXT DEFAULT '',
+            team_id TEXT DEFAULT NULL,
             phone TEXT DEFAULT '',
             is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            last_login TEXT
+            last_login TEXT,
+            FOREIGN KEY (team_id) REFERENCES teams(id)
         )
     `);
     
@@ -278,36 +306,8 @@ function initSchema() {
     `);
 
     // ============================================
-    // QUALITY SYSTEM (QS) TABLES - New Comprehensive System
+    // QUALITY SYSTEM (QS) TABLES - Simplified Design
     // ============================================
-
-    // Teams (e.g., BILLA, Social Media) - configurable quality check groups
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_teams (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            team_code TEXT UNIQUE NOT NULL,
-            default_interaction_channel TEXT DEFAULT 'ticket',
-            is_active INTEGER DEFAULT 1,
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    `);
-
-    // Team role mappings - which roles belong to which teams
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_team_roles (
-            id TEXT PRIMARY KEY,
-            team_id TEXT NOT NULL,
-            role_id TEXT NOT NULL,
-            role_type TEXT DEFAULT 'agent',
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE,
-            FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
-        )
-    `);
 
     // Task categories - for grouping Quality Tasks with default weighting
     database.run(`
@@ -321,11 +321,11 @@ function initSchema() {
             is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE
+            FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
         )
     `);
 
-    // Quality Tasks catalog
+    // Quality Tasks catalog - includes pass threshold settings
     database.run(`
         CREATE TABLE IF NOT EXISTS qs_tasks (
             id TEXT PRIMARY KEY,
@@ -338,6 +338,8 @@ function initSchema() {
             max_points INTEGER DEFAULT 10,
             scale_size INTEGER DEFAULT 5,
             scale_inverted INTEGER DEFAULT 0,
+            pass_threshold REAL DEFAULT 0.7,
+            pass_scale_value INTEGER DEFAULT NULL,
             weight_override REAL DEFAULT NULL,
             sort_order INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1,
@@ -346,7 +348,7 @@ function initSchema() {
             created_by TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES qs_teams(id),
+            FOREIGN KEY (team_id) REFERENCES teams(id),
             FOREIGN KEY (category_id) REFERENCES qs_task_categories(id),
             FOREIGN KEY (created_by) REFERENCES users(id)
         )
@@ -379,13 +381,13 @@ function initSchema() {
             is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE
+            FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
         )
     `);
 
-    // Quality Checks catalog - groupings of tasks
+    // Quality Checks catalog - sections stored as JSON, includes scoring config
     database.run(`
-        CREATE TABLE IF NOT EXISTS qs_checks (
+        CREATE TABLE IF NOT EXISTS qs_quality_checks (
             id TEXT PRIMARY KEY,
             check_number TEXT UNIQUE NOT NULL,
             team_id TEXT NOT NULL,
@@ -393,44 +395,33 @@ function initSchema() {
             name TEXT NOT NULL,
             description TEXT DEFAULT '',
             passing_score INTEGER DEFAULT 80,
+            min_passed_tasks INTEGER DEFAULT 0,
+            require_all_critical INTEGER DEFAULT 0,
+            sections TEXT DEFAULT '[]',
             is_active INTEGER DEFAULT 1,
             is_archived INTEGER DEFAULT 0,
             archived_at TEXT DEFAULT NULL,
             created_by TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES qs_teams(id),
+            FOREIGN KEY (team_id) REFERENCES teams(id),
             FOREIGN KEY (category_id) REFERENCES qs_check_categories(id),
             FOREIGN KEY (created_by) REFERENCES users(id)
         )
     `);
 
-    // Check sections - for organizing tasks within a check
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_check_sections (
-            id TEXT PRIMARY KEY,
-            check_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            weight REAL DEFAULT 1.0,
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (check_id) REFERENCES qs_checks(id) ON DELETE CASCADE
-        )
-    `);
-
-    // Check tasks - junction table linking tasks to checks (optionally via sections)
+    // Check tasks - junction table linking tasks to checks (section stored in JSON above)
     database.run(`
         CREATE TABLE IF NOT EXISTS qs_check_tasks (
             id TEXT PRIMARY KEY,
             check_id TEXT NOT NULL,
             task_id TEXT NOT NULL,
-            section_id TEXT DEFAULT NULL,
+            section_name TEXT DEFAULT NULL,
             weight_override REAL DEFAULT NULL,
+            is_critical INTEGER DEFAULT 0,
             sort_order INTEGER DEFAULT 0,
-            FOREIGN KEY (check_id) REFERENCES qs_checks(id) ON DELETE CASCADE,
-            FOREIGN KEY (task_id) REFERENCES qs_tasks(id),
-            FOREIGN KEY (section_id) REFERENCES qs_check_sections(id) ON DELETE SET NULL
+            FOREIGN KEY (check_id) REFERENCES qs_quality_checks(id) ON DELETE CASCADE,
+            FOREIGN KEY (task_id) REFERENCES qs_tasks(id)
         )
     `);
 
@@ -450,35 +441,36 @@ function initSchema() {
             total_score REAL DEFAULT 0,
             max_score REAL DEFAULT 0,
             percentage REAL DEFAULT 0,
+            passed_tasks INTEGER DEFAULT 0,
+            total_tasks INTEGER DEFAULT 0,
             passed INTEGER DEFAULT 0,
             supervisor_notes TEXT DEFAULT '',
             status TEXT DEFAULT 'in_progress',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES qs_teams(id),
-            FOREIGN KEY (check_id) REFERENCES qs_checks(id),
+            FOREIGN KEY (team_id) REFERENCES teams(id),
+            FOREIGN KEY (check_id) REFERENCES qs_quality_checks(id),
             FOREIGN KEY (agent_id) REFERENCES users(id),
             FOREIGN KEY (evaluator_id) REFERENCES users(id)
         )
     `);
 
-    // Evaluation answers - scores for each task
+    // Evaluation answers - scores for each task, includes pass status
     database.run(`
         CREATE TABLE IF NOT EXISTS qs_evaluation_answers (
             id TEXT PRIMARY KEY,
             evaluation_id TEXT NOT NULL,
             task_id TEXT NOT NULL,
             check_task_id TEXT NOT NULL,
-            section_id TEXT DEFAULT NULL,
             score REAL DEFAULT 0,
             max_score REAL DEFAULT 0,
             raw_value TEXT DEFAULT '',
+            task_passed INTEGER DEFAULT 0,
             notes TEXT DEFAULT '',
             created_at TEXT NOT NULL,
             FOREIGN KEY (evaluation_id) REFERENCES qs_evaluations(id) ON DELETE CASCADE,
             FOREIGN KEY (task_id) REFERENCES qs_tasks(id),
-            FOREIGN KEY (check_task_id) REFERENCES qs_check_tasks(id),
-            FOREIGN KEY (section_id) REFERENCES qs_check_sections(id)
+            FOREIGN KEY (check_task_id) REFERENCES qs_check_tasks(id)
         )
     `);
 
@@ -512,32 +504,20 @@ function initSchema() {
             is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE
-        )
-    `);
-
-    // Team-specific settings
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_team_settings (
-            id TEXT PRIMARY KEY,
-            team_id TEXT NOT NULL,
-            setting_key TEXT NOT NULL,
-            setting_value TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE,
-            UNIQUE(team_id, setting_key)
+            FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
         )
     `);
 
     // QS indexes
     database.run('CREATE INDEX IF NOT EXISTS idx_qs_tasks_team ON qs_tasks(team_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_qs_tasks_category ON qs_tasks(category_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_checks_team ON qs_checks(team_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_quality_checks_team ON qs_quality_checks(team_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_qs_check_tasks_check ON qs_check_tasks(check_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_team ON qs_evaluations(team_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_agent ON qs_evaluations(agent_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_evaluator ON qs_evaluations(evaluator_id)');
     database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluation_answers_eval ON qs_evaluation_answers(evaluation_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_users_team ON users(team_id)');
     
     database.run(`
         CREATE TABLE IF NOT EXISTS settings (
@@ -836,6 +816,74 @@ function runMigrations(database) {
         database.run('ALTER TABLE kc_test_runs ADD COLUMN archived_at TEXT DEFAULT NULL');
     }
     
+    // Migration 7: Add team_id to users (rename from department)
+    if (columnExists('users', 'department') && !columnExists('users', 'team_id')) {
+        console.log('Adding team_id column to users...');
+        database.run('ALTER TABLE users ADD COLUMN team_id TEXT DEFAULT NULL');
+        // Note: Manual migration may be needed to convert department values to team_ids
+    }
+    
+    // Migration 8: Add pass_threshold to qs_tasks
+    if (columnExists('qs_tasks', 'id') && !columnExists('qs_tasks', 'pass_threshold')) {
+        console.log('Adding pass_threshold columns to qs_tasks...');
+        database.run('ALTER TABLE qs_tasks ADD COLUMN pass_threshold REAL DEFAULT 0.7');
+        database.run('ALTER TABLE qs_tasks ADD COLUMN pass_scale_value INTEGER DEFAULT NULL');
+    }
+    
+    // Migration 9: Add scoring config to qs_quality_checks (if qs_checks exists, rename it)
+    function tableExists(tableName) {
+        try {
+            const result = all(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [tableName]);
+            return result.length > 0;
+        } catch (e) {
+            return false;
+        }
+    }
+    
+    if (tableExists('qs_checks') && !tableExists('qs_quality_checks')) {
+        console.log('Renaming qs_checks to qs_quality_checks...');
+        database.run('ALTER TABLE qs_checks RENAME TO qs_quality_checks');
+        
+        // Add new columns
+        if (!columnExists('qs_quality_checks', 'min_passed_tasks')) {
+            database.run('ALTER TABLE qs_quality_checks ADD COLUMN min_passed_tasks INTEGER DEFAULT 0');
+        }
+        if (!columnExists('qs_quality_checks', 'require_all_critical')) {
+            database.run('ALTER TABLE qs_quality_checks ADD COLUMN require_all_critical INTEGER DEFAULT 0');
+        }
+        if (!columnExists('qs_quality_checks', 'sections')) {
+            database.run("ALTER TABLE qs_quality_checks ADD COLUMN sections TEXT DEFAULT '[]'");
+        }
+        
+        // Update indexes
+        database.run('DROP INDEX IF EXISTS idx_qs_checks_team');
+        database.run('CREATE INDEX IF NOT EXISTS idx_qs_quality_checks_team ON qs_quality_checks(team_id)');
+    }
+    
+    // Migration 10: Add is_critical to qs_check_tasks
+    if (columnExists('qs_check_tasks', 'id') && !columnExists('qs_check_tasks', 'is_critical')) {
+        console.log('Adding is_critical to qs_check_tasks...');
+        database.run('ALTER TABLE qs_check_tasks ADD COLUMN is_critical INTEGER DEFAULT 0');
+        
+        // Also add section_name if migrating from section_id
+        if (columnExists('qs_check_tasks', 'section_id') && !columnExists('qs_check_tasks', 'section_name')) {
+            database.run('ALTER TABLE qs_check_tasks ADD COLUMN section_name TEXT DEFAULT NULL');
+        }
+    }
+    
+    // Migration 11: Add task_passed to qs_evaluation_answers
+    if (columnExists('qs_evaluation_answers', 'id') && !columnExists('qs_evaluation_answers', 'task_passed')) {
+        console.log('Adding task_passed to qs_evaluation_answers...');
+        database.run('ALTER TABLE qs_evaluation_answers ADD COLUMN task_passed INTEGER DEFAULT 0');
+    }
+    
+    // Migration 12: Add passed_tasks and total_tasks to qs_evaluations
+    if (columnExists('qs_evaluations', 'id') && !columnExists('qs_evaluations', 'passed_tasks')) {
+        console.log('Adding passed_tasks/total_tasks to qs_evaluations...');
+        database.run('ALTER TABLE qs_evaluations ADD COLUMN passed_tasks INTEGER DEFAULT 0');
+        database.run('ALTER TABLE qs_evaluations ADD COLUMN total_tasks INTEGER DEFAULT 0');
+    }
+    
     // Note: Migration for orphaned assignments is now manual - run from Admin Panel
     
     console.log('Database migrations completed');
@@ -902,11 +950,14 @@ function ensurePermissions() {
         { id: 'settings_edit', name: 'Edit Settings', module: 'settings' },
         { id: 'admin_access', name: 'Admin Access', module: 'admin' },
         { id: 'integration_access', name: 'Integration Access', module: 'integrations' },
+        // Teams - Management
+        { id: 'teams_view', name: 'View Teams', module: 'teams' },
+        { id: 'teams_create', name: 'Create Teams', module: 'teams' },
+        { id: 'teams_edit', name: 'Edit Teams', module: 'teams' },
+        { id: 'teams_delete', name: 'Delete Teams', module: 'teams' },
+        { id: 'teams_permissions_manage', name: 'Manage Team Permissions', module: 'teams' },
         // Quality System (QS) - Tab Access
         { id: 'qs_view', name: 'View Quality System Tab', module: 'quality_system' },
-        // Quality System - Team Access
-        { id: 'qs_team_billa_access', name: 'Access BILLA Team', module: 'quality_system' },
-        { id: 'qs_team_social_access', name: 'Access Social Media Team', module: 'quality_system' },
         // Quality System - Tracking Overview
         { id: 'qs_tracking_view', name: 'View Quality Tracking', module: 'quality_system' },
         { id: 'qs_tracking_view_all', name: 'View All Teams in Tracking', module: 'quality_system' },
@@ -1033,11 +1084,14 @@ async function seedData() {
         { id: 'settings_edit', name: 'Edit Settings', module: 'settings' },
         { id: 'admin_access', name: 'Admin Access', module: 'admin' },
         { id: 'integration_access', name: 'Integration Access', module: 'integrations' },
+        // Teams - Management
+        { id: 'teams_view', name: 'View Teams', module: 'teams' },
+        { id: 'teams_create', name: 'Create Teams', module: 'teams' },
+        { id: 'teams_edit', name: 'Edit Teams', module: 'teams' },
+        { id: 'teams_delete', name: 'Delete Teams', module: 'teams' },
+        { id: 'teams_permissions_manage', name: 'Manage Team Permissions', module: 'teams' },
         // Quality System (QS) - Tab Access
         { id: 'qs_view', name: 'View Quality System Tab', module: 'quality_system' },
-        // Quality System - Team Access
-        { id: 'qs_team_billa_access', name: 'Access BILLA Team', module: 'quality_system' },
-        { id: 'qs_team_social_access', name: 'Access Social Media Team', module: 'quality_system' },
         // Quality System - Tracking Overview
         { id: 'qs_tracking_view', name: 'View Quality Tracking', module: 'quality_system' },
         { id: 'qs_tracking_view_all', name: 'View All Teams in Tracking', module: 'quality_system' },
@@ -1091,8 +1145,11 @@ async function seedData() {
                           'kc_assign_tests', 'kc_assigned_view'];
     const kcUserPerms = ['kc_view', 'kc_assigned_view']; // Can see the tab and their assigned tests
     
-    // Quality System permission sets
-    const qsSupervisorPerms = ['qs_view', 'qs_team_billa_access', 'qs_team_social_access', 
+    // Team management permission sets
+    const teamAdminPerms = ['teams_view', 'teams_create', 'teams_edit', 'teams_delete', 'teams_permissions_manage'];
+    
+    // Quality System permission sets (team access now based on user.team_id)
+    const qsSupervisorPerms = ['qs_view', 
                                'qs_tracking_view', 'qs_tracking_view_all',
                                'qs_tasks_view', 'qs_tasks_create', 'qs_tasks_edit', 'qs_tasks_delete',
                                'qs_checks_view', 'qs_checks_create', 'qs_checks_edit', 'qs_checks_delete',
@@ -1101,7 +1158,7 @@ async function seedData() {
                                'qs_results_view_team', 'qs_results_delete',
                                'qs_supervisor_notes_view',
                                'qs_settings_manage', 'qs_quotas_manage', 'qs_team_config_manage'];
-    const qsEvaluatorPerms = ['qs_view', 'qs_team_billa_access', 'qs_team_social_access',
+    const qsEvaluatorPerms = ['qs_view',
                               'qs_tracking_view',
                               'qs_tasks_view', 'qs_checks_view',
                               'qs_evaluate',
@@ -1112,9 +1169,12 @@ async function seedData() {
     const roles = [
         { id: 'admin', name: 'Administrator', description: 'Full system access', isAdmin: 1, isSystem: 1, permissions: allPermIds },
         { id: 'supervisor', name: 'Supervisor', description: 'Team management', isAdmin: 0, isSystem: 1, 
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 'quality_view', 'quality_view_all', 'quality_create', ...kcEditorPerms, ...qsSupervisorPerms, 'role_view', 'settings_view'] },
+          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 
+                       'quality_view', 'quality_view_all', 'quality_create', 
+                       ...teamAdminPerms, ...kcEditorPerms, ...qsSupervisorPerms, 'role_view', 'settings_view'] },
         { id: 'qa_analyst', name: 'QA Analyst', description: 'Quality evaluations', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage', ...kcEditorPerms, ...qsEvaluatorPerms] },
+          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage', 
+                       'teams_view', ...kcEditorPerms, ...qsEvaluatorPerms] },
         { id: 'agent', name: 'Support Agent', description: 'Ticket handling', isAdmin: 0, isSystem: 1,
           permissions: ['ticket_view', 'ticket_create', 'ticket_edit', 'quality_view', ...kcUserPerms, ...qsAgentPerms] },
         // Knowledge Check specific roles
@@ -1126,14 +1186,9 @@ async function seedData() {
           permissions: ['user_view', ...kcUserPerms] },
         // Quality System specific roles
         { id: 'qs_supervisor', name: 'QS Supervisor', description: 'Full Quality System management', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', ...qsSupervisorPerms] },
+          permissions: ['user_view', 'teams_view', ...qsSupervisorPerms] },
         { id: 'qs_evaluator', name: 'QS Evaluator', description: 'Conduct quality evaluations', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', ...qsEvaluatorPerms] },
-        // Team-specific roles for filtering agents
-        { id: 'billa', name: 'BILLA', description: 'BILLA team member', isAdmin: 0, isSystem: 0,
-          permissions: [...qsAgentPerms] },
-        { id: 'social_media', name: 'Social Media', description: 'Social Media team member', isAdmin: 0, isSystem: 0,
-          permissions: [...qsAgentPerms] }
+          permissions: ['user_view', 'teams_view', ...qsEvaluatorPerms] }
     ];
     
     roles.forEach(r => {
@@ -1144,12 +1199,35 @@ async function seedData() {
         });
     });
     
-    // Default admin user
+    // Default teams (unified for the whole application)
+    const defaultTeams = [
+        { id: uuidv4(), name: 'BILLA', teamCode: 'billa', description: 'BILLA Partner Team', color: '#ff6b00', sortOrder: 0 },
+        { id: uuidv4(), name: 'Social Media', teamCode: 'social_media', description: 'Social Media Team', color: '#1da1f2', sortOrder: 1 },
+        { id: uuidv4(), name: 'Support', teamCode: 'support', description: 'General Support Team', color: '#10b981', sortOrder: 2 }
+    ];
+    
+    defaultTeams.forEach(team => {
+        run(`INSERT OR IGNORE INTO teams (id, name, team_code, description, color, is_active, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+            [team.id, team.name, team.teamCode, team.description, team.color, team.sortOrder, now, now]);
+        
+        // Add default QS task category for each team
+        run(`INSERT OR IGNORE INTO qs_task_categories (id, team_id, name, description, default_weight, sort_order, is_active, created_at, updated_at)
+             VALUES (?, ?, 'Allgemein', 'Allgemeine Aufgaben', 1.0, 0, 1, ?, ?)`,
+            [uuidv4(), team.id, now, now]);
+        
+        // Add default QS check category for each team
+        run(`INSERT OR IGNORE INTO qs_check_categories (id, team_id, name, description, sort_order, is_active, created_at, updated_at)
+             VALUES (?, ?, 'Standard', 'Standard Quality Checks', 0, 1, ?, ?)`,
+            [uuidv4(), team.id, now, now]);
+    });
+    
+    // Default admin user (no team - can see all)
     const bcryptRounds = Config.get('security.bcryptRounds', 10);
     const hashedPw = await bcrypt.hash('admin123', bcryptRounds);
-    run(`INSERT INTO users (id, username, email, password, first_name, last_name, role_id, department, is_active, created_at, updated_at)
+    run(`INSERT INTO users (id, username, email, password, first_name, last_name, role_id, team_id, is_active, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [uuidv4(), 'admin', 'admin@company.com', hashedPw, 'System', 'Administrator', 'admin', 'IT', 1, now, now]);
+        [uuidv4(), 'admin', 'admin@company.com', hashedPw, 'System', 'Administrator', 'admin', null, 1, now, now]);
     
     // Default quality categories
     const categories = [
@@ -1197,35 +1275,6 @@ async function seedData() {
         [defaultKcCategory.id, defaultKcCategory.name, defaultKcCategory.description, 
          defaultKcCategory.defaultWeighting, defaultKcCategory.sortOrder, now, now]);
     
-    // Default Quality System teams
-    const qsTeams = [
-        { id: uuidv4(), name: 'BILLA', description: 'BILLA Partner Quality Checks', teamCode: 'billa', sortOrder: 0 },
-        { id: uuidv4(), name: 'Social Media', description: 'Social Media Team Quality Checks', teamCode: 'social_media', sortOrder: 1 }
-    ];
-    
-    qsTeams.forEach(team => {
-        run(`INSERT OR IGNORE INTO qs_teams (id, name, description, team_code, default_interaction_channel, is_active, sort_order, created_at, updated_at)
-             VALUES (?, ?, ?, ?, 'ticket', 1, ?, ?, ?)`,
-            [team.id, team.name, team.description, team.teamCode, team.sortOrder, now, now]);
-        
-        // Link the team-specific roles
-        const roleId = team.teamCode === 'billa' ? 'billa' : 'social_media';
-        run(`INSERT OR IGNORE INTO qs_team_roles (id, team_id, role_id, role_type, created_at)
-             VALUES (?, ?, ?, 'agent', ?)`,
-            [uuidv4(), team.id, roleId, now]);
-        
-        // Add default task category for each team
-        const catId = uuidv4();
-        run(`INSERT OR IGNORE INTO qs_task_categories (id, team_id, name, description, default_weight, sort_order, is_active, created_at, updated_at)
-             VALUES (?, ?, 'Allgemein', 'Allgemeine Aufgaben', 1.0, 0, 1, ?, ?)`,
-            [catId, team.id, now, now]);
-        
-        // Add default check category for each team
-        run(`INSERT OR IGNORE INTO qs_check_categories (id, team_id, name, description, sort_order, is_active, created_at, updated_at)
-             VALUES (?, ?, 'Standard', 'Standard Quality Checks', 0, 1, ?, ?)`,
-            [uuidv4(), team.id, now, now]);
-    });
-    
     // Default QS settings
     const qsDefaultSettings = {
         'qs.passingScore': '80',
@@ -1249,26 +1298,43 @@ async function seedData() {
 const UserSystem = {
     getAll() {
         return all(`
-            SELECT u.*, r.name as role_name, r.is_admin 
-            FROM users u LEFT JOIN roles r ON u.role_id = r.id 
+            SELECT u.*, r.name as role_name, r.is_admin, t.name as team_name, t.team_code
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            LEFT JOIN teams t ON u.team_id = t.id
             ORDER BY u.created_at DESC
         `);
     },
     
     getById(id) {
         return get(`
-            SELECT u.*, r.name as role_name, r.is_admin 
-            FROM users u LEFT JOIN roles r ON u.role_id = r.id 
+            SELECT u.*, r.name as role_name, r.is_admin, t.name as team_name, t.team_code
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            LEFT JOIN teams t ON u.team_id = t.id
             WHERE u.id = ?
         `, [id]);
     },
     
     getByUsername(username) {
         return get(`
-            SELECT u.*, r.name as role_name, r.is_admin 
-            FROM users u LEFT JOIN roles r ON u.role_id = r.id 
+            SELECT u.*, r.name as role_name, r.is_admin, t.name as team_name, t.team_code
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            LEFT JOIN teams t ON u.team_id = t.id
             WHERE LOWER(u.username) = LOWER(?)
         `, [username]);
+    },
+    
+    getByTeam(teamId) {
+        return all(`
+            SELECT u.*, r.name as role_name, r.is_admin, t.name as team_name, t.team_code
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            LEFT JOIN teams t ON u.team_id = t.id
+            WHERE u.team_id = ?
+            ORDER BY u.last_name, u.first_name
+        `, [teamId]);
     },
     
     getByEmail(email) {
@@ -1286,10 +1352,10 @@ const UserSystem = {
         const hashedPw = await bcrypt.hash(data.password, bcryptRounds);
         const defaultRole = Config.get('users.defaultRole', 'agent');
         
-        run(`INSERT INTO users (id, username, email, password, first_name, last_name, role_id, department, phone, is_active, created_at, updated_at)
+        run(`INSERT INTO users (id, username, email, password, first_name, last_name, role_id, team_id, phone, is_active, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, data.username.toLowerCase(), data.email.toLowerCase(), hashedPw, data.firstName, data.lastName,
-             data.roleId || defaultRole, data.department || '', data.phone || '', data.isActive !== false ? 1 : 0, now, now]);
+             data.roleId || defaultRole, data.teamId || null, data.phone || '', data.isActive !== false ? 1 : 0, now, now]);
         
         saveDb();
         return this.getById(id);
@@ -1313,7 +1379,7 @@ const UserSystem = {
         if (data.firstName) { sql += ', first_name = ?'; params.push(data.firstName); }
         if (data.lastName) { sql += ', last_name = ?'; params.push(data.lastName); }
         if (data.roleId) { sql += ', role_id = ?'; params.push(data.roleId); }
-        if (data.department !== undefined) { sql += ', department = ?'; params.push(data.department); }
+        if (data.teamId !== undefined) { sql += ', team_id = ?'; params.push(data.teamId || null); }
         if (data.phone !== undefined) { sql += ', phone = ?'; params.push(data.phone); }
         if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
         if (data.lastLogin) { sql += ', last_login = ?'; params.push(data.lastLogin); }
@@ -1819,6 +1885,188 @@ const QualitySystem = {
 };
 
 // ============================================
+// TEAMS SYSTEM - Unified Team Management
+// ============================================
+
+const TeamsSystem = {
+    getAll() {
+        return all('SELECT * FROM teams WHERE is_active = 1 ORDER BY sort_order, name');
+    },
+    
+    getAllIncludingInactive() {
+        return all('SELECT * FROM teams ORDER BY sort_order, name');
+    },
+    
+    getById(id) {
+        return get('SELECT * FROM teams WHERE id = ?', [id]);
+    },
+    
+    getByCode(teamCode) {
+        return get('SELECT * FROM teams WHERE team_code = ?', [teamCode]);
+    },
+    
+    create(data) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        
+        // Generate team_code from name if not provided
+        const teamCode = data.teamCode || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        
+        run(`INSERT INTO teams (id, name, team_code, description, color, is_active, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.name, teamCode, data.description || '', data.color || '#3b82f6', 
+             data.isActive !== false ? 1 : 0, data.sortOrder || 0, now, now]);
+        
+        saveDb();
+        return this.getById(id);
+    },
+    
+    update(id, data) {
+        const now = new Date().toISOString();
+        const existing = this.getById(id);
+        if (!existing) return null;
+        
+        let sql = 'UPDATE teams SET updated_at = ?';
+        let params = [now];
+        
+        if (data.name !== undefined) { sql += ', name = ?'; params.push(data.name); }
+        if (data.teamCode !== undefined) { sql += ', team_code = ?'; params.push(data.teamCode); }
+        if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
+        if (data.color !== undefined) { sql += ', color = ?'; params.push(data.color); }
+        if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
+        if (data.sortOrder !== undefined) { sql += ', sort_order = ?'; params.push(data.sortOrder); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        
+        run(sql, params);
+        saveDb();
+        return this.getById(id);
+    },
+    
+    delete(id) {
+        // Check if team has users
+        const usersInTeam = all('SELECT id FROM users WHERE team_id = ?', [id]);
+        if (usersInTeam.length > 0) {
+            throw new Error('Cannot delete team with assigned users');
+        }
+        
+        // Delete team permissions
+        run('DELETE FROM team_permissions WHERE team_id = ?', [id]);
+        
+        run('DELETE FROM teams WHERE id = ?', [id]);
+        saveDb();
+        return true;
+    },
+    
+    // Team members
+    getMembers(teamId) {
+        return all(`
+            SELECT u.*, r.name as role_name, r.is_admin
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            WHERE u.team_id = ? AND u.is_active = 1
+            ORDER BY u.last_name, u.first_name
+        `, [teamId]);
+    },
+    
+    getMemberCount(teamId) {
+        const result = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId]);
+        return result ? result.count : 0;
+    },
+    
+    // Team permissions
+    getPermissions(teamId) {
+        return all(`
+            SELECT tp.*, p.name as permission_name, p.module
+            FROM team_permissions tp
+            JOIN permissions p ON tp.permission_id = p.id
+            WHERE tp.team_id = ?
+        `, [teamId]);
+    },
+    
+    setPermission(teamId, permissionId, granted = true) {
+        const id = uuidv4();
+        run(`INSERT OR REPLACE INTO team_permissions (id, team_id, permission_id, granted)
+             VALUES (?, ?, ?, ?)`,
+            [id, teamId, permissionId, granted ? 1 : 0]);
+        saveDb();
+    },
+    
+    removePermission(teamId, permissionId) {
+        run('DELETE FROM team_permissions WHERE team_id = ? AND permission_id = ?', [teamId, permissionId]);
+        saveDb();
+    },
+    
+    clearPermissions(teamId) {
+        run('DELETE FROM team_permissions WHERE team_id = ?', [teamId]);
+        saveDb();
+    },
+    
+    setPermissions(teamId, permissions) {
+        // Clear existing
+        this.clearPermissions(teamId);
+        
+        // Add new permissions
+        permissions.forEach(p => {
+            const id = uuidv4();
+            run(`INSERT INTO team_permissions (id, team_id, permission_id, granted)
+                 VALUES (?, ?, ?, 1)`,
+                [id, teamId, p.permissionId || p]);
+        });
+        
+        saveDb();
+        return this.getPermissions(teamId);
+    },
+    
+    // Check if team has a specific permission granted
+    hasPermission(teamId, permissionId) {
+        const result = get(
+            'SELECT granted FROM team_permissions WHERE team_id = ? AND permission_id = ?',
+            [teamId, permissionId]
+        );
+        return result ? result.granted === 1 : false;
+    },
+    
+    // Get effective permissions for a team (merges team permissions with role permissions)
+    getEffectivePermissions(teamId, roleId) {
+        // Get role permissions
+        const rolePerms = all(`
+            SELECT p.id, p.name, p.module
+            FROM permissions p
+            JOIN role_permissions rp ON p.id = rp.permission_id
+            WHERE rp.role_id = ?
+        `, [roleId]);
+        
+        // Get team-specific overrides (only granted ones)
+        const teamPerms = all(`
+            SELECT p.id, p.name, p.module
+            FROM permissions p
+            JOIN team_permissions tp ON p.id = tp.permission_id
+            WHERE tp.team_id = ? AND tp.granted = 1
+        `, [teamId]);
+        
+        // Merge: team permissions add to (don't replace) role permissions
+        const permMap = new Map();
+        rolePerms.forEach(p => permMap.set(p.id, p));
+        teamPerms.forEach(p => permMap.set(p.id, p));
+        
+        return Array.from(permMap.values());
+    },
+    
+    // Get statistics for a team
+    getStatistics(teamId) {
+        const memberCount = this.getMemberCount(teamId);
+        const activeUsers = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId])?.count || 0;
+        
+        return {
+            memberCount,
+            activeUsers
+        };
+    }
+};
+
+// ============================================
 // QUALITY SYSTEM v2 (QS) - Comprehensive Quality Management
 // ============================================
 
@@ -1857,7 +2105,7 @@ const QS = {
     // TEAM MANAGEMENT
     // ============================================
     getAllTeams() {
-        const teams = all('SELECT * FROM qs_teams WHERE is_active = 1 ORDER BY sort_order, name');
+        const teams = all('SELECT * FROM teams WHERE is_active = 1 ORDER BY sort_order, name');
         return teams.map(t => ({
             id: t.id,
             name: t.name,
@@ -1873,7 +2121,7 @@ const QS = {
     },
     
     getTeamById(id) {
-        const t = get('SELECT * FROM qs_teams WHERE id = ?', [id]);
+        const t = get('SELECT * FROM teams WHERE id = ?', [id]);
         if (!t) return null;
         return {
             id: t.id,
@@ -1890,7 +2138,7 @@ const QS = {
     },
     
     getTeamByCode(code) {
-        const t = get('SELECT * FROM qs_teams WHERE team_code = ?', [code]);
+        const t = get('SELECT * FROM teams WHERE team_code = ?', [code]);
         if (!t) return null;
         return this.getTeamById(t.id);
     },
@@ -2059,6 +2307,8 @@ const QS = {
             maxPoints: t.max_points,
             scaleSize: t.scale_size,
             scaleInverted: !!t.scale_inverted,
+            passThreshold: t.pass_threshold ?? 0.7,
+            passScaleValue: t.pass_scale_value,
             weightOverride: t.weight_override,
             effectiveWeight: t.weight_override ?? t.category_weight ?? 1.0,
             sortOrder: t.sort_order,
@@ -2085,12 +2335,22 @@ const QS = {
         
         const maxSort = get('SELECT MAX(sort_order) as m FROM qs_tasks WHERE team_id = ?', [teamId])?.m || 0;
         
+        // Determine default pass threshold based on scoring type
+        let passThreshold = data.passThreshold;
+        let passScaleValue = data.passScaleValue;
+        
+        if (passThreshold === undefined) {
+            passThreshold = data.scoringType === 'checkbox' ? 1.0 : 0.7; // Default 70% for points/scale, 100% for checkbox
+        }
+        
         run(`INSERT INTO qs_tasks (id, task_number, team_id, category_id, title, task_text, scoring_type, 
-             max_points, scale_size, scale_inverted, weight_override, sort_order, is_active, created_by, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+             max_points, scale_size, scale_inverted, pass_threshold, pass_scale_value, weight_override, 
+             sort_order, is_active, created_by, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
             [id, taskNumber, teamId, data.categoryId || null, data.title || '', data.taskText,
              data.scoringType || 'points', data.maxPoints || 10, data.scaleSize || 5,
-             data.scaleInverted ? 1 : 0, data.weightOverride || null, maxSort + 1, userId, now, now]);
+             data.scaleInverted ? 1 : 0, passThreshold, passScaleValue || null,
+             data.weightOverride || null, maxSort + 1, userId, now, now]);
         
         // Add references if provided
         if (data.references?.length) {
@@ -2110,12 +2370,14 @@ const QS = {
         
         run(`UPDATE qs_tasks SET 
              category_id = ?, title = ?, task_text = ?, scoring_type = ?, max_points = ?,
-             scale_size = ?, scale_inverted = ?, weight_override = ?, sort_order = ?, updated_at = ?
+             scale_size = ?, scale_inverted = ?, pass_threshold = ?, pass_scale_value = ?,
+             weight_override = ?, sort_order = ?, updated_at = ?
              WHERE id = ?`,
             [data.categoryId ?? existing.categoryId, data.title ?? existing.title, 
              data.taskText ?? existing.taskText, data.scoringType ?? existing.scoringType,
              data.maxPoints ?? existing.maxPoints, data.scaleSize ?? existing.scaleSize,
              data.scaleInverted !== undefined ? (data.scaleInverted ? 1 : 0) : (existing.scaleInverted ? 1 : 0),
+             data.passThreshold ?? existing.passThreshold, data.passScaleValue ?? existing.passScaleValue,
              data.weightOverride ?? existing.weightOverride, data.sortOrder ?? existing.sortOrder, now, id]);
         
         // Update references if provided
@@ -2243,7 +2505,7 @@ const QS = {
     },
     
     deleteCheckCategory(id) {
-        const checksUsing = get('SELECT COUNT(*) as c FROM qs_checks WHERE category_id = ? AND is_archived = 0', [id])?.c || 0;
+        const checksUsing = get('SELECT COUNT(*) as c FROM qs_quality_checks WHERE category_id = ? AND is_archived = 0', [id])?.c || 0;
         if (checksUsing > 0) {
             return { success: false, error: `Category is used by ${checksUsing} active check(s)` };
         }
@@ -2259,7 +2521,7 @@ const QS = {
         let sql = `SELECT ch.*, cat.name as category_name,
                    (SELECT first_name || ' ' || last_name FROM users WHERE id = ch.created_by) as created_by_name,
                    (SELECT COUNT(*) FROM qs_check_tasks WHERE check_id = ch.id) as task_count
-                   FROM qs_checks ch
+                   FROM qs_quality_checks ch
                    LEFT JOIN qs_check_categories cat ON ch.category_id = cat.id
                    WHERE ch.team_id = ?`;
         const params = [teamId];
@@ -2286,7 +2548,7 @@ const QS = {
             SELECT ch.*, cat.name as category_name,
             (SELECT first_name || ' ' || last_name FROM users WHERE id = ch.created_by) as created_by_name,
             (SELECT COUNT(*) FROM qs_check_tasks WHERE check_id = ch.id) as task_count
-            FROM qs_checks ch
+            FROM qs_quality_checks ch
             LEFT JOIN qs_check_categories cat ON ch.category_id = cat.id
             WHERE ch.id = ?
         `, [id]);
@@ -2295,6 +2557,14 @@ const QS = {
     },
     
     formatCheck(ch, includeTasks = false) {
+        // Parse sections from JSON
+        let sections = [];
+        try {
+            sections = JSON.parse(ch.sections || '[]');
+        } catch (e) {
+            sections = [];
+        }
+        
         const check = {
             id: ch.id,
             checkNumber: ch.check_number,
@@ -2304,6 +2574,9 @@ const QS = {
             name: ch.name,
             description: ch.description,
             passingScore: ch.passing_score,
+            minPassedTasks: ch.min_passed_tasks || 0,
+            requireAllCritical: !!ch.require_all_critical,
+            sections: sections,
             isActive: !!ch.is_active,
             isArchived: !!ch.is_archived,
             archivedAt: ch.archived_at,
@@ -2315,7 +2588,6 @@ const QS = {
         };
         
         if (includeTasks) {
-            check.sections = this.getCheckSections(ch.id);
             check.tasks = this.getCheckTasks(ch.id);
             check.maxScore = this.calculateCheckMaxScore(check.tasks);
         }
@@ -2352,22 +2624,19 @@ const QS = {
         const id = uuidv4();
         let checkNumber = this.generateCheckNumber();
         
-        while (get('SELECT id FROM qs_checks WHERE check_number = ?', [checkNumber])) {
+        while (get('SELECT id FROM qs_quality_checks WHERE check_number = ?', [checkNumber])) {
             checkNumber = this.generateCheckNumber();
         }
         
-        run(`INSERT INTO qs_checks (id, check_number, team_id, category_id, name, description, passing_score, 
-             is_active, created_by, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-            [id, checkNumber, teamId, data.categoryId || null, data.name, data.description || '',
-             data.passingScore || 80, userId, now, now]);
+        // Store sections as JSON
+        const sectionsJson = JSON.stringify(data.sections || []);
         
-        // Add sections if provided
-        if (data.sections?.length) {
-            data.sections.forEach((section, idx) => {
-                this.addCheckSection(id, section, idx);
-            });
-        }
+        run(`INSERT INTO qs_quality_checks (id, check_number, team_id, category_id, name, description, passing_score, 
+             min_passed_tasks, require_all_critical, sections, is_active, created_by, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+            [id, checkNumber, teamId, data.categoryId || null, data.name, data.description || '',
+             data.passingScore || 80, data.minPassedTasks || 0, data.requireAllCritical ? 1 : 0,
+             sectionsJson, userId, now, now]);
         
         // Add tasks if provided
         if (data.tasks?.length) {
@@ -2385,21 +2654,22 @@ const QS = {
         const existing = this.getCheckById(id);
         if (!existing) return null;
         
-        run(`UPDATE qs_checks SET 
-             category_id = ?, name = ?, description = ?, passing_score = ?, updated_at = ?
-             WHERE id = ?`,
-            [data.categoryId ?? existing.categoryId, data.name ?? existing.name,
-             data.description ?? existing.description, data.passingScore ?? existing.passingScore, now, id]);
+        // Build update query dynamically
+        let sql = 'UPDATE qs_quality_checks SET updated_at = ?';
+        let params = [now];
         
-        // Update sections if provided
-        if (data.sections !== undefined) {
-            run('DELETE FROM qs_check_sections WHERE check_id = ?', [id]);
-            if (data.sections?.length) {
-                data.sections.forEach((section, idx) => {
-                    this.addCheckSection(id, section, idx);
-                });
-            }
-        }
+        if (data.categoryId !== undefined) { sql += ', category_id = ?'; params.push(data.categoryId); }
+        if (data.name !== undefined) { sql += ', name = ?'; params.push(data.name); }
+        if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
+        if (data.passingScore !== undefined) { sql += ', passing_score = ?'; params.push(data.passingScore); }
+        if (data.minPassedTasks !== undefined) { sql += ', min_passed_tasks = ?'; params.push(data.minPassedTasks); }
+        if (data.requireAllCritical !== undefined) { sql += ', require_all_critical = ?'; params.push(data.requireAllCritical ? 1 : 0); }
+        if (data.sections !== undefined) { sql += ', sections = ?'; params.push(JSON.stringify(data.sections)); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        
+        run(sql, params);
         
         // Update tasks if provided
         if (data.tasks !== undefined) {
@@ -2417,14 +2687,14 @@ const QS = {
     
     archiveCheck(id) {
         const now = new Date().toISOString();
-        run('UPDATE qs_checks SET is_archived = 1, archived_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+        run('UPDATE qs_quality_checks SET is_archived = 1, archived_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
         saveDb();
         return this.getCheckById(id);
     },
     
     restoreCheck(id) {
         const now = new Date().toISOString();
-        run('UPDATE qs_checks SET is_archived = 0, archived_at = NULL, updated_at = ? WHERE id = ?', [now, id]);
+        run('UPDATE qs_quality_checks SET is_archived = 0, archived_at = NULL, updated_at = ? WHERE id = ?', [now, id]);
         saveDb();
         return this.getCheckById(id);
     },
@@ -2436,36 +2706,9 @@ const QS = {
         }
         
         run('DELETE FROM qs_check_tasks WHERE check_id = ?', [id]);
-        run('DELETE FROM qs_check_sections WHERE check_id = ?', [id]);
-        run('DELETE FROM qs_checks WHERE id = ?', [id]);
+        run('DELETE FROM qs_quality_checks WHERE id = ?', [id]);
         saveDb();
         return { success: true };
-    },
-
-    // ============================================
-    // CHECK SECTIONS
-    // ============================================
-    getCheckSections(checkId) {
-        return all('SELECT * FROM qs_check_sections WHERE check_id = ? ORDER BY sort_order', [checkId]).map(s => ({
-            id: s.id,
-            checkId: s.check_id,
-            name: s.name,
-            description: s.description,
-            weight: s.weight,
-            sortOrder: s.sort_order,
-            createdAt: s.created_at
-        }));
-    },
-    
-    addCheckSection(checkId, data, sortOrder = 0) {
-        const now = new Date().toISOString();
-        const id = data.id || uuidv4();
-        
-        run(`INSERT INTO qs_check_sections (id, check_id, name, description, weight, sort_order, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [id, checkId, data.name, data.description || '', data.weight || 1.0, sortOrder, now]);
-        
-        return id;
     },
 
     // ============================================
@@ -2474,13 +2717,12 @@ const QS = {
     getCheckTasks(checkId) {
         const tasks = all(`
             SELECT ct.*, t.task_number, t.title, t.task_text, t.scoring_type, t.max_points, 
-                   t.scale_size, t.scale_inverted, t.weight_override as task_weight_override,
-                   tc.name as task_category_name, tc.default_weight as task_category_weight,
-                   s.name as section_name
+                   t.scale_size, t.scale_inverted, t.pass_threshold, t.pass_scale_value,
+                   t.weight_override as task_weight_override,
+                   tc.name as task_category_name, tc.default_weight as task_category_weight
             FROM qs_check_tasks ct
             LEFT JOIN qs_tasks t ON ct.task_id = t.id
             LEFT JOIN qs_task_categories tc ON t.category_id = tc.id
-            LEFT JOIN qs_check_sections s ON ct.section_id = s.id
             WHERE ct.check_id = ?
             ORDER BY ct.sort_order
         `, [checkId]);
@@ -2489,8 +2731,8 @@ const QS = {
             id: ct.id,
             checkId: ct.check_id,
             taskId: ct.task_id,
-            sectionId: ct.section_id,
             sectionName: ct.section_name,
+            isCritical: !!ct.is_critical,
             weightOverride: ct.weight_override,
             sortOrder: ct.sort_order,
             task: {
@@ -2501,6 +2743,8 @@ const QS = {
                 maxPoints: ct.max_points,
                 scaleSize: ct.scale_size,
                 scaleInverted: !!ct.scale_inverted,
+                passThreshold: ct.pass_threshold ?? 0.7,
+                passScaleValue: ct.pass_scale_value,
                 effectiveWeight: ct.weight_override ?? ct.task_weight_override ?? ct.task_category_weight ?? 1.0,
                 categoryName: ct.task_category_name,
                 references: this.getTaskReferences(ct.task_id)
@@ -2511,9 +2755,10 @@ const QS = {
     addCheckTask(checkId, data, sortOrder = 0) {
         const id = uuidv4();
         
-        run(`INSERT INTO qs_check_tasks (id, check_id, task_id, section_id, weight_override, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [id, checkId, data.taskId, data.sectionId || null, data.weightOverride || null, sortOrder]);
+        run(`INSERT INTO qs_check_tasks (id, check_id, task_id, section_name, is_critical, weight_override, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, checkId, data.taskId, data.sectionName || null, data.isCritical ? 1 : 0, 
+             data.weightOverride || null, sortOrder]);
         
         return id;
     },
@@ -2526,7 +2771,7 @@ const QS = {
                    (SELECT first_name || ' ' || last_name FROM users WHERE id = e.agent_id) as agent_name,
                    (SELECT first_name || ' ' || last_name FROM users WHERE id = e.evaluator_id) as evaluator_name
                    FROM qs_evaluations e
-                   LEFT JOIN qs_checks ch ON e.check_id = ch.id
+                   LEFT JOIN qs_quality_checks ch ON e.check_id = ch.id
                    WHERE e.team_id = ?`;
         const params = [teamId];
         
@@ -2567,7 +2812,7 @@ const QS = {
             (SELECT first_name || ' ' || last_name FROM users WHERE id = e.agent_id) as agent_name,
             (SELECT first_name || ' ' || last_name FROM users WHERE id = e.evaluator_id) as evaluator_name
             FROM qs_evaluations e
-            LEFT JOIN qs_checks ch ON e.check_id = ch.id
+            LEFT JOIN qs_quality_checks ch ON e.check_id = ch.id
             WHERE e.id = ?
         `, [id]);
         if (!e) return null;
@@ -2593,6 +2838,8 @@ const QS = {
             totalScore: e.total_score,
             maxScore: e.max_score,
             percentage: e.percentage,
+            passedTasks: e.passed_tasks || 0,
+            totalTasks: e.total_tasks || 0,
             passed: !!e.passed,
             passingScore: e.passing_score,
             supervisorNotes: e.supervisor_notes,
@@ -2633,9 +2880,15 @@ const QS = {
         const evaluation = this.getEvaluationById(id, false);
         if (!evaluation) return null;
         
+        // Get check details for pass logic
+        const check = this.getCheckById(evaluation.checkId, true);
+        
         // Calculate scores
         let totalScore = 0;
         let maxScore = 0;
+        let passedTasks = 0;
+        let totalTasks = 0;
+        let criticalTasksFailed = false;
         
         // Save answers
         if (data.answers?.length) {
@@ -2644,50 +2897,95 @@ const QS = {
                 const task = this.getTaskById(answer.taskId);
                 if (!task) return;
                 
+                totalTasks++;
                 let answerScore = 0;
                 let answerMaxScore = 0;
+                let taskPassed = false;
                 const weight = answer.weightOverride ?? task.effectiveWeight ?? 1.0;
+                
+                // Find if this task is marked critical in the check
+                const checkTask = check.tasks?.find(ct => ct.taskId === answer.taskId);
+                const isCritical = checkTask?.isCritical || false;
                 
                 switch (task.scoringType) {
                     case 'points':
                         answerMaxScore = (task.maxPoints || 10) * weight;
                         answerScore = (parseFloat(answer.rawValue) || 0) * weight;
+                        // Task passes if score >= threshold percentage of max
+                        const passThreshold = task.passThreshold ?? 0.7;
+                        taskPassed = answerScore >= (answerMaxScore * passThreshold);
                         break;
                     case 'scale':
                         answerMaxScore = (task.scaleSize || 5) * weight;
                         let scaleValue = parseInt(answer.rawValue) || 0;
+                        const originalScaleValue = scaleValue;
                         if (task.scaleInverted) {
                             // Invert: if 10 is worst, 1 is best, then selecting 3 on 1-10 = 10-3+1 = 8
                             scaleValue = (task.scaleSize || 5) - scaleValue + 1;
                         }
                         answerScore = scaleValue * weight;
+                        // Task passes if scale value >= passScaleValue (or passThreshold % of max scale)
+                        if (task.passScaleValue != null) {
+                            // Direct comparison with pass threshold value
+                            if (task.scaleInverted) {
+                                // For inverted: lower original value is better
+                                taskPassed = originalScaleValue <= task.passScaleValue;
+                            } else {
+                                taskPassed = originalScaleValue >= task.passScaleValue;
+                            }
+                        } else {
+                            // Use percentage threshold
+                            const passThreshold = task.passThreshold ?? 0.7;
+                            taskPassed = answerScore >= (answerMaxScore * passThreshold);
+                        }
                         break;
                     case 'checkbox':
                         answerMaxScore = 1 * weight;
                         answerScore = (answer.rawValue === 'true' || answer.rawValue === '1' || answer.rawValue === true) ? weight : 0;
+                        // Checkbox: passed if checked (value = true)
+                        taskPassed = answerScore > 0;
                         break;
+                }
+                
+                if (taskPassed) {
+                    passedTasks++;
+                } else if (isCritical) {
+                    criticalTasksFailed = true;
                 }
                 
                 totalScore += answerScore;
                 maxScore += answerMaxScore;
                 
-                run(`INSERT INTO qs_evaluation_answers (id, evaluation_id, task_id, check_task_id, section_id, 
-                     score, max_score, raw_value, notes, created_at)
+                run(`INSERT INTO qs_evaluation_answers (id, evaluation_id, task_id, check_task_id, 
+                     score, max_score, raw_value, task_passed, notes, created_at)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [answerId, id, answer.taskId, answer.checkTaskId, answer.sectionId || null,
-                     answerScore, answerMaxScore, String(answer.rawValue), answer.notes || '', now]);
+                    [answerId, id, answer.taskId, answer.checkTaskId, 
+                     answerScore, answerMaxScore, String(answer.rawValue), taskPassed ? 1 : 0, 
+                     answer.notes || '', now]);
             });
         }
         
         const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-        const check = this.getCheckById(evaluation.checkId, false);
-        const passed = percentage >= (check?.passingScore || 80);
+        
+        // Determine if evaluation passed based on multiple criteria
+        let passed = percentage >= (check?.passingScore || 80);
+        
+        // Check minimum passed tasks requirement
+        if (check?.minPassedTasks > 0 && passedTasks < check.minPassedTasks) {
+            passed = false;
+        }
+        
+        // Check critical tasks requirement
+        if (check?.requireAllCritical && criticalTasksFailed) {
+            passed = false;
+        }
         
         run(`UPDATE qs_evaluations SET 
-             total_score = ?, max_score = ?, percentage = ?, passed = ?, 
+             total_score = ?, max_score = ?, percentage = ?, passed_tasks = ?, total_tasks = ?, passed = ?, 
              supervisor_notes = ?, status = 'completed', completed_at = ?, updated_at = ?
              WHERE id = ?`,
-            [totalScore, maxScore, percentage, passed ? 1 : 0, data.supervisorNotes || '', now, now, id]);
+            [totalScore, maxScore, percentage, passedTasks, totalTasks, passed ? 1 : 0, 
+             data.supervisorNotes || '', now, now, id]);
         
         saveDb();
         return this.getEvaluationById(id);
@@ -2714,10 +3012,9 @@ const QS = {
     getEvaluationAnswers(evaluationId) {
         return all(`
             SELECT ea.*, t.task_number, t.title, t.task_text, t.scoring_type, t.max_points, t.scale_size, t.scale_inverted,
-                   s.name as section_name
+                   t.pass_threshold, t.pass_scale_value
             FROM qs_evaluation_answers ea
             LEFT JOIN qs_tasks t ON ea.task_id = t.id
-            LEFT JOIN qs_check_sections s ON ea.section_id = s.id
             WHERE ea.evaluation_id = ?
             ORDER BY ea.created_at
         `, [evaluationId]).map(a => ({
@@ -2725,11 +3022,10 @@ const QS = {
             evaluationId: a.evaluation_id,
             taskId: a.task_id,
             checkTaskId: a.check_task_id,
-            sectionId: a.section_id,
-            sectionName: a.section_name,
             score: a.score,
             maxScore: a.max_score,
             rawValue: a.raw_value,
+            taskPassed: !!a.task_passed,
             notes: a.notes,
             task: {
                 taskNumber: a.task_number,
@@ -2737,6 +3033,8 @@ const QS = {
                 taskText: a.task_text,
                 scoringType: a.scoring_type,
                 maxPoints: a.max_points,
+                passThreshold: a.pass_threshold,
+                passScaleValue: a.pass_scale_value,
                 scaleSize: a.scale_size,
                 scaleInverted: !!a.scale_inverted
             },
@@ -2861,13 +3159,13 @@ const QS = {
             passingRate: evaluations.length ? 
                 Math.round(evaluations.filter(e => e.passed).length / evaluations.length * 100) : 0,
             taskCount: get('SELECT COUNT(*) as c FROM qs_tasks WHERE team_id = ? AND is_archived = 0', [teamId])?.c || 0,
-            checkCount: get('SELECT COUNT(*) as c FROM qs_checks WHERE team_id = ? AND is_archived = 0', [teamId])?.c || 0
+            checkCount: get('SELECT COUNT(*) as c FROM qs_quality_checks WHERE team_id = ? AND is_archived = 0', [teamId])?.c || 0
         };
     },
     
     getAgentStatistics(agentId, teamId = null) {
         let sql = `SELECT e.*, ch.name as check_name FROM qs_evaluations e
-                   LEFT JOIN qs_checks ch ON e.check_id = ch.id
+                   LEFT JOIN qs_quality_checks ch ON e.check_id = ch.id
                    WHERE e.agent_id = ? AND e.status = 'completed'`;
         const params = [agentId];
         
@@ -2922,8 +3220,8 @@ const QS = {
                    (SELECT first_name || ' ' || last_name FROM users WHERE id = e.agent_id) as agent_name,
                    (SELECT first_name || ' ' || last_name FROM users WHERE id = e.evaluator_id) as evaluator_name
                    FROM qs_evaluations e
-                   LEFT JOIN qs_checks ch ON e.check_id = ch.id
-                   LEFT JOIN qs_teams t ON e.team_id = t.id
+                   LEFT JOIN qs_quality_checks ch ON e.check_id = ch.id
+                   LEFT JOIN teams t ON e.team_id = t.id
                    WHERE 1=1`;
         const params = [];
         
@@ -2981,8 +3279,8 @@ const QS = {
         const evalThisMonth = evaluations.filter(e => new Date(e.created_at) >= monthStart).length;
         
         const teams = teamIds ? 
-            all(`SELECT * FROM qs_teams WHERE id IN (${teamIds.map(() => '?').join(',')})`, teamIds) :
-            all('SELECT * FROM qs_teams WHERE is_active = 1');
+            all(`SELECT * FROM teams WHERE id IN (${teamIds.map(() => '?').join(',')})`, teamIds) :
+            all('SELECT * FROM teams WHERE is_active = 1');
         
         return {
             totalEvaluations: evaluations.length,
@@ -4743,6 +5041,7 @@ module.exports = {
     // Subsystems
     UserSystem,
     RoleSystem,
+    TeamsSystem,
     TicketSystem,
     QualitySystem,
     QS, // Quality System v2
