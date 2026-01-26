@@ -1305,6 +1305,63 @@
     gap: var(--space-xs);
 }
 
+/* Agent Details Modal */
+.agent-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.agent-stats-grid .stat-card {
+    text-align: center;
+    padding: var(--space-md);
+    background: var(--bg-muted);
+    border-radius: var(--radius-md);
+}
+
+.agent-stats-grid .stat-value {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: var(--brand-primary);
+}
+
+.agent-stats-grid .stat-label {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.agent-recent-evaluations {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.recent-eval-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.recent-eval-item:hover {
+    background: var(--bg-hover);
+}
+
+.recent-eval-item .eval-date {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    min-width: 80px;
+}
+
+.recent-eval-item .eval-check {
+    flex: 1;
+}
+
 /* ============================================
    RESPONSIVE
    ============================================ */

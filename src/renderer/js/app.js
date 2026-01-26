@@ -444,6 +444,9 @@ const App = {
                 case 'qsMyResults':
                     await QualitySystemViews.showMyResultsView();
                     break;
+                case 'qsSettings':
+                    await QualitySystemViews.showSettingsView();
+                    break;
                 case 'roles':
                     await RolesView.init();
                     break;

@@ -1905,6 +1905,204 @@ const QualitySystemViews = {
     
     async continueEvaluation(evaluationId) {
         await this.startEvaluationForm(evaluationId);
+    },
+
+    // ============================================
+    // SETTINGS VIEW
+    // ============================================
+    
+    async showSettingsView() {
+        // Load the template if not already loaded
+        const container = document.getElementById('main-content');
+        if (!document.getElementById('view-qsSettings')) {
+            const template = await fetch('templates/qsSettings.html').then(r => r.text());
+            container.insertAdjacentHTML('beforeend', template);
+        }
+        
+        // Hide other views and show settings
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-qsSettings').classList.add('active');
+        
+        // Setup back button
+        document.getElementById('qs-settings-back-btn').onclick = () => App.navigateTo('qualitySystem');
+        
+        // Load global settings
+        const globalSettings = await api.settings.getAll();
+        if (globalSettings.success) {
+            const settings = globalSettings.settings;
+            document.getElementById('qs-settings-passing-score').value = settings['qs.passingScore'] || 80;
+            document.getElementById('qs-settings-default-scoring').value = settings['qs.defaultScoringType'] || 'points';
+            document.getElementById('qs-settings-default-scale').value = settings['qs.defaultScaleSize'] || '5';
+            document.getElementById('qs-settings-default-channel').value = settings['qs.defaultInteractionChannel'] || 'ticket';
+        }
+        
+        // Load teams and their quotas/roles
+        await this.loadSettingsTeams();
+        
+        // Setup save button
+        document.getElementById('qs-settings-save-btn').onclick = () => this.saveSettings();
+    },
+    
+    async loadSettingsTeams() {
+        const teams = await api.qs.getTeams();
+        if (!teams.success) return;
+        
+        const roles = await api.roles.getAll();
+        const allRoles = roles.success ? roles.roles : [];
+        
+        // Quotas section
+        const quotasList = document.getElementById('qs-quotas-list');
+        quotasList.innerHTML = teams.teams.map(team => `
+            <div class="qs-quota-item" data-team-id="${team.id}">
+                <h4>${team.name}</h4>
+                <div class="qs-quota-form">
+                    <div class="form-group">
+                        <label>Supervisor-Quote (pro Woche)</label>
+                        <input type="number" class="form-input" id="quota-supervisor-${team.id}" min="0" value="0" placeholder="0 = unbegrenzt">
+                    </div>
+                    <div class="form-group">
+                        <label>Agent-Quote (pro Monat)</label>
+                        <input type="number" class="form-input" id="quota-agent-${team.id}" min="0" value="0" placeholder="0 = unbegrenzt">
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Load existing quotas
+        for (const team of teams.teams) {
+            const quotas = await api.qs.getQuotas(team.id);
+            if (quotas.success) {
+                quotas.quotas.forEach(q => {
+                    const input = document.getElementById(`quota-${q.quotaType}-${team.id}`);
+                    if (input) input.value = q.targetCount;
+                });
+            }
+        }
+        
+        // Team roles section
+        const rolesList = document.getElementById('qs-team-roles-list');
+        rolesList.innerHTML = teams.teams.map(team => {
+            const teamRoles = team.roles?.filter(r => r.role_type === 'agent').map(r => r.role_id) || [];
+            
+            return `
+                <div class="qs-team-role-item" data-team-id="${team.id}">
+                    <h4>${team.name} - Agent-Rollen</h4>
+                    <p class="text-muted text-sm">Wählen Sie die Rollen, deren Mitglieder als Agents für ${team.name} gelten.</p>
+                    <div class="qs-role-form">
+                        ${allRoles.map(role => `
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="team-role-${team.id}" value="${role.id}" ${teamRoles.includes(role.id) ? 'checked' : ''}>
+                                ${role.name}
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+    
+    async saveSettings() {
+        try {
+            // Save global settings
+            const globalSettings = {
+                'qs.passingScore': document.getElementById('qs-settings-passing-score').value,
+                'qs.defaultScoringType': document.getElementById('qs-settings-default-scoring').value,
+                'qs.defaultScaleSize': document.getElementById('qs-settings-default-scale').value,
+                'qs.defaultInteractionChannel': document.getElementById('qs-settings-default-channel').value
+            };
+            
+            await api.settings.setMany(globalSettings);
+            
+            // Save quotas and team roles
+            const teams = await api.qs.getTeams();
+            if (teams.success) {
+                for (const team of teams.teams) {
+                    // Save quotas
+                    const supervisorQuota = document.getElementById(`quota-supervisor-${team.id}`);
+                    const agentQuota = document.getElementById(`quota-agent-${team.id}`);
+                    
+                    if (supervisorQuota && parseInt(supervisorQuota.value) > 0) {
+                        await api.qs.setQuota(team.id, {
+                            quotaType: 'supervisor',
+                            targetCount: parseInt(supervisorQuota.value),
+                            periodType: 'week'
+                        });
+                    }
+                    
+                    if (agentQuota && parseInt(agentQuota.value) > 0) {
+                        await api.qs.setQuota(team.id, {
+                            quotaType: 'agent',
+                            targetCount: parseInt(agentQuota.value),
+                            periodType: 'month'
+                        });
+                    }
+                    
+                    // Save team roles
+                    const roleCheckboxes = document.querySelectorAll(`input[name="team-role-${team.id}"]:checked`);
+                    const selectedRoles = Array.from(roleCheckboxes).map(cb => cb.value);
+                    await api.qs.updateTeamRoles(team.id, selectedRoles, 'agent');
+                }
+            }
+            
+            Toast.success('Einstellungen gespeichert');
+        } catch (error) {
+            console.error('Save settings error:', error);
+            Toast.error('Fehler beim Speichern');
+        }
+    },
+
+    // ============================================
+    // VIEW AGENT DETAILS
+    // ============================================
+    
+    async viewAgentDetails(agentId) {
+        const statsResult = await api.qs.getAgentStatistics(agentId, this.currentTeamId);
+        if (!statsResult.success) {
+            Toast.error('Fehler beim Laden der Agent-Details');
+            return;
+        }
+        
+        const stats = statsResult.statistics;
+        
+        const content = `
+            <div class="agent-details">
+                <div class="agent-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.totalEvaluations}</div>
+                        <div class="stat-label">Evaluierungen</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.averageScore}%</div>
+                        <div class="stat-label">Durchschnitt</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.passingRate}%</div>
+                        <div class="stat-label">Bestanden</div>
+                    </div>
+                </div>
+                
+                <h4>Letzte Evaluierungen</h4>
+                <div class="agent-recent-evaluations">
+                    ${stats.recentEvaluations?.length ? stats.recentEvaluations.map(e => `
+                        <div class="recent-eval-item" onclick="QualitySystemViews.viewEvaluationResult('${e.id}'); Modal.close();">
+                            <span class="eval-date">${new Date(e.createdAt).toLocaleDateString('de-DE')}</span>
+                            <span class="eval-check">${e.checkName}</span>
+                            <span class="badge ${e.passed ? 'badge-success' : 'badge-danger'}">${e.percentage}%</span>
+                        </div>
+                    `).join('') : '<p class="text-muted">Keine Evaluierungen vorhanden</p>'}
+                </div>
+            </div>
+        `;
+        
+        Modal.show({
+            title: 'Agent Statistiken',
+            content,
+            size: 'medium',
+            buttons: [
+                { text: 'Schließen', className: 'btn-secondary', action: 'close' },
+                { text: 'Neuer Check', className: 'btn-primary', action: () => { Modal.close(); this.startEvaluationForAgent(agentId); }, permission: 'qs_evaluate' }
+            ]
+        });
     }
 };
 
