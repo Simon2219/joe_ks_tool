@@ -142,8 +142,10 @@ const RolesView = {
     getModuleDisplayName(module) {
         const moduleNames = {
             users: 'Users',
+            teams: 'Teams',
             tickets: 'Tickets',
-            quality: 'Quality System',
+            quality: 'Quality (Legacy)',
+            qualitySystem: 'Quality System v2',
             knowledgeCheck: 'Knowledge Check',
             roles: 'Roles',
             settings: 'Settings',
@@ -164,7 +166,7 @@ const RolesView = {
         const grouped = Permissions.getPermissionsByModule(this.allPermissions.map(p => p.id));
 
         // Define the order of modules for display
-        const moduleOrder = ['users', 'tickets', 'quality', 'knowledgeCheck', 'roles', 'settings', 'integrations', 'admin'];
+        const moduleOrder = ['users', 'teams', 'tickets', 'quality', 'qualitySystem', 'knowledgeCheck', 'roles', 'settings', 'integrations', 'admin'];
 
         const formHtml = `
             <form id="role-form">

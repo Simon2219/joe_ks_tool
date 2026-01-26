@@ -69,8 +69,8 @@ const QualitySystemViews = {
             }
         }
         
-        // Setup tile click handlers
-        document.querySelectorAll('.qs-tile[data-navigate]').forEach(tile => {
+        // Setup tile click handlers (using kc-tile class now for consistency)
+        document.querySelectorAll('#qs-tiles-container .kc-tile[data-navigate]').forEach(tile => {
             tile.onclick = () => {
                 const view = tile.dataset.navigate;
                 if (view && Permissions.hasPermission(tile.dataset.permission)) {
@@ -84,13 +84,16 @@ const QualitySystemViews = {
     },
     
     updateTileVisibility() {
-        document.querySelectorAll('.qs-tile[data-permission]').forEach(tile => {
+        const container = document.getElementById('qs-tiles-container');
+        if (!container) return;
+        
+        container.querySelectorAll('.kc-tile[data-permission]').forEach(tile => {
             const perm = tile.dataset.permission;
             tile.style.display = Permissions.hasPermission(perm) ? '' : 'none';
         });
         
         // Check if any tiles are visible
-        const visibleTiles = document.querySelectorAll('.qs-tile[data-permission]:not([style*="display: none"])');
+        const visibleTiles = container.querySelectorAll('.kc-tile[data-permission]:not([style*="display: none"])');
         const noAccessMsg = document.getElementById('qs-no-access-message');
         if (noAccessMsg) {
             noAccessMsg.style.display = visibleTiles.length === 0 ? 'block' : 'none';

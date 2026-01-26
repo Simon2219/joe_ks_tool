@@ -310,7 +310,8 @@ const App = {
     async navigateTo(viewName) {
         // Define which views belong to which submenu groups
         const submenuGroups = {
-            knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcTestRuns', 'kcArchive', 'kcAssigned']
+            knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcTestRuns', 'kcArchive', 'kcAssigned'],
+            qualitySystem: ['qualitySystem', 'qsTeamBilla', 'qsTeamSocial', 'qsTracking', 'qsMyResults', 'qsSettings', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult']
         };
         
         // Update active nav item
@@ -371,6 +372,16 @@ const App = {
             users: 'UserSystem',
             tickets: 'TicketSystem',
             quality: 'QualitySystem',
+            qualitySystem: 'Quality System',
+            qsTeamBilla: 'BILLA',
+            qsTeamSocial: 'Social Media',
+            qsTracking: 'Quality Tracking',
+            qsMyResults: 'Meine Ergebnisse',
+            qsSettings: 'QS Einstellungen',
+            qsTasks: 'Aufgaben Katalog',
+            qsChecks: 'Check Katalog',
+            qsEvaluation: 'Quality Check',
+            qsResult: 'Evaluierungsergebnis',
             knowledgeCheck: 'Knowledge Check',
             kcQuestions: 'Fragen Katalog',
             kcTests: 'Test Katalog',
@@ -379,6 +390,7 @@ const App = {
             kcArchive: 'Archiv',
             kcAssigned: 'Zugewiesene Tests',
             roles: 'RoleSystem',
+            teams: 'Team Setup',
             integrations: 'IntegrationSystem',
             settings: 'Settings',
             admin: 'Admin Panel'
@@ -450,6 +462,9 @@ const App = {
                 case 'roles':
                     await RolesView.init();
                     break;
+                case 'teams':
+                    await TeamsView.init();
+                    break;
                 case 'integrations':
                     await IntegrationsView.init();
                     break;
@@ -483,6 +498,7 @@ const App = {
             kcArchive: KCArchiveView,
             kcAssigned: KCAssignedView,
             roles: RolesView,
+            teams: TeamsView,
             integrations: IntegrationsView,
             settings: SettingsView,
             admin: AdminPanelView

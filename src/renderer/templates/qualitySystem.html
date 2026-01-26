@@ -1,8 +1,8 @@
 <section id="view-qualitySystem" class="view">
-    <div class="qs-tiles-container" id="qs-tiles-container">
+    <div class="kc-tiles-container" id="qs-tiles-container">
         <!-- BILLA Team Tile -->
-        <div class="qs-tile" data-navigate="qsTeamBilla" data-permission="qs_team_billa_access">
-            <div class="qs-tile-icon qs-tile-billa">
+        <div class="kc-tile qs-tile" data-navigate="qsTeamBilla" data-permission="qs_team_billa_access">
+            <div class="kc-tile-icon qs-icon-billa">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
@@ -12,12 +12,12 @@
             </div>
             <h3>BILLA</h3>
             <p>Quality Checks für das BILLA Team durchführen und verwalten</p>
-            <span class="qs-tile-stat" id="qs-stat-billa-agents">0 Agents</span>
+            <span class="kc-tile-stat" id="qs-stat-billa-agents">0 Agents</span>
         </div>
         
         <!-- Social Media Team Tile -->
-        <div class="qs-tile" data-navigate="qsTeamSocial" data-permission="qs_team_social_access">
-            <div class="qs-tile-icon qs-tile-social">
+        <div class="kc-tile qs-tile" data-navigate="qsTeamSocial" data-permission="qs_team_social_access">
+            <div class="kc-tile-icon qs-icon-social">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
@@ -27,12 +27,12 @@
             </div>
             <h3>Social Media</h3>
             <p>Quality Checks für das Social Media Team durchführen und verwalten</p>
-            <span class="qs-tile-stat" id="qs-stat-social-agents">0 Agents</span>
+            <span class="kc-tile-stat" id="qs-stat-social-agents">0 Agents</span>
         </div>
         
         <!-- Quality Tracking Tile -->
-        <div class="qs-tile" data-navigate="qsTracking" data-permission="qs_tracking_view">
-            <div class="qs-tile-icon qs-tile-tracking">
+        <div class="kc-tile qs-tile" data-navigate="qsTracking" data-permission="qs_tracking_view">
+            <div class="kc-tile-icon qs-icon-tracking">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="20" x2="18" y2="10"></line>
                     <line x1="12" y1="20" x2="12" y2="4"></line>
@@ -41,12 +41,12 @@
             </div>
             <h3>Quality Tracking</h3>
             <p>Übersicht über alle Quality Checks und Statistiken</p>
-            <span class="qs-tile-stat" id="qs-stat-tracking-total">0 Evaluierungen</span>
+            <span class="kc-tile-stat" id="qs-stat-tracking-total">0 Evaluierungen</span>
         </div>
         
         <!-- My Results Tile (for agents) -->
-        <div class="qs-tile" data-navigate="qsMyResults" data-permission="qs_results_view_own">
-            <div class="qs-tile-icon qs-tile-results">
+        <div class="kc-tile qs-tile" data-navigate="qsMyResults" data-permission="qs_results_view_own">
+            <div class="kc-tile-icon qs-icon-results">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
@@ -54,12 +54,12 @@
             </div>
             <h3>Meine Ergebnisse</h3>
             <p>Ihre persönlichen Quality Check Ergebnisse und Statistiken</p>
-            <span class="qs-tile-stat" id="qs-stat-my-results">0 Checks</span>
+            <span class="kc-tile-stat" id="qs-stat-my-results">0 Checks</span>
         </div>
         
         <!-- Settings Tile (for supervisors) -->
-        <div class="qs-tile" data-navigate="qsSettings" data-permission="qs_settings_manage">
-            <div class="qs-tile-icon qs-tile-settings">
+        <div class="kc-tile qs-tile" data-navigate="qsSettings" data-permission="qs_settings_manage">
+            <div class="kc-tile-icon qs-icon-settings">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"></circle>
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -67,11 +67,12 @@
             </div>
             <h3>Einstellungen</h3>
             <p>Supervisor-Einstellungen und Standardwerte konfigurieren</p>
+            <span class="kc-tile-stat">Konfiguration</span>
         </div>
     </div>
     
     <!-- Message for users without sub-page access -->
-    <div class="qs-no-access-message" id="qs-no-access-message" style="display: none;">
+    <div class="kc-no-access-message" id="qs-no-access-message" style="display: none;">
         <div class="empty-state">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>

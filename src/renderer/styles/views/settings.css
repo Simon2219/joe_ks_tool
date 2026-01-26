@@ -89,7 +89,8 @@
    ROLES GRID
    ============================================ */
 
-.roles-grid {
+.roles-grid,
+.teams-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: var(--space-lg);
@@ -157,11 +158,29 @@
 
 .role-card-footer {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     gap: var(--space-sm);
     padding: var(--space-md) var(--space-lg);
     border-top: 1px solid var(--border-color);
     background: var(--bg-primary);
+}
+
+.role-card-footer > div {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+/* Team card specific */
+.team-card .team-stats-row {
+    display: flex;
+    gap: var(--space-md);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+}
+
+.team-card .team-stats-row strong {
+    color: var(--brand-primary);
 }
 
 /* ============================================

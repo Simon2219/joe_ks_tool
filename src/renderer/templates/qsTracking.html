@@ -8,27 +8,26 @@
                 </svg>
                 Zurück
             </button>
-            <h1>Quality Tracking</h1>
         </div>
     </div>
 
-    <!-- Global Statistics -->
-    <div class="qs-tracking-stats" id="qs-tracking-stats">
-        <div class="stat-card stat-card-lg">
-            <div class="stat-value" id="qs-tracking-total">0</div>
-            <div class="stat-label">Gesamt Evaluierungen</div>
+    <!-- Global Statistics - Using KC Results Overview Style -->
+    <div class="kc-results-overview" id="qs-tracking-stats">
+        <div class="stat-card">
+            <span class="stat-value" id="qs-tracking-total">0</span>
+            <span class="stat-label">Gesamt Evaluierungen</span>
         </div>
-        <div class="stat-card stat-card-lg">
-            <div class="stat-value" id="qs-tracking-month">0</div>
-            <div class="stat-label">Diesen Monat</div>
+        <div class="stat-card">
+            <span class="stat-value" id="qs-tracking-month">0</span>
+            <span class="stat-label">Diesen Monat</span>
         </div>
-        <div class="stat-card stat-card-lg">
-            <div class="stat-value" id="qs-tracking-avg">0%</div>
-            <div class="stat-label">Durchschnitt</div>
+        <div class="stat-card">
+            <span class="stat-value" id="qs-tracking-avg">0%</span>
+            <span class="stat-label">Durchschnitt</span>
         </div>
-        <div class="stat-card stat-card-lg">
-            <div class="stat-value" id="qs-tracking-pass">0%</div>
-            <div class="stat-label">Bestehensrate</div>
+        <div class="stat-card">
+            <span class="stat-value" id="qs-tracking-pass">0%</span>
+            <span class="stat-label">Bestehensrate</span>
         </div>
     </div>
 
@@ -40,33 +39,25 @@
         </div>
     </div>
 
-    <!-- Filters -->
-    <div class="view-filters">
-        <div class="filter-group">
-            <input type="text" id="qs-tracking-search" class="form-input" placeholder="Suchen...">
-        </div>
-        <div class="filter-group">
-            <select id="qs-tracking-team-filter" class="form-select">
+    <!-- Filters - Proper inline layout -->
+    <div class="view-header" style="margin-top: var(--space-lg);">
+        <div class="view-filters" style="flex-wrap: wrap; gap: var(--space-sm);">
+            <input type="text" id="qs-tracking-search" class="form-input" placeholder="Suchen..." style="min-width: 150px; flex: 1;">
+            <select id="qs-tracking-team-filter" class="form-select" style="min-width: 120px;">
                 <option value="">Alle Teams</option>
             </select>
-        </div>
-        <div class="filter-group">
-            <select id="qs-tracking-status-filter" class="form-select">
+            <select id="qs-tracking-status-filter" class="form-select" style="min-width: 120px;">
                 <option value="">Alle Status</option>
                 <option value="completed">Abgeschlossen</option>
                 <option value="in_progress">In Bearbeitung</option>
             </select>
-        </div>
-        <div class="filter-group">
-            <select id="qs-tracking-result-filter" class="form-select">
+            <select id="qs-tracking-result-filter" class="form-select" style="min-width: 130px;">
                 <option value="">Alle Ergebnisse</option>
                 <option value="passed">Bestanden</option>
                 <option value="failed">Nicht bestanden</option>
             </select>
-        </div>
-        <div class="filter-group">
-            <input type="date" id="qs-tracking-date-from" class="form-input">
-            <input type="date" id="qs-tracking-date-to" class="form-input">
+            <input type="date" id="qs-tracking-date-from" class="form-input" style="min-width: 130px;">
+            <input type="date" id="qs-tracking-date-to" class="form-input" style="min-width: 130px;">
         </div>
     </div>
 

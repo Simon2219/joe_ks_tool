@@ -3,101 +3,28 @@
    ============================================ */
 
 /* ============================================
-   MAIN TILES PAGE
+   MAIN TILES PAGE - Using KC Tile Styles
    ============================================ */
 
-.qs-tiles-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--space-lg);
-    padding: var(--space-lg);
+/* QS-specific icon colors that override the default gradient */
+.qs-tile .kc-tile-icon.qs-icon-billa {
+    background: linear-gradient(135deg, #ff6b00 0%, #ff8c33 100%);
 }
 
-.qs-tile {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-xl);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
+.qs-tile .kc-tile-icon.qs-icon-social {
+    background: linear-gradient(135deg, #1da1f2 0%, #4db5f5 100%);
 }
 
-.qs-tile:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--brand-primary);
+.qs-tile .kc-tile-icon.qs-icon-tracking {
+    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
 }
 
-.qs-tile-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--brand-primary-light);
-    color: var(--brand-primary);
+.qs-tile .kc-tile-icon.qs-icon-results {
+    background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
 }
 
-.qs-tile-icon svg {
-    width: 28px;
-    height: 28px;
-}
-
-.qs-tile-billa {
-    background: rgba(255, 107, 0, 0.1);
-    color: #ff6b00;
-}
-
-.qs-tile-social {
-    background: rgba(29, 161, 242, 0.1);
-    color: #1da1f2;
-}
-
-.qs-tile-tracking {
-    background: rgba(16, 185, 129, 0.1);
-    color: #10b981;
-}
-
-.qs-tile-results {
-    background: rgba(139, 92, 246, 0.1);
-    color: #8b5cf6;
-}
-
-.qs-tile-settings {
-    background: rgba(107, 114, 128, 0.1);
-    color: #6b7280;
-}
-
-.qs-tile h3 {
-    margin: 0;
-    font-size: var(--text-lg);
-    color: var(--text);
-}
-
-.qs-tile p {
-    margin: 0;
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-    flex: 1;
-}
-
-.qs-tile-stat {
-    font-size: var(--text-sm);
-    color: var(--brand-primary);
-    font-weight: 500;
-    padding: var(--space-xs) var(--space-sm);
-    background: var(--brand-primary-light);
-    border-radius: var(--radius-sm);
-    display: inline-block;
-    width: fit-content;
-}
-
-.qs-no-access-message {
-    padding: var(--space-xl);
+.qs-tile .kc-tile-icon.qs-icon-settings {
+    background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
 }
 
 /* ============================================
@@ -933,38 +860,10 @@
 }
 
 /* ============================================
-   TRACKING VIEW
+   TRACKING VIEW - Now using KC styles
    ============================================ */
 
-.qs-tracking-stats {
-    display: flex;
-    gap: var(--space-lg);
-    padding: 0 var(--space-lg) var(--space-lg);
-    flex-wrap: wrap;
-}
-
-.stat-card-lg {
-    flex: 1;
-    min-width: 180px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-xl);
-    text-align: center;
-}
-
-.stat-card-lg .stat-value {
-    font-size: var(--text-4xl);
-    font-weight: 700;
-    color: var(--brand-primary);
-    line-height: 1;
-}
-
-.stat-card-lg .stat-label {
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-    margin-top: var(--space-sm);
-}
+/* Remove old custom stats, use kc-results-overview instead */
 
 .qs-tracking-teams {
     padding: 0 var(--space-lg) var(--space-lg);
@@ -1018,15 +917,10 @@
 }
 
 /* ============================================
-   MY RESULTS VIEW
+   MY RESULTS VIEW - Now using KC styles
    ============================================ */
 
-.qs-my-stats {
-    display: flex;
-    gap: var(--space-lg);
-    padding: 0 var(--space-lg) var(--space-lg);
-    flex-wrap: wrap;
-}
+/* Stats section now uses kc-results-overview */
 
 .qs-my-recent {
     padding: 0 var(--space-lg);

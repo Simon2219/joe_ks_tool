@@ -85,6 +85,7 @@ const Permissions = {
         const adminNavSection = document.getElementById('admin-nav-section');
         if (adminNavSection) {
             const hasAdminAccess = this.hasPermission('role_view') || 
+                                   this.hasPermission('teams_view') ||
                                    this.hasPermission('admin_access');
             adminNavSection.style.display = hasAdminAccess ? '' : 'none';
         }
