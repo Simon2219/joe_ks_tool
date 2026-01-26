@@ -12,6 +12,7 @@ const Config = require('./config/Config');
 
 // Import services
 const encryptionService = require('./src/server/services/encryptionService');
+const FileService = require('./src/server/services/fileService');
 
 // Import database
 const { initializeDatabase, shutdown: shutdownDatabase } = require('./src/server/database');
@@ -21,6 +22,7 @@ const authRoutes = require('./src/server/routes/auth');
 const userRoutes = require('./src/server/routes/users');
 const ticketRoutes = require('./src/server/routes/tickets');
 const qualityRoutes = require('./src/server/routes/quality');
+const qualitySystemRoutes = require('./src/server/routes/qualitySystem');
 const knowledgeCheckRoutes = require('./src/server/routes/knowledgeCheck');
 const roleRoutes = require('./src/server/routes/roles');
 const settingsRoutes = require('./src/server/routes/settings');
@@ -74,11 +76,15 @@ if (Config.get('logging.logRequests') && Config.isDevelopment()) {
 // Serve static files from the renderer directory
 app.use(express.static(path.join(__dirname, 'src/renderer')));
 
+// Serve uploaded files
+app.use('/api/files', express.static(FileService.getStoragePath()));
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/quality', qualityRoutes);
+app.use('/api/qs', qualitySystemRoutes);
 app.use('/api/knowledge-check', knowledgeCheckRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/settings', settingsRoutes);
