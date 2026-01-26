@@ -1,0 +1,158 @@
+/**
+ * Dashboard Styles
+ * Dashboard grid, stat cards, and activity list
+ */
+
+/* ============================================
+   DASHBOARD GRID
+   ============================================ */
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+}
+
+.dashboard-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.dashboard-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.dashboard-card.half-width {
+    grid-column: span 2;
+}
+
+.dashboard-card .card-header {
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dashboard-card .card-header h3 {
+    font-size: var(--text-body);
+    font-weight: var(--font-semibold);
+    color: var(--text-secondary);
+}
+
+/* ============================================
+   STATS CONTENT
+   ============================================ */
+
+.stats-content {
+    display: flex;
+    padding: var(--space-lg);
+    gap: var(--space-xl);
+}
+
+.stat-item {
+    flex: 1;
+    text-align: center;
+}
+
+.stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: var(--font-bold);
+    color: var(--brand-primary);
+    line-height: 1.2;
+}
+
+.stat-label {
+    display: block;
+    font-size: var(--text-caption);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: var(--space-xs);
+}
+
+/* Stat value color classes (pastel colors for percentage indicators) */
+.stat-value.stat-color-danger {
+    color: #e57373; /* Pastel red */
+}
+
+.stat-value.stat-color-warning {
+    color: #ffb74d; /* Pastel orange/yellow */
+}
+
+.stat-value.stat-color-success {
+    color: #81c784; /* Pastel green */
+}
+
+/* ============================================
+   ACTIVITY LIST
+   ============================================ */
+
+.activity-list {
+    padding: var(--space-lg);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+
+.activity-icon svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+}
+
+.activity-content {
+    flex: 1;
+}
+
+.activity-text {
+    font-size: var(--text-body);
+}
+
+.activity-time {
+    font-size: var(--text-caption);
+    color: var(--text-muted);
+}
+
+/* ============================================
+   DASHBOARD RESPONSIVE
+   ============================================ */
+
+@media (max-width: 1200px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-content {
+        flex-direction: column;
+    }
+}

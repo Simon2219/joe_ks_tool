@@ -1,0 +1,242 @@
+/**
+ * Settings, Roles & Integrations Styles
+ * Settings panels, role cards, integration cards
+ */
+
+/* ============================================
+   SETTINGS
+   ============================================ */
+
+.settings-container {
+    max-width: 800px;
+}
+
+.settings-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--space-lg);
+    overflow: hidden;
+}
+
+.settings-section h3 {
+    padding: var(--space-lg);
+    font-size: var(--text-h3);
+    font-weight: var(--font-semibold);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-form {
+    padding: var(--space-lg);
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-row:last-child {
+    border-bottom: none;
+}
+
+.settings-label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.settings-label span {
+    font-weight: var(--font-medium);
+}
+
+.settings-label small {
+    font-size: var(--text-caption);
+    color: var(--text-muted);
+}
+
+/* Migration Item */
+.migration-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    gap: var(--space-lg);
+}
+
+.migration-info {
+    flex: 1;
+}
+
+.migration-info strong {
+    display: block;
+    margin-bottom: var(--space-xs);
+    color: var(--text-primary);
+}
+
+.migration-info p {
+    margin: 0 0 var(--space-sm) 0;
+    font-size: var(--text-body);
+    color: var(--text-muted);
+}
+
+/* ============================================
+   ROLES GRID
+   ============================================ */
+
+.roles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-lg);
+}
+
+.role-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.role-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.role-info h3 {
+    font-size: var(--text-h3);
+    font-weight: var(--font-semibold);
+    margin-bottom: var(--space-xs);
+}
+
+.role-info p {
+    font-size: var(--text-body);
+    color: var(--text-secondary);
+}
+
+.role-meta {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.role-card-body {
+    padding: var(--space-lg);
+}
+
+.role-card-body h4 {
+    font-size: var(--text-caption);
+    font-weight: var(--font-semibold);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-sm);
+}
+
+.permissions-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.permission-tag {
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-caption);
+    color: var(--text-secondary);
+}
+
+.role-card-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+/* ============================================
+   INTEGRATIONS
+   ============================================ */
+
+.integrations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: var(--space-lg);
+}
+
+.integration-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.integration-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.integration-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+    font-weight: var(--font-bold);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.integration-icon.sharepoint {
+    background: linear-gradient(135deg, #038387, #00a4ef);
+    color: white;
+}
+
+.integration-icon.jira {
+    background: linear-gradient(135deg, #0052cc, #2684ff);
+    color: white;
+}
+
+.integration-info h3 {
+    font-size: var(--text-h3);
+    font-weight: var(--font-semibold);
+    margin-bottom: var(--space-xs);
+}
+
+.integration-status {
+    font-size: var(--text-caption);
+    color: var(--text-muted);
+}
+
+.integration-status.connected {
+    color: var(--color-success);
+}
+
+.integration-config {
+    padding: var(--space-lg);
+}
+
+/* ============================================
+   SETTINGS RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .integrations-grid {
+        grid-template-columns: 1fr;
+    }
+}

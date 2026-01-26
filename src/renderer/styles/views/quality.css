@@ -1,0 +1,147 @@
+/**
+ * Quality Evaluation Styles
+ * Quality overview, evaluation forms, scorecards
+ */
+
+/* ============================================
+   QUALITY OVERVIEW
+   ============================================ */
+
+.quality-overview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.quality-stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-lg);
+    text-align: center;
+}
+
+.quality-stat-card .stat-value {
+    font-size: 2.5rem;
+    font-weight: var(--font-bold);
+    color: var(--brand-primary);
+}
+
+.quality-stat-card .stat-label {
+    font-size: var(--text-body);
+    color: var(--text-secondary);
+    margin-top: var(--space-sm);
+}
+
+/* ============================================
+   EVALUATION FORM
+   ============================================ */
+
+.evaluation-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.evaluation-category {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.evaluation-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-tertiary);
+}
+
+.evaluation-category-header h4 {
+    font-size: var(--text-body);
+    font-weight: var(--font-semibold);
+}
+
+.evaluation-category-weight {
+    font-size: var(--text-caption);
+    color: var(--text-muted);
+}
+
+.evaluation-criteria-list {
+    padding: var(--space-md) var(--space-lg);
+}
+
+.evaluation-criterion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.evaluation-criterion:last-child {
+    border-bottom: none;
+}
+
+.criterion-name {
+    font-size: var(--text-body);
+}
+
+.criterion-score {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.criterion-score input {
+    width: 60px;
+    text-align: center;
+}
+
+.criterion-max {
+    font-size: var(--text-caption);
+    color: var(--text-muted);
+}
+
+/* ============================================
+   SCORECARD
+   ============================================ */
+
+.scorecard {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-md);
+    padding: var(--space-lg);
+}
+
+.scorecard-item {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    text-align: center;
+}
+
+.scorecard-value {
+    font-size: 1.5rem;
+    font-weight: var(--font-bold);
+    color: var(--brand-primary);
+}
+
+.scorecard-label {
+    font-size: var(--text-caption);
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* ============================================
+   QUALITY RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .quality-overview {
+        grid-template-columns: 1fr;
+    }
+}
