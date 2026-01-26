@@ -266,7 +266,10 @@ const Modal = {
                 done(null);
                 return;
             }
-    
+
+            // Setup event handlers for special field types
+            this.setupFormEventHandlers(form);
+
             const handleSubmit = async () => {
                 const formData = Helpers.getFormData(form);
     
@@ -425,6 +428,52 @@ const Modal = {
                 >`;
                 break;
 
+            case 'range':
+                // Slider with min/max/value display
+                html += `<div class="form-range-wrapper">
+                    <input 
+                        type="range" 
+                        id="${name}" 
+                        name="${name}" 
+                        class="form-range"
+                        value="${Helpers.escapeHtml(String(value || min || 0))}"
+                        ${min !== undefined ? `min="${min}"` : 'min="0"'}
+                        ${max !== undefined ? `max="${max}"` : 'max="100"'}
+                        ${step !== undefined ? `step="${step}"` : ''}
+                    >
+                    <span class="form-range-value">${value || min || 0}</span>
+                </div>`;
+                break;
+
+            case 'radio':
+                html += `<div class="form-radio-group">`;
+                for (const opt of options) {
+                    const optValue = typeof opt === 'object' ? opt.value : opt;
+                    const optLabel = typeof opt === 'object' ? opt.label : opt;
+                    const checked = optValue === value ? 'checked' : '';
+                    html += `
+                        <label class="form-radio">
+                            <input type="radio" name="${name}" value="${optValue}" ${checked}>
+                            <span>${Helpers.escapeHtml(optLabel)}</span>
+                        </label>`;
+                }
+                html += `</div>`;
+                break;
+
+            case 'scale':
+                // Visual scale selector (1-N buttons)
+                const scaleMax = max || 5;
+                const scaleInverted = field.inverted || false;
+                html += `<div class="form-scale" data-inverted="${scaleInverted}">`;
+                for (let i = 1; i <= scaleMax; i++) {
+                    const selected = parseInt(value) === i ? 'selected' : '';
+                    const label = scaleInverted ? (scaleMax - i + 1) : i;
+                    html += `<button type="button" class="scale-btn ${selected}" data-value="${i}">${label}</button>`;
+                }
+                html += `<input type="hidden" name="${name}" value="${value || ''}">`;
+                html += `</div>`;
+                break;
+
             case 'date':
                 html += `<input 
                     type="date" 
@@ -482,7 +531,90 @@ const Modal = {
         return html;
     },
 
- 
+    /**
+     * Sets up event handlers for dynamic form elements
+     * Called after form is inserted into DOM
+     */
+    setupFormEventHandlers(formEl) {
+        // Range slider value display
+        formEl.querySelectorAll('.form-range').forEach(range => {
+            const display = range.parentElement.querySelector('.form-range-value');
+            if (display) {
+                range.addEventListener('input', () => {
+                    display.textContent = range.value;
+                });
+            }
+        });
+
+        // Scale selector buttons
+        formEl.querySelectorAll('.form-scale').forEach(scaleContainer => {
+            const hiddenInput = scaleContainer.querySelector('input[type="hidden"]');
+            const buttons = scaleContainer.querySelectorAll('.scale-btn');
+            
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Remove selected from all
+                    buttons.forEach(b => b.classList.remove('selected'));
+                    // Add to clicked
+                    btn.classList.add('selected');
+                    // Update hidden input
+                    if (hiddenInput) {
+                        hiddenInput.value = btn.dataset.value;
+                    }
+                });
+            });
+        });
+    },
+
+    /**
+     * Helper: Creates common field configurations
+     * Reduces repetitive field definition code
+     */
+    fieldConfig: {
+        text(name, label, opts = {}) {
+            return { name, label, type: 'text', ...opts };
+        },
+        
+        email(name, label, opts = {}) {
+            return { name, label, type: 'email', required: true, ...opts };
+        },
+        
+        password(name, label, opts = {}) {
+            return { name, label, type: 'password', ...opts };
+        },
+        
+        number(name, label, opts = {}) {
+            return { name, label, type: 'number', ...opts };
+        },
+        
+        select(name, label, options, opts = {}) {
+            return { name, label, type: 'select', options, ...opts };
+        },
+        
+        textarea(name, label, opts = {}) {
+            return { name, label, type: 'textarea', rows: 3, ...opts };
+        },
+        
+        checkbox(name, label, opts = {}) {
+            return { name, label, type: 'checkbox', ...opts };
+        },
+        
+        date(name, label, opts = {}) {
+            return { name, label, type: 'date', ...opts };
+        },
+        
+        range(name, label, min, max, opts = {}) {
+            return { name, label, type: 'range', min, max, ...opts };
+        },
+        
+        scale(name, label, max = 5, opts = {}) {
+            return { name, label, type: 'scale', max, ...opts };
+        },
+        
+        radio(name, label, options, opts = {}) {
+            return { name, label, type: 'radio', options, ...opts };
+        }
+    }
 };
 
 
