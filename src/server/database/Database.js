@@ -2,6 +2,11 @@
  * Database.js
  * Consolidated SQLite database operations for all subsystems
  * Uses sql.js (pure JavaScript - no native compilation required)
+ * 
+ * Architecture:
+ * - Core: Database connection and query helpers
+ * - Setup (./setup/): Schema, migrations, and seeding (only used during init)
+ * - Systems: Runtime API for each subsystem (Users, Roles, Teams, etc.)
  */
 
 const initSqlJs = require('sql.js');
@@ -11,8 +16,11 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const Config = require('../../../config/Config');
 
+// Import setup modules (only used during initialization)
+const Setup = require('./setup');
+
 // ============================================
-// DATABASE CONNECTION
+// DATABASE CONNECTION & CORE
 // ============================================
 
 const DATA_DIR = path.join(__dirname, '../../../data');
@@ -121,1172 +129,40 @@ function get(sql, params = []) {
 }
 
 // ============================================
-// SCHEMA INITIALIZATION
+// SCHEMA & SETUP (delegated to setup module)
 // ============================================
 
+/**
+ * Initialize database schema
+ * Creates tables, runs migrations, and seeds data if needed
+ */
 function initSchema() {
     const database = getDb();
+    const isNewDb = get("SELECT name FROM sqlite_master WHERE type='table' AND name='users'") === null;
     
-    // Teams table - unified team management for the entire application
-    database.run(`
-        CREATE TABLE IF NOT EXISTS teams (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            team_code TEXT UNIQUE NOT NULL,
-            description TEXT DEFAULT '',
-            color TEXT DEFAULT '#3b82f6',
-            is_active INTEGER DEFAULT 1,
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    `);
-
-    // Team-specific permissions - override default permissions per team
-    database.run(`
-        CREATE TABLE IF NOT EXISTS team_permissions (
-            id TEXT PRIMARY KEY,
-            team_id TEXT NOT NULL,
-            permission_id TEXT NOT NULL,
-            granted INTEGER DEFAULT 1,
-            FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
-            UNIQUE(team_id, permission_id)
-        )
-    `);
-
-    database.run(`
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            first_name TEXT NOT NULL,
-            last_name TEXT NOT NULL,
-            role_id TEXT NOT NULL,
-            team_id TEXT DEFAULT NULL,
-            phone TEXT DEFAULT '',
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            last_login TEXT,
-            FOREIGN KEY (team_id) REFERENCES teams(id)
-        )
-    `);
+    // 1. Create all tables (idempotent - IF NOT EXISTS)
+    Setup.createTables(database);
     
-    database.run(`
-        CREATE TABLE IF NOT EXISTS roles (
-            id TEXT PRIMARY KEY,
-            name TEXT UNIQUE NOT NULL,
-            description TEXT DEFAULT '',
-            is_admin INTEGER DEFAULT 0,
-            is_system INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    `);
+    // 2. Run migrations for existing databases
+    Setup.runMigrations(database, all);
     
-    database.run(`
-        CREATE TABLE IF NOT EXISTS permissions (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            module TEXT NOT NULL,
-            description TEXT DEFAULT ''
-        )
-    `);
+    // 3. Create indexes (after migrations so columns exist)
+    Setup.createIndexes(database);
     
-    database.run(`
-        CREATE TABLE IF NOT EXISTS role_permissions (
-            role_id TEXT NOT NULL,
-            permission_id TEXT NOT NULL,
-            PRIMARY KEY (role_id, permission_id)
-        )
-    `);
+    // 4. Ensure all permissions exist
+    Setup.ensurePermissions(run, get);
     
-    database.run(`
-        CREATE TABLE IF NOT EXISTS refresh_tokens (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            token_hash TEXT UNIQUE NOT NULL,
-            expires_at TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            revoked INTEGER DEFAULT 0
-        )
-    `);
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS tickets (
-            id TEXT PRIMARY KEY,
-            ticket_number TEXT UNIQUE NOT NULL,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            status TEXT DEFAULT 'new',
-            priority TEXT DEFAULT 'medium',
-            category TEXT DEFAULT 'general',
-            customer_name TEXT DEFAULT '',
-            customer_email TEXT DEFAULT '',
-            customer_phone TEXT DEFAULT '',
-            assigned_to TEXT,
-            created_by TEXT NOT NULL,
-            due_date TEXT,
-            resolved_at TEXT,
-            closed_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    `);
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS ticket_comments (
-            id TEXT PRIMARY KEY,
-            ticket_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-    `);
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS ticket_history (
-            id TEXT PRIMARY KEY,
-            ticket_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            action TEXT NOT NULL,
-            details TEXT DEFAULT '',
-            created_at TEXT NOT NULL
-        )
-    `);
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS quality_categories (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            weight INTEGER DEFAULT 25,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    `);
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS quality_criteria (
-            id TEXT PRIMARY KEY,
-            category_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            max_score INTEGER DEFAULT 10
-        )
-    `);
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS quality_reports (
-            id TEXT PRIMARY KEY,
-            report_number TEXT UNIQUE NOT NULL,
-            agent_id TEXT NOT NULL,
-            evaluator_id TEXT NOT NULL,
-            evaluation_type TEXT NOT NULL,
-            evaluation_date TEXT NOT NULL,
-            overall_score INTEGER DEFAULT 0,
-            passed INTEGER DEFAULT 0,
-            strengths TEXT DEFAULT '',
-            improvements TEXT DEFAULT '',
-            coaching_notes TEXT DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    `);
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS quality_scores (
-            id TEXT PRIMARY KEY,
-            report_id TEXT NOT NULL,
-            category_id TEXT NOT NULL,
-            score INTEGER DEFAULT 0,
-            max_score INTEGER DEFAULT 10
-        )
-    `);
-
-    // ============================================
-    // QUALITY SYSTEM (QS) TABLES - Simplified Design
-    // ============================================
-
-    // Task categories - for grouping Quality Tasks with default weighting
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_task_categories (
-            id TEXT PRIMARY KEY,
-            team_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            default_weight REAL DEFAULT 1.0,
-            sort_order INTEGER DEFAULT 0,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
-        )
-    `);
-
-    // Quality Tasks catalog - includes pass threshold settings
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_tasks (
-            id TEXT PRIMARY KEY,
-            task_number TEXT UNIQUE NOT NULL,
-            team_id TEXT NOT NULL,
-            category_id TEXT,
-            title TEXT DEFAULT '',
-            task_text TEXT NOT NULL,
-            scoring_type TEXT DEFAULT 'points',
-            max_points INTEGER DEFAULT 10,
-            scale_size INTEGER DEFAULT 5,
-            scale_inverted INTEGER DEFAULT 0,
-            pass_threshold REAL DEFAULT 0.7,
-            pass_scale_value INTEGER DEFAULT NULL,
-            weight_override REAL DEFAULT NULL,
-            sort_order INTEGER DEFAULT 0,
-            is_active INTEGER DEFAULT 1,
-            is_archived INTEGER DEFAULT 0,
-            archived_at TEXT DEFAULT NULL,
-            created_by TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES teams(id),
-            FOREIGN KEY (category_id) REFERENCES qs_task_categories(id),
-            FOREIGN KEY (created_by) REFERENCES users(id)
-        )
-    `);
-
-    // Task references - templates attached to tasks (guidelines, examples)
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_task_references (
-            id TEXT PRIMARY KEY,
-            task_id TEXT NOT NULL,
-            reference_type TEXT NOT NULL,
-            reference_text TEXT DEFAULT '',
-            file_path TEXT DEFAULT '',
-            file_name TEXT DEFAULT '',
-            url TEXT DEFAULT '',
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (task_id) REFERENCES qs_tasks(id) ON DELETE CASCADE
-        )
-    `);
-
-    // Check categories - for organizing Quality Checks
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_check_categories (
-            id TEXT PRIMARY KEY,
-            team_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            sort_order INTEGER DEFAULT 0,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
-        )
-    `);
-
-    // Quality Checks catalog - sections stored as JSON, includes scoring config
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_quality_checks (
-            id TEXT PRIMARY KEY,
-            check_number TEXT UNIQUE NOT NULL,
-            team_id TEXT NOT NULL,
-            category_id TEXT,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            passing_score INTEGER DEFAULT 80,
-            min_passed_tasks INTEGER DEFAULT 0,
-            require_all_critical INTEGER DEFAULT 0,
-            sections TEXT DEFAULT '[]',
-            is_active INTEGER DEFAULT 1,
-            is_archived INTEGER DEFAULT 0,
-            archived_at TEXT DEFAULT NULL,
-            created_by TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES teams(id),
-            FOREIGN KEY (category_id) REFERENCES qs_check_categories(id),
-            FOREIGN KEY (created_by) REFERENCES users(id)
-        )
-    `);
-
-    // Check tasks - junction table linking tasks to checks (section stored in JSON above)
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_check_tasks (
-            id TEXT PRIMARY KEY,
-            check_id TEXT NOT NULL,
-            task_id TEXT NOT NULL,
-            section_name TEXT DEFAULT NULL,
-            weight_override REAL DEFAULT NULL,
-            is_critical INTEGER DEFAULT 0,
-            sort_order INTEGER DEFAULT 0,
-            FOREIGN KEY (check_id) REFERENCES qs_quality_checks(id) ON DELETE CASCADE,
-            FOREIGN KEY (task_id) REFERENCES qs_tasks(id)
-        )
-    `);
-
-    // Evaluations - filled out quality checks
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_evaluations (
-            id TEXT PRIMARY KEY,
-            evaluation_number TEXT UNIQUE NOT NULL,
-            team_id TEXT NOT NULL,
-            check_id TEXT NOT NULL,
-            agent_id TEXT NOT NULL,
-            evaluator_id TEXT NOT NULL,
-            interaction_channel TEXT DEFAULT 'ticket',
-            interaction_reference TEXT DEFAULT '',
-            started_at TEXT NOT NULL,
-            completed_at TEXT,
-            total_score REAL DEFAULT 0,
-            max_score REAL DEFAULT 0,
-            percentage REAL DEFAULT 0,
-            passed_tasks INTEGER DEFAULT 0,
-            total_tasks INTEGER DEFAULT 0,
-            passed INTEGER DEFAULT 0,
-            supervisor_notes TEXT DEFAULT '',
-            status TEXT DEFAULT 'in_progress',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES teams(id),
-            FOREIGN KEY (check_id) REFERENCES qs_quality_checks(id),
-            FOREIGN KEY (agent_id) REFERENCES users(id),
-            FOREIGN KEY (evaluator_id) REFERENCES users(id)
-        )
-    `);
-
-    // Evaluation answers - scores for each task, includes pass status
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_evaluation_answers (
-            id TEXT PRIMARY KEY,
-            evaluation_id TEXT NOT NULL,
-            task_id TEXT NOT NULL,
-            check_task_id TEXT NOT NULL,
-            score REAL DEFAULT 0,
-            max_score REAL DEFAULT 0,
-            raw_value TEXT DEFAULT '',
-            task_passed INTEGER DEFAULT 0,
-            notes TEXT DEFAULT '',
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (evaluation_id) REFERENCES qs_evaluations(id) ON DELETE CASCADE,
-            FOREIGN KEY (task_id) REFERENCES qs_tasks(id),
-            FOREIGN KEY (check_task_id) REFERENCES qs_check_tasks(id)
-        )
-    `);
-
-    // Evaluation evidence - attachments added during evaluation
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_evaluation_evidence (
-            id TEXT PRIMARY KEY,
-            evaluation_id TEXT NOT NULL,
-            answer_id TEXT DEFAULT NULL,
-            evidence_type TEXT NOT NULL,
-            evidence_text TEXT DEFAULT '',
-            file_path TEXT DEFAULT '',
-            file_name TEXT DEFAULT '',
-            url TEXT DEFAULT '',
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (evaluation_id) REFERENCES qs_evaluations(id) ON DELETE CASCADE,
-            FOREIGN KEY (answer_id) REFERENCES qs_evaluation_answers(id) ON DELETE CASCADE
-        )
-    `);
-
-    // Evaluation quotas - how many evaluations required per team/period
-    database.run(`
-        CREATE TABLE IF NOT EXISTS qs_quotas (
-            id TEXT PRIMARY KEY,
-            team_id TEXT NOT NULL,
-            quota_type TEXT NOT NULL,
-            target_count INTEGER DEFAULT 0,
-            period_type TEXT DEFAULT 'week',
-            period_value INTEGER DEFAULT 1,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
-        )
-    `);
-
-    // QS indexes
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_tasks_team ON qs_tasks(team_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_tasks_category ON qs_tasks(category_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_quality_checks_team ON qs_quality_checks(team_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_check_tasks_check ON qs_check_tasks(check_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_team ON qs_evaluations(team_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_agent ON qs_evaluations(agent_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_evaluator ON qs_evaluations(evaluator_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluation_answers_eval ON qs_evaluation_answers(evaluation_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_users_team ON users(team_id)');
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            encrypted INTEGER DEFAULT 0,
-            updated_at TEXT NOT NULL
-        )
-    `);
-    
-    database.run(`
-        CREATE TABLE IF NOT EXISTS integration_credentials (
-            id TEXT PRIMARY KEY,
-            type TEXT UNIQUE NOT NULL,
-            credentials TEXT NOT NULL,
-            encrypted INTEGER DEFAULT 0,
-            is_connected INTEGER DEFAULT 0,
-            updated_at TEXT NOT NULL
-        )
-    `);
-
-    // ============================================
-    // KNOWLEDGE CHECK SYSTEM TABLES
-    // ============================================
-
-    // Categories for grouping questions
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_categories (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            default_weighting INTEGER DEFAULT 1,
-            sort_order INTEGER DEFAULT 0,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    `);
-
-    // Questions catalog
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_questions (
-            id TEXT PRIMARY KEY,
-            category_id TEXT,
-            title TEXT DEFAULT '',
-            question_text TEXT NOT NULL,
-            question_type TEXT DEFAULT 'multiple_choice',
-            weighting INTEGER DEFAULT NULL,
-            allow_partial_answer INTEGER DEFAULT 0,
-            exact_answer TEXT DEFAULT '',
-            trigger_words TEXT DEFAULT '[]',
-            is_active INTEGER DEFAULT 1,
-            is_archived INTEGER DEFAULT 0,
-            archived_at TEXT DEFAULT NULL,
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (category_id) REFERENCES kc_categories(id)
-        )
-    `);
-
-    // Multiple choice options for questions
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_question_options (
-            id TEXT PRIMARY KEY,
-            question_id TEXT NOT NULL,
-            option_text TEXT NOT NULL,
-            is_correct INTEGER DEFAULT 0,
-            sort_order INTEGER DEFAULT 0,
-            FOREIGN KEY (question_id) REFERENCES kc_questions(id) ON DELETE CASCADE
-        )
-    `);
-
-    // Test categories (separate from question categories)
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_test_categories (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            sort_order INTEGER DEFAULT 0,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    `);
-
-    // Test catalog (groupings of questions)
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_tests (
-            id TEXT PRIMARY KEY,
-            test_number TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            category_id TEXT,
-            time_limit_minutes INTEGER DEFAULT NULL,
-            passing_score INTEGER DEFAULT 80,
-            is_active INTEGER DEFAULT 1,
-            is_archived INTEGER DEFAULT 0,
-            archived_at TEXT DEFAULT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (category_id) REFERENCES kc_test_categories(id)
-        )
-    `);
-
-    // Junction table for tests and questions
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_test_questions (
-            id TEXT PRIMARY KEY,
-            test_id TEXT NOT NULL,
-            question_id TEXT NOT NULL,
-            sort_order INTEGER DEFAULT 0,
-            weighting_override INTEGER DEFAULT NULL,
-            FOREIGN KEY (test_id) REFERENCES kc_tests(id) ON DELETE CASCADE,
-            FOREIGN KEY (question_id) REFERENCES kc_questions(id) ON DELETE CASCADE
-        )
-    `);
-
-    // Test results
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_test_results (
-            id TEXT PRIMARY KEY,
-            result_number TEXT UNIQUE NOT NULL,
-            test_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            evaluator_id TEXT,
-            started_at TEXT NOT NULL,
-            completed_at TEXT,
-            total_score REAL DEFAULT 0,
-            max_score REAL DEFAULT 0,
-            percentage REAL DEFAULT 0,
-            passed INTEGER DEFAULT 0,
-            notes TEXT DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (test_id) REFERENCES kc_tests(id),
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (evaluator_id) REFERENCES users(id)
-        )
-    `);
-
-    // Individual answers in a test result
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_test_answers (
-            id TEXT PRIMARY KEY,
-            result_id TEXT NOT NULL,
-            question_id TEXT NOT NULL,
-            answer_text TEXT DEFAULT '',
-            selected_options TEXT DEFAULT '[]',
-            option_details TEXT DEFAULT '[]',
-            is_correct INTEGER DEFAULT 0,
-            score REAL DEFAULT 0,
-            max_score REAL DEFAULT 0,
-            evaluator_notes TEXT DEFAULT '',
-            FOREIGN KEY (result_id) REFERENCES kc_test_results(id) ON DELETE CASCADE,
-            FOREIGN KEY (question_id) REFERENCES kc_questions(id)
-        )
-    `);
-
-    // Test Runs - groups tests and users together
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_test_runs (
-            id TEXT PRIMARY KEY,
-            run_number TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            due_date TEXT,
-            status TEXT DEFAULT 'pending',
-            created_by TEXT NOT NULL,
-            notes TEXT DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (created_by) REFERENCES users(id)
-        )
-    `);
-
-    // Tests included in a test run
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_test_run_tests (
-            id TEXT PRIMARY KEY,
-            run_id TEXT NOT NULL,
-            test_id TEXT NOT NULL,
-            sort_order INTEGER DEFAULT 0,
-            FOREIGN KEY (run_id) REFERENCES kc_test_runs(id) ON DELETE CASCADE,
-            FOREIGN KEY (test_id) REFERENCES kc_tests(id)
-        )
-    `);
-
-    // Test assignments - assign tests to users (now linked to a test run)
-    database.run(`
-        CREATE TABLE IF NOT EXISTS kc_test_assignments (
-            id TEXT PRIMARY KEY,
-            run_id TEXT,
-            test_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            assigned_by TEXT NOT NULL,
-            due_date TEXT,
-            status TEXT DEFAULT 'pending',
-            result_id TEXT,
-            notes TEXT DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (run_id) REFERENCES kc_test_runs(id),
-            FOREIGN KEY (test_id) REFERENCES kc_tests(id),
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (assigned_by) REFERENCES users(id),
-            FOREIGN KEY (result_id) REFERENCES kc_test_results(id)
-        )
-    `);
-
-    // Create indexes
-    database.run('CREATE INDEX IF NOT EXISTS idx_kc_questions_category ON kc_questions(category_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_questions_test ON kc_test_questions(test_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_test ON kc_test_results(test_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_user ON kc_test_results(user_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_user ON kc_test_assignments(user_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_test ON kc_test_assignments(test_id)');
-    // Note: idx_kc_test_assignments_run is created in migrations after run_id column exists
-    database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_run_tests_run ON kc_test_run_tests(run_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to)');
-    database.run('CREATE INDEX IF NOT EXISTS idx_quality_reports_agent ON quality_reports(agent_id)');
-    
-    // Run migrations for existing databases
-    runMigrations(database);
-    
+    // Save after schema changes
     saveDb();
-    console.log('Database schema initialized');
+    
+    return isNewDb;
 }
 
 /**
- * Run database migrations to add missing columns to existing tables
+ * Seed default data (for new databases)
  */
-function runMigrations(database) {
-    console.log('Running database migrations...');
-    
-    // Helper function to check if a column exists
-    function columnExists(tableName, columnName) {
-        try {
-            const result = all(`PRAGMA table_info(${tableName})`);
-            return result.some(col => col.name === columnName);
-        } catch (e) {
-            return false;
-        }
-    }
-    
-    // Migration 1: Add is_archived and archived_at to kc_questions
-    if (!columnExists('kc_questions', 'is_archived')) {
-        console.log('Adding is_archived column to kc_questions...');
-        database.run('ALTER TABLE kc_questions ADD COLUMN is_archived INTEGER DEFAULT 0');
-    }
-    if (!columnExists('kc_questions', 'archived_at')) {
-        console.log('Adding archived_at column to kc_questions...');
-        database.run('ALTER TABLE kc_questions ADD COLUMN archived_at TEXT DEFAULT NULL');
-    }
-    
-    // Migration 2: Add is_archived and archived_at to kc_tests
-    if (!columnExists('kc_tests', 'is_archived')) {
-        console.log('Adding is_archived column to kc_tests...');
-        database.run('ALTER TABLE kc_tests ADD COLUMN is_archived INTEGER DEFAULT 0');
-    }
-    if (!columnExists('kc_tests', 'archived_at')) {
-        console.log('Adding archived_at column to kc_tests...');
-        database.run('ALTER TABLE kc_tests ADD COLUMN archived_at TEXT DEFAULT NULL');
-    }
-    
-    // Migration 3: Add run_id to kc_test_assignments
-    if (!columnExists('kc_test_assignments', 'run_id')) {
-        console.log('Adding run_id column to kc_test_assignments...');
-        database.run('ALTER TABLE kc_test_assignments ADD COLUMN run_id TEXT DEFAULT NULL');
-        // Create index after column exists
-        database.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
-    }
-    
-    // Migration 4: Add allow_partial_answer to kc_questions
-    if (!columnExists('kc_questions', 'allow_partial_answer')) {
-        console.log('Adding allow_partial_answer column to kc_questions...');
-        database.run('ALTER TABLE kc_questions ADD COLUMN allow_partial_answer INTEGER DEFAULT 0');
-    }
-    
-    // Migration 5: Add option_details to kc_test_answers for storing full answer info
-    if (!columnExists('kc_test_answers', 'option_details')) {
-        console.log('Adding option_details column to kc_test_answers...');
-        database.run('ALTER TABLE kc_test_answers ADD COLUMN option_details TEXT DEFAULT \'[]\'');
-    }
-    
-    // Migration 6: Add is_archived and archived_at to kc_test_runs
-    if (!columnExists('kc_test_runs', 'is_archived')) {
-        console.log('Adding is_archived column to kc_test_runs...');
-        database.run('ALTER TABLE kc_test_runs ADD COLUMN is_archived INTEGER DEFAULT 0');
-    }
-    if (!columnExists('kc_test_runs', 'archived_at')) {
-        console.log('Adding archived_at column to kc_test_runs...');
-        database.run('ALTER TABLE kc_test_runs ADD COLUMN archived_at TEXT DEFAULT NULL');
-    }
-    
-    // Migration 7: Add team_id to users (rename from department)
-    if (columnExists('users', 'department') && !columnExists('users', 'team_id')) {
-        console.log('Adding team_id column to users...');
-        database.run('ALTER TABLE users ADD COLUMN team_id TEXT DEFAULT NULL');
-        // Note: Manual migration may be needed to convert department values to team_ids
-    }
-    
-    // Migration 8: Add pass_threshold to qs_tasks
-    if (columnExists('qs_tasks', 'id') && !columnExists('qs_tasks', 'pass_threshold')) {
-        console.log('Adding pass_threshold columns to qs_tasks...');
-        database.run('ALTER TABLE qs_tasks ADD COLUMN pass_threshold REAL DEFAULT 0.7');
-        database.run('ALTER TABLE qs_tasks ADD COLUMN pass_scale_value INTEGER DEFAULT NULL');
-    }
-    
-    // Migration 9: Add scoring config to qs_quality_checks (if qs_checks exists, rename it)
-    function tableExists(tableName) {
-        try {
-            const result = all(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [tableName]);
-            return result.length > 0;
-        } catch (e) {
-            return false;
-        }
-    }
-    
-    if (tableExists('qs_checks') && !tableExists('qs_quality_checks')) {
-        console.log('Renaming qs_checks to qs_quality_checks...');
-        database.run('ALTER TABLE qs_checks RENAME TO qs_quality_checks');
-        
-        // Add new columns
-        if (!columnExists('qs_quality_checks', 'min_passed_tasks')) {
-            database.run('ALTER TABLE qs_quality_checks ADD COLUMN min_passed_tasks INTEGER DEFAULT 0');
-        }
-        if (!columnExists('qs_quality_checks', 'require_all_critical')) {
-            database.run('ALTER TABLE qs_quality_checks ADD COLUMN require_all_critical INTEGER DEFAULT 0');
-        }
-        if (!columnExists('qs_quality_checks', 'sections')) {
-            database.run("ALTER TABLE qs_quality_checks ADD COLUMN sections TEXT DEFAULT '[]'");
-        }
-        
-        // Update indexes
-        database.run('DROP INDEX IF EXISTS idx_qs_checks_team');
-        database.run('CREATE INDEX IF NOT EXISTS idx_qs_quality_checks_team ON qs_quality_checks(team_id)');
-    }
-    
-    // Migration 10: Add is_critical to qs_check_tasks
-    if (columnExists('qs_check_tasks', 'id') && !columnExists('qs_check_tasks', 'is_critical')) {
-        console.log('Adding is_critical to qs_check_tasks...');
-        database.run('ALTER TABLE qs_check_tasks ADD COLUMN is_critical INTEGER DEFAULT 0');
-        
-        // Also add section_name if migrating from section_id
-        if (columnExists('qs_check_tasks', 'section_id') && !columnExists('qs_check_tasks', 'section_name')) {
-            database.run('ALTER TABLE qs_check_tasks ADD COLUMN section_name TEXT DEFAULT NULL');
-        }
-    }
-    
-    // Migration 11: Add task_passed to qs_evaluation_answers
-    if (columnExists('qs_evaluation_answers', 'id') && !columnExists('qs_evaluation_answers', 'task_passed')) {
-        console.log('Adding task_passed to qs_evaluation_answers...');
-        database.run('ALTER TABLE qs_evaluation_answers ADD COLUMN task_passed INTEGER DEFAULT 0');
-    }
-    
-    // Migration 12: Add passed_tasks and total_tasks to qs_evaluations
-    if (columnExists('qs_evaluations', 'id') && !columnExists('qs_evaluations', 'passed_tasks')) {
-        console.log('Adding passed_tasks/total_tasks to qs_evaluations...');
-        database.run('ALTER TABLE qs_evaluations ADD COLUMN passed_tasks INTEGER DEFAULT 0');
-        database.run('ALTER TABLE qs_evaluations ADD COLUMN total_tasks INTEGER DEFAULT 0');
-    }
-    
-    // Note: Migration for orphaned assignments is now manual - run from Admin Panel
-    
-    console.log('Database migrations completed');
-}
-
-
-// ============================================
-// SEED DEFAULT DATA
-// ============================================
-
-/**
- * Ensure all current permissions exist in the database (for existing installations)
- */
-function ensurePermissions() {
-    console.log('Ensuring all permissions exist...');
-    
-    const permissions = [
-        { id: 'user_view', name: 'View Users', module: 'users' },
-        { id: 'user_create', name: 'Create Users', module: 'users' },
-        { id: 'user_edit', name: 'Edit Users', module: 'users' },
-        { id: 'user_delete', name: 'Delete Users', module: 'users' },
-        { id: 'ticket_view', name: 'View Own Tickets', module: 'tickets' },
-        { id: 'ticket_view_all', name: 'View All Tickets', module: 'tickets' },
-        { id: 'ticket_create', name: 'Create Tickets', module: 'tickets' },
-        { id: 'ticket_edit', name: 'Edit Tickets', module: 'tickets' },
-        { id: 'ticket_delete', name: 'Delete Tickets', module: 'tickets' },
-        { id: 'ticket_assign', name: 'Assign Tickets', module: 'tickets' },
-        { id: 'quality_view', name: 'View Own Evaluations', module: 'quality' },
-        { id: 'quality_view_all', name: 'View All Evaluations', module: 'quality' },
-        { id: 'quality_create', name: 'Create Evaluations', module: 'quality' },
-        { id: 'quality_edit', name: 'Edit Evaluations', module: 'quality' },
-        { id: 'quality_delete', name: 'Delete Evaluations', module: 'quality' },
-        { id: 'quality_manage', name: 'Manage Categories', module: 'quality' },
-        // Knowledge Check - Categories (Delete > Create > Edit)
-        { id: 'kc_categories_delete', name: 'Delete Categories', module: 'knowledge_check' },
-        { id: 'kc_categories_create', name: 'Create Categories', module: 'knowledge_check' },
-        { id: 'kc_categories_edit', name: 'Edit Categories', module: 'knowledge_check' },
-        // Knowledge Check - Questions (Delete > Create > Edit > View)
-        { id: 'kc_questions_delete', name: 'Delete Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_create', name: 'Create Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_edit', name: 'Edit Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_view', name: 'View Question Catalog', module: 'knowledge_check' },
-        // Knowledge Check - Tests (Delete > Create > Edit > View)
-        { id: 'kc_tests_delete', name: 'Delete Tests', module: 'knowledge_check' },
-        { id: 'kc_tests_create', name: 'Create Tests', module: 'knowledge_check' },
-        { id: 'kc_tests_edit', name: 'Edit Tests', module: 'knowledge_check' },
-        { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
-        // Knowledge Check - Results (Delete > Evaluate > View)
-        { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
-        { id: 'kc_results_evaluate', name: 'Evaluate Test Results', module: 'knowledge_check' },
-        { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
-        // Knowledge Check - Test Runs & Assignments
-        { id: 'kc_assign_tests', name: 'Create Test Run', module: 'knowledge_check' },
-        { id: 'kc_assigned_view', name: 'View Assigned Tests', module: 'knowledge_check' },
-        // Knowledge Check - Archive (combined permission)
-        { id: 'kc_archive_access', name: 'Archive Access', module: 'knowledge_check' },
-        // Knowledge Check - Tab Access
-        { id: 'kc_view', name: 'View Knowledge Check Tab', module: 'knowledge_check' },
-        { id: 'role_view', name: 'View Roles', module: 'roles' },
-        { id: 'role_create', name: 'Create Roles', module: 'roles' },
-        { id: 'role_edit', name: 'Edit Roles', module: 'roles' },
-        { id: 'role_delete', name: 'Delete Roles', module: 'roles' },
-        { id: 'settings_view', name: 'View Settings', module: 'settings' },
-        { id: 'settings_edit', name: 'Edit Settings', module: 'settings' },
-        { id: 'admin_access', name: 'Admin Access', module: 'admin' },
-        { id: 'integration_access', name: 'Integration Access', module: 'integrations' },
-        // Teams - Management
-        { id: 'teams_view', name: 'View Teams', module: 'teams' },
-        { id: 'teams_create', name: 'Create Teams', module: 'teams' },
-        { id: 'teams_edit', name: 'Edit Teams', module: 'teams' },
-        { id: 'teams_delete', name: 'Delete Teams', module: 'teams' },
-        { id: 'teams_permissions_manage', name: 'Manage Team Permissions', module: 'teams' },
-        // Quality System (QS) - Tab Access
-        { id: 'qs_view', name: 'View Quality System Tab', module: 'quality_system' },
-        // Quality System - Tracking Overview
-        { id: 'qs_tracking_view', name: 'View Quality Tracking', module: 'quality_system' },
-        { id: 'qs_tracking_view_all', name: 'View All Teams in Tracking', module: 'quality_system' },
-        // Quality System - Task Catalog (Delete > Create > Edit > View)
-        { id: 'qs_tasks_delete', name: 'Delete Quality Tasks', module: 'quality_system' },
-        { id: 'qs_tasks_create', name: 'Create Quality Tasks', module: 'quality_system' },
-        { id: 'qs_tasks_edit', name: 'Edit Quality Tasks', module: 'quality_system' },
-        { id: 'qs_tasks_view', name: 'View Task Catalog', module: 'quality_system' },
-        // Quality System - Check Catalog (Delete > Create > Edit > View)
-        { id: 'qs_checks_delete', name: 'Delete Quality Checks', module: 'quality_system' },
-        { id: 'qs_checks_create', name: 'Create Quality Checks', module: 'quality_system' },
-        { id: 'qs_checks_edit', name: 'Edit Quality Checks', module: 'quality_system' },
-        { id: 'qs_checks_view', name: 'View Check Catalog', module: 'quality_system' },
-        // Quality System - Categories (Delete > Create > Edit)
-        { id: 'qs_categories_delete', name: 'Delete QS Categories', module: 'quality_system' },
-        { id: 'qs_categories_create', name: 'Create QS Categories', module: 'quality_system' },
-        { id: 'qs_categories_edit', name: 'Edit QS Categories', module: 'quality_system' },
-        // Quality System - Evaluations
-        { id: 'qs_evaluate', name: 'Conduct Evaluations', module: 'quality_system' },
-        { id: 'qs_evaluate_random', name: 'Create Random Evaluations', module: 'quality_system' },
-        // Quality System - Results
-        { id: 'qs_results_view_own', name: 'View Own Results', module: 'quality_system' },
-        { id: 'qs_results_view_team', name: 'View Team Results', module: 'quality_system' },
-        { id: 'qs_results_delete', name: 'Delete Evaluation Results', module: 'quality_system' },
-        // Quality System - Supervisor Notes
-        { id: 'qs_supervisor_notes_view', name: 'View Supervisor Notes', module: 'quality_system' },
-        // Quality System - Management
-        { id: 'qs_settings_manage', name: 'Manage QS Settings', module: 'quality_system' },
-        { id: 'qs_quotas_manage', name: 'Manage Evaluation Quotas', module: 'quality_system' },
-        { id: 'qs_team_config_manage', name: 'Configure Team Roles', module: 'quality_system' }
-    ];
-    
-    let addedCount = 0;
-    permissions.forEach(p => {
-        const exists = get('SELECT id FROM permissions WHERE id = ?', [p.id]);
-        if (!exists) {
-            run('INSERT INTO permissions (id, name, module) VALUES (?, ?, ?)', [p.id, p.name, p.module]);
-            addedCount++;
-        }
-    });
-    
-    // Grant all KC and QS permissions to admin role if it exists
-    const adminRole = get('SELECT id FROM roles WHERE id = ? OR name = ?', ['admin', 'Administrator']);
-    if (adminRole) {
-        const kcPermIds = permissions.filter(p => p.module === 'knowledge_check').map(p => p.id);
-        kcPermIds.forEach(permId => {
-            run('INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [adminRole.id, permId]);
-        });
-        const qsPermIds = permissions.filter(p => p.module === 'quality_system').map(p => p.id);
-        qsPermIds.forEach(permId => {
-            run('INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [adminRole.id, permId]);
-        });
-    }
-    
-    if (addedCount > 0) {
-        console.log(`Added ${addedCount} new permissions`);
-        saveDb();
-    }
-}
-
 async function seedData() {
-    const now = new Date().toISOString();
-    
-    // Always ensure permissions exist (for existing installations)
-    ensurePermissions();
-    
-    // Check if already seeded
-    const existing = get('SELECT id FROM users WHERE username = ?', ['admin']);
-    if (existing) {
-        console.log('Database already seeded');
-        return;
-    }
-    
-    console.log('Seeding database...');
-    
-    // Default permissions
-    const permissions = [
-        { id: 'user_view', name: 'View Users', module: 'users' },
-        { id: 'user_create', name: 'Create Users', module: 'users' },
-        { id: 'user_edit', name: 'Edit Users', module: 'users' },
-        { id: 'user_delete', name: 'Delete Users', module: 'users' },
-        { id: 'ticket_view', name: 'View Own Tickets', module: 'tickets' },
-        { id: 'ticket_view_all', name: 'View All Tickets', module: 'tickets' },
-        { id: 'ticket_create', name: 'Create Tickets', module: 'tickets' },
-        { id: 'ticket_edit', name: 'Edit Tickets', module: 'tickets' },
-        { id: 'ticket_delete', name: 'Delete Tickets', module: 'tickets' },
-        { id: 'ticket_assign', name: 'Assign Tickets', module: 'tickets' },
-        { id: 'quality_view', name: 'View Own Evaluations', module: 'quality' },
-        { id: 'quality_view_all', name: 'View All Evaluations', module: 'quality' },
-        { id: 'quality_create', name: 'Create Evaluations', module: 'quality' },
-        { id: 'quality_edit', name: 'Edit Evaluations', module: 'quality' },
-        { id: 'quality_delete', name: 'Delete Evaluations', module: 'quality' },
-        { id: 'quality_manage', name: 'Manage Categories', module: 'quality' },
-        // Knowledge Check - Categories (Delete > Create > Edit)
-        { id: 'kc_categories_delete', name: 'Delete Categories', module: 'knowledge_check' },
-        { id: 'kc_categories_create', name: 'Create Categories', module: 'knowledge_check' },
-        { id: 'kc_categories_edit', name: 'Edit Categories', module: 'knowledge_check' },
-        // Knowledge Check - Questions (Delete > Create > Edit > View)
-        { id: 'kc_questions_delete', name: 'Delete Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_create', name: 'Create Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_edit', name: 'Edit Questions', module: 'knowledge_check' },
-        { id: 'kc_questions_view', name: 'View Question Catalog', module: 'knowledge_check' },
-        // Knowledge Check - Tests (Delete > Create > Edit > View)
-        { id: 'kc_tests_delete', name: 'Delete Tests', module: 'knowledge_check' },
-        { id: 'kc_tests_create', name: 'Create Tests', module: 'knowledge_check' },
-        { id: 'kc_tests_edit', name: 'Edit Tests', module: 'knowledge_check' },
-        { id: 'kc_tests_view', name: 'View Test Catalog', module: 'knowledge_check' },
-        // Knowledge Check - Results (Delete > Evaluate > View)
-        { id: 'kc_results_delete', name: 'Delete Test Results', module: 'knowledge_check' },
-        { id: 'kc_results_evaluate', name: 'Evaluate Test Results', module: 'knowledge_check' },
-        { id: 'kc_results_view', name: 'View Test Results', module: 'knowledge_check' },
-        // Knowledge Check - Test Runs & Assignments
-        { id: 'kc_assign_tests', name: 'Create Test Run', module: 'knowledge_check' },
-        { id: 'kc_assigned_view', name: 'View Assigned Tests', module: 'knowledge_check' },
-        // Knowledge Check - Archive (combined permission)
-        { id: 'kc_archive_access', name: 'Archive Access', module: 'knowledge_check' },
-        // Knowledge Check - Tab Access
-        { id: 'kc_view', name: 'View Knowledge Check Tab', module: 'knowledge_check' },
-        { id: 'role_view', name: 'View Roles', module: 'roles' },
-        { id: 'role_create', name: 'Create Roles', module: 'roles' },
-        { id: 'role_edit', name: 'Edit Roles', module: 'roles' },
-        { id: 'role_delete', name: 'Delete Roles', module: 'roles' },
-        { id: 'settings_view', name: 'View Settings', module: 'settings' },
-        { id: 'settings_edit', name: 'Edit Settings', module: 'settings' },
-        { id: 'admin_access', name: 'Admin Access', module: 'admin' },
-        { id: 'integration_access', name: 'Integration Access', module: 'integrations' },
-        // Teams - Management
-        { id: 'teams_view', name: 'View Teams', module: 'teams' },
-        { id: 'teams_create', name: 'Create Teams', module: 'teams' },
-        { id: 'teams_edit', name: 'Edit Teams', module: 'teams' },
-        { id: 'teams_delete', name: 'Delete Teams', module: 'teams' },
-        { id: 'teams_permissions_manage', name: 'Manage Team Permissions', module: 'teams' },
-        // Quality System (QS) - Tab Access
-        { id: 'qs_view', name: 'View Quality System Tab', module: 'quality_system' },
-        // Quality System - Tracking Overview
-        { id: 'qs_tracking_view', name: 'View Quality Tracking', module: 'quality_system' },
-        { id: 'qs_tracking_view_all', name: 'View All Teams in Tracking', module: 'quality_system' },
-        // Quality System - Task Catalog (Delete > Create > Edit > View)
-        { id: 'qs_tasks_delete', name: 'Delete Quality Tasks', module: 'quality_system' },
-        { id: 'qs_tasks_create', name: 'Create Quality Tasks', module: 'quality_system' },
-        { id: 'qs_tasks_edit', name: 'Edit Quality Tasks', module: 'quality_system' },
-        { id: 'qs_tasks_view', name: 'View Task Catalog', module: 'quality_system' },
-        // Quality System - Check Catalog (Delete > Create > Edit > View)
-        { id: 'qs_checks_delete', name: 'Delete Quality Checks', module: 'quality_system' },
-        { id: 'qs_checks_create', name: 'Create Quality Checks', module: 'quality_system' },
-        { id: 'qs_checks_edit', name: 'Edit Quality Checks', module: 'quality_system' },
-        { id: 'qs_checks_view', name: 'View Check Catalog', module: 'quality_system' },
-        // Quality System - Categories (Delete > Create > Edit)
-        { id: 'qs_categories_delete', name: 'Delete QS Categories', module: 'quality_system' },
-        { id: 'qs_categories_create', name: 'Create QS Categories', module: 'quality_system' },
-        { id: 'qs_categories_edit', name: 'Edit QS Categories', module: 'quality_system' },
-        // Quality System - Evaluations
-        { id: 'qs_evaluate', name: 'Conduct Evaluations', module: 'quality_system' },
-        { id: 'qs_evaluate_random', name: 'Create Random Evaluations', module: 'quality_system' },
-        // Quality System - Results
-        { id: 'qs_results_view_own', name: 'View Own Results', module: 'quality_system' },
-        { id: 'qs_results_view_team', name: 'View Team Results', module: 'quality_system' },
-        { id: 'qs_results_delete', name: 'Delete Evaluation Results', module: 'quality_system' },
-        // Quality System - Supervisor Notes
-        { id: 'qs_supervisor_notes_view', name: 'View Supervisor Notes', module: 'quality_system' },
-        // Quality System - Management
-        { id: 'qs_settings_manage', name: 'Manage QS Settings', module: 'quality_system' },
-        { id: 'qs_quotas_manage', name: 'Manage Evaluation Quotas', module: 'quality_system' },
-        { id: 'qs_team_config_manage', name: 'Configure Team Roles', module: 'quality_system' }
-    ];
-    
-    permissions.forEach(p => {
-        run('INSERT OR IGNORE INTO permissions (id, name, module) VALUES (?, ?, ?)', [p.id, p.name, p.module]);
-    });
-    
-    // Default roles
-    const allPermIds = permissions.map(p => p.id);
-    
-    // Knowledge Check permission sets
-    const kcManagerPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit', 'kc_questions_delete', 
-                           'kc_categories_create', 'kc_categories_edit', 'kc_categories_delete',
-                           'kc_tests_view', 'kc_tests_create', 'kc_tests_edit', 'kc_tests_delete',
-                           'kc_results_view', 'kc_results_evaluate', 'kc_results_delete',
-                           'kc_assign_tests', 'kc_assigned_view',
-                           'kc_archive_access'];
-    const kcEditorPerms = ['kc_view', 'kc_questions_view', 'kc_questions_create', 'kc_questions_edit',
-                          'kc_categories_create', 'kc_categories_edit',
-                          'kc_tests_view', 'kc_tests_create', 'kc_tests_edit',
-                          'kc_results_view', 'kc_results_evaluate',
-                          'kc_assign_tests', 'kc_assigned_view'];
-    const kcUserPerms = ['kc_view', 'kc_assigned_view']; // Can see the tab and their assigned tests
-    
-    // Team management permission sets
-    const teamAdminPerms = ['teams_view', 'teams_create', 'teams_edit', 'teams_delete', 'teams_permissions_manage'];
-    
-    // Quality System permission sets (team access now based on user.team_id)
-    const qsSupervisorPerms = ['qs_view', 
-                               'qs_tracking_view', 'qs_tracking_view_all',
-                               'qs_tasks_view', 'qs_tasks_create', 'qs_tasks_edit', 'qs_tasks_delete',
-                               'qs_checks_view', 'qs_checks_create', 'qs_checks_edit', 'qs_checks_delete',
-                               'qs_categories_create', 'qs_categories_edit', 'qs_categories_delete',
-                               'qs_evaluate', 'qs_evaluate_random',
-                               'qs_results_view_team', 'qs_results_delete',
-                               'qs_supervisor_notes_view',
-                               'qs_settings_manage', 'qs_quotas_manage', 'qs_team_config_manage'];
-    const qsEvaluatorPerms = ['qs_view',
-                              'qs_tracking_view',
-                              'qs_tasks_view', 'qs_checks_view',
-                              'qs_evaluate',
-                              'qs_results_view_team',
-                              'qs_supervisor_notes_view'];
-    const qsAgentPerms = ['qs_view', 'qs_results_view_own']; // Agents only see their own results
-    
-    const roles = [
-        { id: 'admin', name: 'Administrator', description: 'Full system access', isAdmin: 1, isSystem: 1, permissions: allPermIds },
-        { id: 'supervisor', name: 'Supervisor', description: 'Team management', isAdmin: 0, isSystem: 1, 
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 
-                       'quality_view', 'quality_view_all', 'quality_create', 
-                       ...teamAdminPerms, ...kcEditorPerms, ...qsSupervisorPerms, 'role_view', 'settings_view'] },
-        { id: 'qa_analyst', name: 'QA Analyst', description: 'Quality evaluations', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage', 
-                       'teams_view', ...kcEditorPerms, ...qsEvaluatorPerms] },
-        { id: 'agent', name: 'Support Agent', description: 'Ticket handling', isAdmin: 0, isSystem: 1,
-          permissions: ['ticket_view', 'ticket_create', 'ticket_edit', 'quality_view', ...kcUserPerms, ...qsAgentPerms] },
-        // Knowledge Check specific roles
-        { id: 'kc_manager', name: 'Knowledge Manager', description: 'Full Knowledge Check management including delete', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', ...kcManagerPerms] },
-        { id: 'kc_editor', name: 'Knowledge Editor', description: 'Create and edit Knowledge Check content', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', ...kcEditorPerms] },
-        { id: 'kc_user', name: 'Knowledge User', description: 'View Knowledge Check (no content access)', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', ...kcUserPerms] },
-        // Quality System specific roles
-        { id: 'qs_supervisor', name: 'QS Supervisor', description: 'Full Quality System management', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', 'teams_view', ...qsSupervisorPerms] },
-        { id: 'qs_evaluator', name: 'QS Evaluator', description: 'Conduct quality evaluations', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', 'teams_view', ...qsEvaluatorPerms] }
-    ];
-    
-    roles.forEach(r => {
-        run('INSERT OR IGNORE INTO roles (id, name, description, is_admin, is_system, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [r.id, r.name, r.description, r.isAdmin, r.isSystem, now, now]);
-        r.permissions.forEach(p => {
-            run('INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [r.id, p]);
-        });
-    });
-    
-    // Default teams (unified for the whole application)
-    const defaultTeams = [
-        { id: uuidv4(), name: 'BILLA', teamCode: 'billa', description: 'BILLA Partner Team', color: '#ff6b00', sortOrder: 0 },
-        { id: uuidv4(), name: 'Social Media', teamCode: 'social_media', description: 'Social Media Team', color: '#1da1f2', sortOrder: 1 },
-        { id: uuidv4(), name: 'Support', teamCode: 'support', description: 'General Support Team', color: '#10b981', sortOrder: 2 }
-    ];
-    
-    defaultTeams.forEach(team => {
-        run(`INSERT OR IGNORE INTO teams (id, name, team_code, description, color, is_active, sort_order, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-            [team.id, team.name, team.teamCode, team.description, team.color, team.sortOrder, now, now]);
-        
-        // Add default QS task category for each team
-        run(`INSERT OR IGNORE INTO qs_task_categories (id, team_id, name, description, default_weight, sort_order, is_active, created_at, updated_at)
-             VALUES (?, ?, 'Allgemein', 'Allgemeine Aufgaben', 1.0, 0, 1, ?, ?)`,
-            [uuidv4(), team.id, now, now]);
-        
-        // Add default QS check category for each team
-        run(`INSERT OR IGNORE INTO qs_check_categories (id, team_id, name, description, sort_order, is_active, created_at, updated_at)
-             VALUES (?, ?, 'Standard', 'Standard Quality Checks', 0, 1, ?, ?)`,
-            [uuidv4(), team.id, now, now]);
-    });
-    
-    // Default admin user (no team - can see all)
-    const bcryptRounds = Config.get('security.bcryptRounds', 10);
-    const hashedPw = await bcrypt.hash('admin123', bcryptRounds);
-    run(`INSERT INTO users (id, username, email, password, first_name, last_name, role_id, team_id, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [uuidv4(), 'admin', 'admin@company.com', hashedPw, 'System', 'Administrator', 'admin', null, 1, now, now]);
-    
-    // Default quality categories
-    const categories = [
-        { name: 'Communication', description: 'Communication skills', weight: 25, criteria: ['Clarity', 'Professionalism', 'Empathy'] },
-        { name: 'Problem Resolution', description: 'Issue resolution ability', weight: 30, criteria: ['First Contact Resolution', 'Solution Quality', 'Follow-up'] },
-        { name: 'Process Adherence', description: 'Following procedures', weight: 20, criteria: ['Documentation', 'Compliance', 'Tool Usage'] },
-        { name: 'Product Knowledge', description: 'Product understanding', weight: 25, criteria: ['Technical Accuracy', 'Feature Knowledge', 'Policy Understanding'] }
-    ];
-    
-    categories.forEach(c => {
-        const catId = uuidv4();
-        run('INSERT INTO quality_categories (id, name, description, weight, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [catId, c.name, c.description, c.weight, 1, now, now]);
-        c.criteria.forEach(cr => {
-            run('INSERT INTO quality_criteria (id, category_id, name, max_score) VALUES (?, ?, ?, ?)',
-                [uuidv4(), catId, cr, 10]);
-        });
-    });
-    
-    // Default settings
-    const defaultSettings = {
-        'general.companyName': Config.get('app.companyName', 'Customer Support Agency'),
-        'general.timezone': Config.get('app.timezone', 'UTC'),
-        'tickets.defaultPriority': Config.get('tickets.defaultPriority', 'medium'),
-        'tickets.slaEnabled': String(Config.get('tickets.slaEnabled', true)),
-        'quality.passingScore': String(Config.get('quality.passingScore', 80)),
-        'knowledgeCheck.passingScore': '80'
-    };
-    
-    Object.entries(defaultSettings).forEach(([k, v]) => {
-        run('INSERT OR IGNORE INTO settings (key, value, encrypted, updated_at) VALUES (?, ?, ?, ?)', [k, v, 0, now]);
-    });
-    
-    // Default Knowledge Check category
-    const defaultKcCategory = {
-        id: uuidv4(),
-        name: 'Allgemein',
-        description: 'Allgemeine Fragen',
-        defaultWeighting: 1,
-        sortOrder: 0
-    };
-    
-    run(`INSERT OR IGNORE INTO kc_categories (id, name, description, default_weighting, sort_order, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
-        [defaultKcCategory.id, defaultKcCategory.name, defaultKcCategory.description, 
-         defaultKcCategory.defaultWeighting, defaultKcCategory.sortOrder, now, now]);
-    
-    // Default QS settings
-    const qsDefaultSettings = {
-        'qs.passingScore': '80',
-        'qs.defaultScoringType': 'points',
-        'qs.supervisorNotesRoles': JSON.stringify(['admin', 'supervisor', 'qs_supervisor']),
-        'qs.evaluationQuotaEnabled': 'true'
-    };
-    
-    Object.entries(qsDefaultSettings).forEach(([k, v]) => {
-        run('INSERT OR IGNORE INTO settings (key, value, encrypted, updated_at) VALUES (?, ?, ?, ?)', [k, v, 0, now]);
-    });
-    
+    await Setup.seedData(run, get, Config);
     saveDb();
     console.log('Database seeding complete');
 }
@@ -1492,26 +368,149 @@ const RoleSystem = {
     
     delete(id) {
         const role = this.getById(id);
-        if (!role) return { success: false, error: 'Role not found' };
-        if (role.is_system) return { success: false, error: 'Cannot delete system roles' };
-        
-        const userCount = get('SELECT COUNT(*) as c FROM users WHERE role_id = ?', [id]).c;
-        if (userCount > 0) return { success: false, error: `${userCount} users have this role` };
+        if (!role || role.is_system) return false;
         
         run('DELETE FROM role_permissions WHERE role_id = ?', [id]);
         run('DELETE FROM roles WHERE id = ?', [id]);
         saveDb();
-        return { success: true };
-    },
-    
-    hasPermission(roleId, permissionId) {
-        const role = get('SELECT is_admin FROM roles WHERE id = ?', [roleId]);
-        if (role?.is_admin) return true;
-        return !!get('SELECT 1 FROM role_permissions WHERE role_id = ? AND permission_id = ?', [roleId, permissionId]);
+        return true;
     }
 };
 
 // ============================================
+// TEAMS SYSTEM
+// ============================================
+
+const TeamsSystem = {
+    getAll() {
+        return all('SELECT * FROM teams WHERE is_active = 1 ORDER BY sort_order, name');
+    },
+    
+    getAllIncludingInactive() {
+        return all('SELECT * FROM teams ORDER BY sort_order, name');
+    },
+    
+    getById(id) {
+        return get('SELECT * FROM teams WHERE id = ?', [id]);
+    },
+    
+    getByCode(teamCode) {
+        return get('SELECT * FROM teams WHERE team_code = ?', [teamCode]);
+    },
+    
+    create(data) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const teamCode = data.teamCode || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        
+        run(`INSERT INTO teams (id, name, team_code, description, color, is_active, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.name, teamCode, data.description || '', data.color || '#3b82f6', 
+             data.isActive !== false ? 1 : 0, data.sortOrder || 0, now, now]);
+        
+        saveDb();
+        return this.getById(id);
+    },
+    
+    update(id, data) {
+        const now = new Date().toISOString();
+        const existing = this.getById(id);
+        if (!existing) return null;
+        
+        let sql = 'UPDATE teams SET updated_at = ?';
+        let params = [now];
+        
+        if (data.name !== undefined) { sql += ', name = ?'; params.push(data.name); }
+        if (data.teamCode !== undefined) { sql += ', team_code = ?'; params.push(data.teamCode); }
+        if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
+        if (data.color !== undefined) { sql += ', color = ?'; params.push(data.color); }
+        if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
+        if (data.sortOrder !== undefined) { sql += ', sort_order = ?'; params.push(data.sortOrder); }
+        
+        sql += ' WHERE id = ?';
+        params.push(id);
+        
+        run(sql, params);
+        saveDb();
+        return this.getById(id);
+    },
+    
+    delete(id) {
+        const usersInTeam = all('SELECT id FROM users WHERE team_id = ?', [id]);
+        if (usersInTeam.length > 0) {
+            throw new Error('Cannot delete team with assigned users');
+        }
+        
+        run('DELETE FROM team_permissions WHERE team_id = ?', [id]);
+        run('DELETE FROM teams WHERE id = ?', [id]);
+        saveDb();
+        return true;
+    },
+    
+    getMembers(teamId) {
+        return all(`
+            SELECT u.*, r.name as role_name, r.is_admin
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            WHERE u.team_id = ? AND u.is_active = 1
+            ORDER BY u.last_name, u.first_name
+        `, [teamId]);
+    },
+    
+    getMemberCount(teamId) {
+        const result = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId]);
+        return result ? result.count : 0;
+    },
+    
+    getPermissions(teamId) {
+        return all(`
+            SELECT tp.*, p.name as permission_name, p.module
+            FROM team_permissions tp
+            JOIN permissions p ON tp.permission_id = p.id
+            WHERE tp.team_id = ?
+        `, [teamId]);
+    },
+    
+    setPermission(teamId, permissionId, granted = true) {
+        const id = uuidv4();
+        run(`INSERT OR REPLACE INTO team_permissions (id, team_id, permission_id, granted) VALUES (?, ?, ?, ?)`,
+            [id, teamId, permissionId, granted ? 1 : 0]);
+        saveDb();
+    },
+    
+    removePermission(teamId, permissionId) {
+        run('DELETE FROM team_permissions WHERE team_id = ? AND permission_id = ?', [teamId, permissionId]);
+        saveDb();
+    },
+    
+    clearPermissions(teamId) {
+        run('DELETE FROM team_permissions WHERE team_id = ?', [teamId]);
+        saveDb();
+    },
+    
+    setPermissions(teamId, permissions) {
+        this.clearPermissions(teamId);
+        permissions.forEach(p => {
+            const id = uuidv4();
+            run(`INSERT INTO team_permissions (id, team_id, permission_id, granted) VALUES (?, ?, ?, 1)`,
+                [id, teamId, p.permissionId || p]);
+        });
+        saveDb();
+        return this.getPermissions(teamId);
+    },
+    
+    hasPermission(teamId, permissionId) {
+        const result = get('SELECT granted FROM team_permissions WHERE team_id = ? AND permission_id = ?', [teamId, permissionId]);
+        return result ? result.granted === 1 : false;
+    },
+    
+    getStatistics(teamId) {
+        return {
+            memberCount: this.getMemberCount(teamId),
+            activeUsers: get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId])?.count || 0
+        };
+    }
+};
 // TICKET SYSTEM
 // ============================================
 
@@ -1884,189 +883,6 @@ const QualitySystem = {
     }
 };
 
-// ============================================
-// TEAMS SYSTEM - Unified Team Management
-// ============================================
-
-const TeamsSystem = {
-    getAll() {
-        return all('SELECT * FROM teams WHERE is_active = 1 ORDER BY sort_order, name');
-    },
-    
-    getAllIncludingInactive() {
-        return all('SELECT * FROM teams ORDER BY sort_order, name');
-    },
-    
-    getById(id) {
-        return get('SELECT * FROM teams WHERE id = ?', [id]);
-    },
-    
-    getByCode(teamCode) {
-        return get('SELECT * FROM teams WHERE team_code = ?', [teamCode]);
-    },
-    
-    create(data) {
-        const now = new Date().toISOString();
-        const id = uuidv4();
-        
-        // Generate team_code from name if not provided
-        const teamCode = data.teamCode || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-        
-        run(`INSERT INTO teams (id, name, team_code, description, color, is_active, sort_order, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, data.name, teamCode, data.description || '', data.color || '#3b82f6', 
-             data.isActive !== false ? 1 : 0, data.sortOrder || 0, now, now]);
-        
-        saveDb();
-        return this.getById(id);
-    },
-    
-    update(id, data) {
-        const now = new Date().toISOString();
-        const existing = this.getById(id);
-        if (!existing) return null;
-        
-        let sql = 'UPDATE teams SET updated_at = ?';
-        let params = [now];
-        
-        if (data.name !== undefined) { sql += ', name = ?'; params.push(data.name); }
-        if (data.teamCode !== undefined) { sql += ', team_code = ?'; params.push(data.teamCode); }
-        if (data.description !== undefined) { sql += ', description = ?'; params.push(data.description); }
-        if (data.color !== undefined) { sql += ', color = ?'; params.push(data.color); }
-        if (data.isActive !== undefined) { sql += ', is_active = ?'; params.push(data.isActive ? 1 : 0); }
-        if (data.sortOrder !== undefined) { sql += ', sort_order = ?'; params.push(data.sortOrder); }
-        
-        sql += ' WHERE id = ?';
-        params.push(id);
-        
-        run(sql, params);
-        saveDb();
-        return this.getById(id);
-    },
-    
-    delete(id) {
-        // Check if team has users
-        const usersInTeam = all('SELECT id FROM users WHERE team_id = ?', [id]);
-        if (usersInTeam.length > 0) {
-            throw new Error('Cannot delete team with assigned users');
-        }
-        
-        // Delete team permissions
-        run('DELETE FROM team_permissions WHERE team_id = ?', [id]);
-        
-        run('DELETE FROM teams WHERE id = ?', [id]);
-        saveDb();
-        return true;
-    },
-    
-    // Team members
-    getMembers(teamId) {
-        return all(`
-            SELECT u.*, r.name as role_name, r.is_admin
-            FROM users u 
-            LEFT JOIN roles r ON u.role_id = r.id 
-            WHERE u.team_id = ? AND u.is_active = 1
-            ORDER BY u.last_name, u.first_name
-        `, [teamId]);
-    },
-    
-    getMemberCount(teamId) {
-        const result = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId]);
-        return result ? result.count : 0;
-    },
-    
-    // Team permissions
-    getPermissions(teamId) {
-        return all(`
-            SELECT tp.*, p.name as permission_name, p.module
-            FROM team_permissions tp
-            JOIN permissions p ON tp.permission_id = p.id
-            WHERE tp.team_id = ?
-        `, [teamId]);
-    },
-    
-    setPermission(teamId, permissionId, granted = true) {
-        const id = uuidv4();
-        run(`INSERT OR REPLACE INTO team_permissions (id, team_id, permission_id, granted)
-             VALUES (?, ?, ?, ?)`,
-            [id, teamId, permissionId, granted ? 1 : 0]);
-        saveDb();
-    },
-    
-    removePermission(teamId, permissionId) {
-        run('DELETE FROM team_permissions WHERE team_id = ? AND permission_id = ?', [teamId, permissionId]);
-        saveDb();
-    },
-    
-    clearPermissions(teamId) {
-        run('DELETE FROM team_permissions WHERE team_id = ?', [teamId]);
-        saveDb();
-    },
-    
-    setPermissions(teamId, permissions) {
-        // Clear existing
-        this.clearPermissions(teamId);
-        
-        // Add new permissions
-        permissions.forEach(p => {
-            const id = uuidv4();
-            run(`INSERT INTO team_permissions (id, team_id, permission_id, granted)
-                 VALUES (?, ?, ?, 1)`,
-                [id, teamId, p.permissionId || p]);
-        });
-        
-        saveDb();
-        return this.getPermissions(teamId);
-    },
-    
-    // Check if team has a specific permission granted
-    hasPermission(teamId, permissionId) {
-        const result = get(
-            'SELECT granted FROM team_permissions WHERE team_id = ? AND permission_id = ?',
-            [teamId, permissionId]
-        );
-        return result ? result.granted === 1 : false;
-    },
-    
-    // Get effective permissions for a team (merges team permissions with role permissions)
-    getEffectivePermissions(teamId, roleId) {
-        // Get role permissions
-        const rolePerms = all(`
-            SELECT p.id, p.name, p.module
-            FROM permissions p
-            JOIN role_permissions rp ON p.id = rp.permission_id
-            WHERE rp.role_id = ?
-        `, [roleId]);
-        
-        // Get team-specific overrides (only granted ones)
-        const teamPerms = all(`
-            SELECT p.id, p.name, p.module
-            FROM permissions p
-            JOIN team_permissions tp ON p.id = tp.permission_id
-            WHERE tp.team_id = ? AND tp.granted = 1
-        `, [teamId]);
-        
-        // Merge: team permissions add to (don't replace) role permissions
-        const permMap = new Map();
-        rolePerms.forEach(p => permMap.set(p.id, p));
-        teamPerms.forEach(p => permMap.set(p.id, p));
-        
-        return Array.from(permMap.values());
-    },
-    
-    // Get statistics for a team
-    getStatistics(teamId) {
-        const memberCount = this.getMemberCount(teamId);
-        const activeUsers = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId])?.count || 0;
-        
-        return {
-            memberCount,
-            activeUsers
-        };
-    }
-};
-
-// ============================================
 // QUALITY SYSTEM v2 (QS) - Comprehensive Quality Management
 // ============================================
 
