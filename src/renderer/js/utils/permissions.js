@@ -280,10 +280,11 @@ const Permissions = {
         return this.hasPermission('qs_view');
     },
 
-    canAccessQSTeam(teamCode) {
-        if (teamCode === 'billa') return this.hasPermission('qs_team_billa_access');
-        if (teamCode === 'social_media') return this.hasPermission('qs_team_social_access');
-        return false;
+    canAccessQSTeam(teamId) {
+        // Can access if: admin, has view_all permission, or user is assigned to this team
+        if (this.isAdmin()) return true;
+        if (this.hasPermission('qs_tracking_view_all')) return true;
+        return this.currentUser?.teamId === teamId;
     },
 
     canAccessQSTracking() {
@@ -491,11 +492,14 @@ const Permissions = {
             'kc_archive_access': 'Archive Access',
             // Knowledge Check permissions - Tab
             'kc_view': 'View Knowledge Check Tab',
+            // Teams Management
+            'teams_view': 'View Teams',
+            'teams_create': 'Create Teams',
+            'teams_edit': 'Edit Teams',
+            'teams_delete': 'Delete Teams',
+            'teams_permissions_manage': 'Manage Team Permissions',
             // Quality System v2 permissions - Tab
             'qs_view': 'View Quality System Tab',
-            // Quality System v2 permissions - Teams
-            'qs_team_billa_access': 'Access BILLA Team',
-            'qs_team_social_access': 'Access Social Media Team',
             // Quality System v2 permissions - Tracking
             'qs_tracking_view': 'View Quality Tracking',
             'qs_tracking_view_all': 'View All Teams in Tracking',
@@ -537,6 +541,7 @@ const Permissions = {
     getPermissionsByModule(permissions) {
         const modules = {
             users: [],
+            teams: [],
             tickets: [],
             quality: [],
             qualitySystem: [],
@@ -549,6 +554,7 @@ const Permissions = {
 
         for (const perm of permissions) {
             if (perm.startsWith('user_')) modules.users.push(perm);
+            else if (perm.startsWith('teams_')) modules.teams.push(perm);
             else if (perm.startsWith('ticket_')) modules.tickets.push(perm);
             else if (perm.startsWith('quality_')) modules.quality.push(perm);
             else if (perm.startsWith('qs_')) modules.qualitySystem.push(perm);
@@ -559,9 +565,13 @@ const Permissions = {
             else if (perm.startsWith('admin_')) modules.admin.push(perm);
         }
 
+        // Sort Teams permissions
+        const teamsOrder = ['teams_view', 'teams_create', 'teams_edit', 'teams_delete', 'teams_permissions_manage'];
+        modules.teams.sort((a, b) => teamsOrder.indexOf(a) - teamsOrder.indexOf(b));
+
         // Sort Quality System permissions
         const qsOrder = [
-            'qs_view', 'qs_team_billa_access', 'qs_team_social_access',
+            'qs_view',
             'qs_tracking_view', 'qs_tracking_view_all',
             'qs_tasks_delete', 'qs_tasks_create', 'qs_tasks_edit', 'qs_tasks_view',
             'qs_checks_delete', 'qs_checks_create', 'qs_checks_edit', 'qs_checks_view',

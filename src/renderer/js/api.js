@@ -202,8 +202,21 @@ window.api = {
         delete: (id) => API.delete(`/users/${id}`),
         search: (query) => API.get(`/users?search=${encodeURIComponent(query)}`),
         getByRole: (roleId) => API.get(`/users?roleId=${roleId}`),
+        getByTeam: (teamId) => API.get(`/users?teamId=${teamId}`),
         getStatistics: () => API.get('/users/stats'),
         exportUsers: (format) => API.get(`/users/export/${format}`)
+    },
+
+    teams: {
+        getAll: (includeInactive = false) => API.get(`/teams${includeInactive ? '?includeInactive=true' : ''}`),
+        getById: (id) => API.get(`/teams/${id}`),
+        create: (teamData) => API.post('/teams', teamData),
+        update: (id, teamData) => API.put(`/teams/${id}`, teamData),
+        delete: (id) => API.delete(`/teams/${id}`),
+        getMembers: (id) => API.get(`/teams/${id}/members`),
+        getPermissions: (id) => API.get(`/teams/${id}/permissions`),
+        setPermissions: (id, permissions) => API.put(`/teams/${id}/permissions`, { permissions }),
+        getStatistics: (id) => API.get(`/teams/${id}/statistics`)
     },
 
     tickets: {

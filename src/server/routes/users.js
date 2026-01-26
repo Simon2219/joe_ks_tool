@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { UserSystem, RoleSystem } = require('../database');
+const { UserSystem, RoleSystem, TeamsSystem } = require('../database');
 const { authenticate, requirePermission, requireAdmin, hasPermission } = require('../middleware/auth');
 
 // Apply authentication to all routes
@@ -59,14 +59,14 @@ router.get('/export/:format', requirePermission('user_view'), (req, res) => {
         const users = UserSystem.getAll().map(sanitizeUser);
         
         // Generate CSV
-        const headers = ['Username', 'Email', 'First Name', 'Last Name', 'Role', 'Department', 'Status', 'Last Login'];
+        const headers = ['Username', 'Email', 'First Name', 'Last Name', 'Role', 'Team', 'Status', 'Last Login'];
         const rows = users.map(u => [
             u.username,
             u.email,
             u.firstName,
             u.lastName,
             u.roleName,
-            u.department || '',
+            u.teamName || '',
             u.isActive ? 'Active' : 'Inactive',
             u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'
         ]);
@@ -104,7 +104,7 @@ router.get('/:id', requirePermission('user_view'), (req, res) => {
  */
 router.post('/', requireAdmin, async (req, res) => {
     try {
-        const { username, email, password, firstName, lastName, roleId, department, phone, isActive } = req.body;
+        const { username, email, password, firstName, lastName, roleId, teamId, phone, isActive } = req.body;
 
         // Validation
         if (!username || !email || !password || !firstName || !lastName) {
@@ -128,7 +128,12 @@ router.post('/', requireAdmin, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid role' });
         }
 
-        const user = await UserSystem.create({ username, email, password, firstName, lastName, roleId, department, phone, isActive });
+        // Verify team exists if provided
+        if (teamId && !TeamsSystem.getById(teamId)) {
+            return res.status(400).json({ success: false, error: 'Invalid team' });
+        }
+
+        const user = await UserSystem.create({ username, email, password, firstName, lastName, roleId, teamId, phone, isActive });
         res.status(201).json({ success: true, user: sanitizeUser(user) });
     } catch (error) {
         console.error('Create user error:', error);
@@ -211,7 +216,9 @@ function sanitizeUser(user) {
         lastName: user.last_name,
         roleId: user.role_id,
         roleName: user.role_name || '',
-        department: user.department || '',
+        teamId: user.team_id || null,
+        teamName: user.team_name || '',
+        teamCode: user.team_code || '',
         phone: user.phone || '',
         isActive: !!user.is_active,
         isAdmin: !!user.is_admin,

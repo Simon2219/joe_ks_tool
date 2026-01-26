@@ -20,6 +20,7 @@ const { initializeDatabase, shutdown: shutdownDatabase } = require('./src/server
 // Import API routes
 const authRoutes = require('./src/server/routes/auth');
 const userRoutes = require('./src/server/routes/users');
+const teamsRoutes = require('./src/server/routes/teams');
 const ticketRoutes = require('./src/server/routes/tickets');
 const qualityRoutes = require('./src/server/routes/quality');
 const qualitySystemRoutes = require('./src/server/routes/qualitySystem');
@@ -82,6 +83,7 @@ app.use('/api/files', express.static(FileService.getStoragePath()));
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/teams', teamsRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/quality', qualityRoutes);
 app.use('/api/qs', qualitySystemRoutes);

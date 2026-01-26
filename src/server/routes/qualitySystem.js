@@ -7,7 +7,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 
-const { QS, UserSystem } = require('../database');
+const { QS, UserSystem, TeamsSystem } = require('../database');
 const { authenticate, requirePermission, hasPermission } = require('../middleware/auth');
 const FileService = require('../services/fileService');
 
@@ -20,24 +20,26 @@ const upload = multer({
 router.use(authenticate);
 
 // ============================================
-// TEAMS
+// TEAMS (Uses unified TeamsSystem)
 // ============================================
 
 /**
  * GET /api/qs/teams
- * Get all teams the user has access to
+ * Get all teams the user has access to for QS
  */
 router.get('/teams', requirePermission('qs_view'), (req, res) => {
     try {
         let teams = QS.getAllTeams();
         
-        // Filter based on team access permissions
+        // Filter based on user's team assignment (unless they can view all)
         if (!hasPermission(req.user, 'qs_tracking_view_all')) {
-            teams = teams.filter(t => {
-                if (t.teamCode === 'billa' && hasPermission(req.user, 'qs_team_billa_access')) return true;
-                if (t.teamCode === 'social_media' && hasPermission(req.user, 'qs_team_social_access')) return true;
-                return false;
-            });
+            const user = UserSystem.getById(req.user.id);
+            if (user?.team_id) {
+                teams = teams.filter(t => t.id === user.team_id);
+            } else {
+                // User has no team assigned and can't view all - show empty
+                teams = [];
+            }
         }
         
         res.json({ success: true, teams });
@@ -66,30 +68,15 @@ router.get('/teams/:id', requirePermission('qs_view'), (req, res) => {
 
 /**
  * GET /api/qs/teams/:id/agents
- * Get agents in a team
+ * Get agents in a team (users assigned to this team)
  */
 router.get('/teams/:id/agents', requirePermission('qs_view'), (req, res) => {
     try {
-        const agents = QS.getTeamAgents(req.params.id);
+        const agents = TeamsSystem.getMembers(req.params.id);
         res.json({ success: true, agents });
     } catch (error) {
         console.error('Get team agents error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch team agents' });
-    }
-});
-
-/**
- * PUT /api/qs/teams/:id/roles
- * Update team role mappings
- */
-router.put('/teams/:id/roles', requirePermission('qs_team_config_manage'), (req, res) => {
-    try {
-        const { roleIds, roleType } = req.body;
-        const roles = QS.updateTeamRoles(req.params.id, roleIds, roleType || 'agent');
-        res.json({ success: true, roles });
-    } catch (error) {
-        console.error('Update team roles error:', error);
-        res.status(500).json({ success: false, error: 'Failed to update team roles' });
     }
 });
 
