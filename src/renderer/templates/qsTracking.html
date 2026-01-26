@@ -1,0 +1,104 @@
+<section id="view-qsTracking" class="view">
+    <div class="view-header">
+        <div class="view-header-left">
+            <button class="btn btn-secondary btn-back" id="qs-tracking-back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Zurück
+            </button>
+            <h1>Quality Tracking</h1>
+        </div>
+    </div>
+
+    <!-- Global Statistics -->
+    <div class="qs-tracking-stats" id="qs-tracking-stats">
+        <div class="stat-card stat-card-lg">
+            <div class="stat-value" id="qs-tracking-total">0</div>
+            <div class="stat-label">Gesamt Evaluierungen</div>
+        </div>
+        <div class="stat-card stat-card-lg">
+            <div class="stat-value" id="qs-tracking-month">0</div>
+            <div class="stat-label">Diesen Monat</div>
+        </div>
+        <div class="stat-card stat-card-lg">
+            <div class="stat-value" id="qs-tracking-avg">0%</div>
+            <div class="stat-label">Durchschnitt</div>
+        </div>
+        <div class="stat-card stat-card-lg">
+            <div class="stat-value" id="qs-tracking-pass">0%</div>
+            <div class="stat-label">Bestehensrate</div>
+        </div>
+    </div>
+
+    <!-- Team Breakdown -->
+    <div class="qs-tracking-teams" id="qs-tracking-teams">
+        <h3>Team Übersicht</h3>
+        <div class="qs-team-cards" id="qs-team-cards">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="view-filters">
+        <div class="filter-group">
+            <input type="text" id="qs-tracking-search" class="form-input" placeholder="Suchen...">
+        </div>
+        <div class="filter-group">
+            <select id="qs-tracking-team-filter" class="form-select">
+                <option value="">Alle Teams</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <select id="qs-tracking-status-filter" class="form-select">
+                <option value="">Alle Status</option>
+                <option value="completed">Abgeschlossen</option>
+                <option value="in_progress">In Bearbeitung</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <select id="qs-tracking-result-filter" class="form-select">
+                <option value="">Alle Ergebnisse</option>
+                <option value="passed">Bestanden</option>
+                <option value="failed">Nicht bestanden</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <input type="date" id="qs-tracking-date-from" class="form-input">
+            <input type="date" id="qs-tracking-date-to" class="form-input">
+        </div>
+    </div>
+
+    <!-- Evaluations Table -->
+    <div class="table-container">
+        <table class="data-table sortable" id="qs-tracking-table">
+            <thead>
+                <tr>
+                    <th data-sort="number">Nummer</th>
+                    <th data-sort="team">Team</th>
+                    <th data-sort="agent">Agent</th>
+                    <th data-sort="check">Check</th>
+                    <th data-sort="evaluator">Evaluator</th>
+                    <th data-sort="score">Score</th>
+                    <th data-sort="status">Status</th>
+                    <th data-sort="date">Datum</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody id="qs-tracking-tbody">
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="empty-state" id="qs-tracking-empty" style="display: none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        <h3>Keine Evaluierungen gefunden</h3>
+        <p>Es wurden noch keine Quality Checks durchgeführt.</p>
+    </div>
+</section>

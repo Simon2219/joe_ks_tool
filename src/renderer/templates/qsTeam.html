@@ -1,0 +1,163 @@
+<section id="view-qsTeam" class="view">
+    <div class="view-header">
+        <div class="view-header-left">
+            <button class="btn btn-secondary btn-back" id="qs-team-back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Zurück
+            </button>
+            <h1 id="qs-team-title">Team</h1>
+        </div>
+        <div class="view-actions">
+            <button class="btn btn-secondary" id="qs-team-tasks-btn" data-permission="qs_tasks_view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+                Aufgaben Katalog
+            </button>
+            <button class="btn btn-secondary" id="qs-team-checks-btn" data-permission="qs_checks_view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                Check Katalog
+            </button>
+            <button class="btn btn-primary" id="qs-new-evaluation-btn" data-permission="qs_evaluate">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Neuer Quality Check
+            </button>
+        </div>
+    </div>
+
+    <!-- Team Stats -->
+    <div class="qs-team-stats" id="qs-team-stats">
+        <div class="stat-card">
+            <div class="stat-value" id="qs-stat-team-agents">0</div>
+            <div class="stat-label">Agents</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="qs-stat-team-evaluations">0</div>
+            <div class="stat-label">Evaluierungen</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="qs-stat-team-week">0</div>
+            <div class="stat-label">Diese Woche</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="qs-stat-team-avg">0%</div>
+            <div class="stat-label">Ø Score</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="qs-stat-team-pass">0%</div>
+            <div class="stat-label">Bestanden</div>
+        </div>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="qs-view-toggle">
+        <button class="btn btn-toggle active" id="qs-view-agents-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+            </svg>
+            Agents
+        </button>
+        <button class="btn btn-toggle" id="qs-view-evaluations-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            Evaluierungen
+        </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="view-filters" id="qs-team-filters">
+        <div class="filter-group">
+            <input type="text" id="qs-team-search" class="form-input" placeholder="Suchen...">
+        </div>
+        <div class="filter-group" id="qs-filter-status-group" style="display: none;">
+            <select id="qs-filter-status" class="form-select">
+                <option value="">Alle Status</option>
+                <option value="completed">Abgeschlossen</option>
+                <option value="in_progress">In Bearbeitung</option>
+            </select>
+        </div>
+        <div class="filter-group" id="qs-filter-date-group" style="display: none;">
+            <input type="date" id="qs-filter-date-from" class="form-input" placeholder="Von">
+            <input type="date" id="qs-filter-date-to" class="form-input" placeholder="Bis">
+        </div>
+    </div>
+
+    <!-- Agents View -->
+    <div class="qs-agents-view" id="qs-agents-view">
+        <div class="table-container">
+            <table class="data-table sortable" id="qs-agents-table">
+                <thead>
+                    <tr>
+                        <th data-sort="name">Name</th>
+                        <th data-sort="role">Rolle</th>
+                        <th data-sort="evaluations">Evaluierungen</th>
+                        <th data-sort="avgScore">Ø Score</th>
+                        <th data-sort="lastEvaluation">Letzte Evaluierung</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody id="qs-agents-tbody">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+        <div class="empty-state" id="qs-agents-empty" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+            </svg>
+            <h3>Keine Agents gefunden</h3>
+            <p>Diesem Team sind keine Agents zugewiesen.</p>
+        </div>
+    </div>
+
+    <!-- Evaluations View -->
+    <div class="qs-evaluations-view" id="qs-evaluations-view" style="display: none;">
+        <div class="table-container">
+            <table class="data-table sortable" id="qs-evaluations-table">
+                <thead>
+                    <tr>
+                        <th data-sort="number">Nummer</th>
+                        <th data-sort="agent">Agent</th>
+                        <th data-sort="check">Check</th>
+                        <th data-sort="evaluator">Evaluator</th>
+                        <th data-sort="score">Score</th>
+                        <th data-sort="status">Status</th>
+                        <th data-sort="date">Datum</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody id="qs-evaluations-tbody">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+        <div class="empty-state" id="qs-evaluations-empty" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <h3>Keine Evaluierungen gefunden</h3>
+            <p>Es wurden noch keine Quality Checks durchgeführt.</p>
+        </div>
+    </div>
+</section>

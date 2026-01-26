@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="styles/views/settings.css">
     <link rel="stylesheet" href="styles/views/tickets.css">
     <link rel="stylesheet" href="styles/views/knowledge-check.css">
+    <link rel="stylesheet" href="styles/views/quality-system.css">
 </head>
 <body>
     <!-- Login Screen -->
@@ -104,13 +105,30 @@
                         </svg>
                         <span>TicketSystem</span>
                     </a>
-                    <a href="#" class="nav-item" data-view="quality" data-permission="quality_view">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                        </svg>
-                        <span>QualitySystem</span>
-                    </a>
+                    <!-- Quality System v2 with Sub-menu -->
+                    <div class="nav-item-group" data-permission="qs_view">
+                        <a href="#" class="nav-item has-submenu" data-view="qualitySystem" data-permission="qs_view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            <span>Quality System</span>
+                        </a>
+                        <div class="nav-submenu">
+                            <a href="#" class="nav-item nav-subitem" data-view="qsTeamBilla" data-permission="qs_team_billa_access">
+                                <span>BILLA</span>
+                            </a>
+                            <a href="#" class="nav-item nav-subitem" data-view="qsTeamSocial" data-permission="qs_team_social_access">
+                                <span>Social Media</span>
+                            </a>
+                            <a href="#" class="nav-item nav-subitem" data-view="qsTracking" data-permission="qs_tracking_view">
+                                <span>Quality Tracking</span>
+                            </a>
+                            <a href="#" class="nav-item nav-subitem" data-view="qsMyResults" data-permission="qs_results_view_own">
+                                <span>Meine Ergebnisse</span>
+                            </a>
+                        </div>
+                    </div>
                     
                     <!-- Knowledge Check with Sub-menu -->
                     <div class="nav-item-group" data-permission="kc_view">

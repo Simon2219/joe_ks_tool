@@ -1,0 +1,84 @@
+<section id="view-qsSettings" class="view">
+    <div class="view-header">
+        <div class="view-header-left">
+            <button class="btn btn-secondary btn-back" id="qs-settings-back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Zurück
+            </button>
+            <h1>Quality System Einstellungen</h1>
+        </div>
+    </div>
+
+    <div class="settings-container">
+        <!-- General Settings -->
+        <div class="settings-section">
+            <h3>Allgemeine Einstellungen</h3>
+            <div class="settings-grid">
+                <div class="form-group">
+                    <label for="qs-settings-passing-score">Mindest-Score zum Bestehen (%)</label>
+                    <input type="number" id="qs-settings-passing-score" class="form-input" min="0" max="100" value="80">
+                </div>
+                <div class="form-group">
+                    <label for="qs-settings-default-scoring">Standard Scoring-Typ</label>
+                    <select id="qs-settings-default-scoring" class="form-select">
+                        <option value="points">Punkte</option>
+                        <option value="scale">Skala</option>
+                        <option value="checkbox">Checkbox</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="qs-settings-default-scale">Standard Skala-Größe</label>
+                    <select id="qs-settings-default-scale" class="form-select">
+                        <option value="5">1-5</option>
+                        <option value="10">1-10</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="qs-settings-default-channel">Standard Interaktionskanal</label>
+                    <select id="qs-settings-default-channel" class="form-select">
+                        <option value="ticket">Ticket</option>
+                        <option value="call">Anruf</option>
+                        <option value="chat">Chat</option>
+                        <option value="email">E-Mail</option>
+                        <option value="social">Social Media</option>
+                        <option value="other">Sonstige</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quota Settings -->
+        <div class="settings-section" data-permission="qs_quotas_manage">
+            <h3>Evaluierungs-Quoten</h3>
+            <p class="text-muted">Legen Sie fest, wie viele Evaluierungen pro Zeitraum durchgeführt werden sollen.</p>
+            
+            <div class="qs-quotas-list" id="qs-quotas-list">
+                <!-- Populated by JS for each team -->
+            </div>
+        </div>
+
+        <!-- Team Role Mappings -->
+        <div class="settings-section" data-permission="qs_team_config_manage">
+            <h3>Team-Rollen Zuordnung</h3>
+            <p class="text-muted">Legen Sie fest, welche Rollen zu welchem Team gehören.</p>
+            
+            <div class="qs-team-roles-list" id="qs-team-roles-list">
+                <!-- Populated by JS for each team -->
+            </div>
+        </div>
+
+        <div class="settings-actions">
+            <button class="btn btn-primary" id="qs-settings-save-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Einstellungen speichern
+            </button>
+        </div>
+    </div>
+</section>

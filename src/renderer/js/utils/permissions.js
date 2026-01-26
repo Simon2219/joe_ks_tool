@@ -274,6 +274,95 @@ const Permissions = {
     },
 
     /**
+     * Quality System v2 permission helpers
+     */
+    canAccessQualitySystem() {
+        return this.hasPermission('qs_view');
+    },
+
+    canAccessQSTeam(teamCode) {
+        if (teamCode === 'billa') return this.hasPermission('qs_team_billa_access');
+        if (teamCode === 'social_media') return this.hasPermission('qs_team_social_access');
+        return false;
+    },
+
+    canAccessQSTracking() {
+        return this.hasPermission('qs_tracking_view');
+    },
+
+    canViewAllQSTeams() {
+        return this.hasPermission('qs_tracking_view_all');
+    },
+
+    canCreateQSTasks() {
+        return this.hasPermission('qs_tasks_create');
+    },
+
+    canEditQSTasks() {
+        return this.hasPermission('qs_tasks_edit');
+    },
+
+    canDeleteQSTasks() {
+        return this.hasPermission('qs_tasks_delete');
+    },
+
+    canViewQSTasks() {
+        return this.hasPermission('qs_tasks_view');
+    },
+
+    canCreateQSChecks() {
+        return this.hasPermission('qs_checks_create');
+    },
+
+    canEditQSChecks() {
+        return this.hasPermission('qs_checks_edit');
+    },
+
+    canDeleteQSChecks() {
+        return this.hasPermission('qs_checks_delete');
+    },
+
+    canViewQSChecks() {
+        return this.hasPermission('qs_checks_view');
+    },
+
+    canConductQSEvaluations() {
+        return this.hasPermission('qs_evaluate');
+    },
+
+    canCreateRandomEvaluations() {
+        return this.hasPermission('qs_evaluate_random');
+    },
+
+    canViewOwnQSResults() {
+        return this.hasPermission('qs_results_view_own');
+    },
+
+    canViewTeamQSResults() {
+        return this.hasPermission('qs_results_view_team');
+    },
+
+    canDeleteQSResults() {
+        return this.hasPermission('qs_results_delete');
+    },
+
+    canViewSupervisorNotes() {
+        return this.hasPermission('qs_supervisor_notes_view');
+    },
+
+    canManageQSSettings() {
+        return this.hasPermission('qs_settings_manage');
+    },
+
+    canManageQSQuotas() {
+        return this.hasPermission('qs_quotas_manage');
+    },
+
+    canConfigureQSTeamRoles() {
+        return this.hasPermission('qs_team_config_manage');
+    },
+
+    /**
      * Shorthand for hasPermission
      */
     has(permission) {
@@ -401,7 +490,42 @@ const Permissions = {
             // Knowledge Check permissions - Archive
             'kc_archive_access': 'Archive Access',
             // Knowledge Check permissions - Tab
-            'kc_view': 'View Knowledge Check Tab'
+            'kc_view': 'View Knowledge Check Tab',
+            // Quality System v2 permissions - Tab
+            'qs_view': 'View Quality System Tab',
+            // Quality System v2 permissions - Teams
+            'qs_team_billa_access': 'Access BILLA Team',
+            'qs_team_social_access': 'Access Social Media Team',
+            // Quality System v2 permissions - Tracking
+            'qs_tracking_view': 'View Quality Tracking',
+            'qs_tracking_view_all': 'View All Teams in Tracking',
+            // Quality System v2 permissions - Tasks
+            'qs_tasks_delete': 'Delete Quality Tasks',
+            'qs_tasks_create': 'Create Quality Tasks',
+            'qs_tasks_edit': 'Edit Quality Tasks',
+            'qs_tasks_view': 'View Task Catalog',
+            // Quality System v2 permissions - Checks
+            'qs_checks_delete': 'Delete Quality Checks',
+            'qs_checks_create': 'Create Quality Checks',
+            'qs_checks_edit': 'Edit Quality Checks',
+            'qs_checks_view': 'View Check Catalog',
+            // Quality System v2 permissions - Categories
+            'qs_categories_delete': 'Delete QS Categories',
+            'qs_categories_create': 'Create QS Categories',
+            'qs_categories_edit': 'Edit QS Categories',
+            // Quality System v2 permissions - Evaluations
+            'qs_evaluate': 'Conduct Evaluations',
+            'qs_evaluate_random': 'Create Random Evaluations',
+            // Quality System v2 permissions - Results
+            'qs_results_view_own': 'View Own Results',
+            'qs_results_view_team': 'View Team Results',
+            'qs_results_delete': 'Delete Evaluation Results',
+            // Quality System v2 permissions - Supervisor Notes
+            'qs_supervisor_notes_view': 'View Supervisor Notes',
+            // Quality System v2 permissions - Management
+            'qs_settings_manage': 'Manage QS Settings',
+            'qs_quotas_manage': 'Manage Evaluation Quotas',
+            'qs_team_config_manage': 'Configure Team Roles'
         };
         
         return permissionNames[permissionId] || permissionId;
@@ -415,6 +539,7 @@ const Permissions = {
             users: [],
             tickets: [],
             quality: [],
+            qualitySystem: [],
             knowledgeCheck: [],
             roles: [],
             settings: [],
@@ -426,12 +551,34 @@ const Permissions = {
             if (perm.startsWith('user_')) modules.users.push(perm);
             else if (perm.startsWith('ticket_')) modules.tickets.push(perm);
             else if (perm.startsWith('quality_')) modules.quality.push(perm);
+            else if (perm.startsWith('qs_')) modules.qualitySystem.push(perm);
             else if (perm.startsWith('kc_')) modules.knowledgeCheck.push(perm);
             else if (perm.startsWith('role_')) modules.roles.push(perm);
             else if (perm.startsWith('settings_')) modules.settings.push(perm);
             else if (perm.startsWith('integration_')) modules.integrations.push(perm);
             else if (perm.startsWith('admin_')) modules.admin.push(perm);
         }
+
+        // Sort Quality System permissions
+        const qsOrder = [
+            'qs_view', 'qs_team_billa_access', 'qs_team_social_access',
+            'qs_tracking_view', 'qs_tracking_view_all',
+            'qs_tasks_delete', 'qs_tasks_create', 'qs_tasks_edit', 'qs_tasks_view',
+            'qs_checks_delete', 'qs_checks_create', 'qs_checks_edit', 'qs_checks_view',
+            'qs_categories_delete', 'qs_categories_create', 'qs_categories_edit',
+            'qs_evaluate', 'qs_evaluate_random',
+            'qs_results_view_own', 'qs_results_view_team', 'qs_results_delete',
+            'qs_supervisor_notes_view',
+            'qs_settings_manage', 'qs_quotas_manage', 'qs_team_config_manage'
+        ];
+        
+        modules.qualitySystem.sort((a, b) => {
+            const indexA = qsOrder.indexOf(a);
+            const indexB = qsOrder.indexOf(b);
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+        });
 
         // Sort Knowledge Check permissions in the proper order (by importance/group)
         const kcOrder = [

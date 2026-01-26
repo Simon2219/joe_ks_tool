@@ -1,0 +1,76 @@
+<section id="view-qsChecks" class="view">
+    <div class="view-header">
+        <div class="view-header-left">
+            <button class="btn btn-secondary btn-back" id="qs-checks-back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Zurück
+            </button>
+            <h1 id="qs-checks-title">Check Katalog</h1>
+        </div>
+        <div class="view-actions">
+            <button class="btn btn-secondary" id="qs-manage-check-categories-btn" data-permission="qs_categories_create">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Kategorien verwalten
+            </button>
+            <button class="btn btn-primary" id="qs-add-check-btn" data-permission="qs_checks_create">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Neuer Check
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="view-filters">
+        <div class="filter-group">
+            <input type="text" id="qs-checks-search" class="form-input" placeholder="Checks suchen...">
+        </div>
+        <div class="filter-group">
+            <select id="qs-checks-category-filter" class="form-select">
+                <option value="">Alle Kategorien</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="qs-checks-archived-filter">
+                Archiviert anzeigen
+            </label>
+        </div>
+    </div>
+
+    <!-- Checks List -->
+    <div class="qs-checks-content">
+        <div class="qs-categories-sidebar" id="qs-check-categories-sidebar">
+            <div class="qs-categories-header">
+                <h3>Kategorien</h3>
+            </div>
+            <div class="qs-categories-list" id="qs-check-categories-list">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <div class="qs-checks-main">
+            <div class="qs-checks-grid" id="qs-checks-grid">
+                <!-- Populated by JS -->
+            </div>
+            <div class="empty-state" id="qs-checks-empty" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <h3>Keine Checks gefunden</h3>
+                <p>Erstellen Sie Ihren ersten Quality Check um zu beginnen.</p>
+                <button class="btn btn-primary" id="qs-checks-empty-add-btn" data-permission="qs_checks_create">
+                    Neuen Check erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,46 @@
+<section id="view-qsMyResults" class="view">
+    <div class="view-header">
+        <div class="view-header-left">
+            <button class="btn btn-secondary btn-back" id="qs-my-results-back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Zurück
+            </button>
+            <h1>Meine Ergebnisse</h1>
+        </div>
+    </div>
+
+    <!-- Personal Statistics -->
+    <div class="qs-my-stats" id="qs-my-stats">
+        <div class="stat-card stat-card-lg">
+            <div class="stat-value" id="qs-my-total">0</div>
+            <div class="stat-label">Gesamt Evaluierungen</div>
+        </div>
+        <div class="stat-card stat-card-lg">
+            <div class="stat-value" id="qs-my-avg">0%</div>
+            <div class="stat-label">Durchschnitt</div>
+        </div>
+        <div class="stat-card stat-card-lg">
+            <div class="stat-value" id="qs-my-pass">0%</div>
+            <div class="stat-label">Bestehensrate</div>
+        </div>
+    </div>
+
+    <!-- Recent Evaluations -->
+    <div class="qs-my-recent">
+        <h3>Letzte Evaluierungen</h3>
+        <div class="qs-my-results-list" id="qs-my-results-list">
+            <!-- Populated by JS -->
+        </div>
+        <div class="empty-state" id="qs-my-results-empty" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <h3>Noch keine Evaluierungen</h3>
+            <p>Sie haben noch keine Quality Checks erhalten.</p>
+        </div>
+    </div>
+</section>

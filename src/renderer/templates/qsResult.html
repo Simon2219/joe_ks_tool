@@ -1,0 +1,97 @@
+<section id="view-qsResult" class="view">
+    <div class="view-header">
+        <div class="view-header-left">
+            <button class="btn btn-secondary btn-back" id="qs-result-back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Zurück
+            </button>
+            <h1 id="qs-result-title">Evaluierung</h1>
+        </div>
+        <div class="view-actions" data-permission="qs_results_delete">
+            <button class="btn btn-danger" id="qs-result-delete-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Löschen
+            </button>
+        </div>
+    </div>
+
+    <!-- Result Summary Card -->
+    <div class="qs-result-summary">
+        <div class="qs-result-score-display" id="qs-result-score-display">
+            <div class="score-circle" id="qs-result-score-circle">
+                <span class="score-value" id="qs-result-percentage">0%</span>
+                <span class="score-label" id="qs-result-status">-</span>
+            </div>
+        </div>
+        <div class="qs-result-details">
+            <div class="detail-row">
+                <label>Evaluierung Nr.</label>
+                <span id="qs-result-number">-</span>
+            </div>
+            <div class="detail-row">
+                <label>Agent</label>
+                <span id="qs-result-agent">-</span>
+            </div>
+            <div class="detail-row">
+                <label>Evaluator</label>
+                <span id="qs-result-evaluator">-</span>
+            </div>
+            <div class="detail-row">
+                <label>Quality Check</label>
+                <span id="qs-result-check">-</span>
+            </div>
+            <div class="detail-row">
+                <label>Kanal</label>
+                <span id="qs-result-channel">-</span>
+            </div>
+            <div class="detail-row">
+                <label>Referenz</label>
+                <span id="qs-result-reference">-</span>
+            </div>
+            <div class="detail-row">
+                <label>Datum</label>
+                <span id="qs-result-date">-</span>
+            </div>
+            <div class="detail-row">
+                <label>Punkte</label>
+                <span id="qs-result-points">0 / 0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Breakdown (if sections exist) -->
+    <div class="qs-result-sections" id="qs-result-sections" style="display: none;">
+        <h3>Bereichs-Übersicht</h3>
+        <div class="qs-section-bars" id="qs-section-bars">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- Task Results -->
+    <div class="qs-result-tasks">
+        <h3>Aufgaben Ergebnisse</h3>
+        <div class="qs-result-tasks-list" id="qs-result-tasks-list">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- Supervisor Notes (conditional) -->
+    <div class="qs-result-notes" id="qs-result-notes-section" style="display: none;">
+        <h3>Supervisor Notizen</h3>
+        <div class="qs-notes-content" id="qs-result-supervisor-notes">-</div>
+    </div>
+
+    <!-- Evidence -->
+    <div class="qs-result-evidence" id="qs-result-evidence-section" style="display: none;">
+        <h3>Nachweise</h3>
+        <div class="qs-evidence-gallery" id="qs-result-evidence-list">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+</section>

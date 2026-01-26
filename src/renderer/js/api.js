@@ -354,6 +354,106 @@ window.api = {
         permanentDeleteTestRun: (id) => API.delete(`/knowledge-check/archive/test-runs/${id}`)
     },
 
+    // Quality System v2
+    qs: {
+        // Teams
+        getTeams: () => API.get('/qs/teams'),
+        getTeamById: (id) => API.get(`/qs/teams/${id}`),
+        getTeamAgents: (teamId) => API.get(`/qs/teams/${teamId}/agents`),
+        updateTeamRoles: (teamId, roleIds, roleType) => API.put(`/qs/teams/${teamId}/roles`, { roleIds, roleType }),
+        getTeamStatistics: (teamId, filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/qs/teams/${teamId}/statistics${params ? '?' + params : ''}`);
+        },
+
+        // Task Categories
+        getTaskCategories: (teamId) => API.get(`/qs/teams/${teamId}/task-categories`),
+        createTaskCategory: (teamId, data) => API.post(`/qs/teams/${teamId}/task-categories`, data),
+        updateTaskCategory: (id, data) => API.put(`/qs/task-categories/${id}`, data),
+        deleteTaskCategory: (id) => API.delete(`/qs/task-categories/${id}`),
+
+        // Tasks
+        getTasks: (teamId, filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/qs/teams/${teamId}/tasks${params ? '?' + params : ''}`);
+        },
+        getTaskById: (id) => API.get(`/qs/tasks/${id}`),
+        createTask: (teamId, data) => API.post(`/qs/teams/${teamId}/tasks`, data),
+        updateTask: (id, data) => API.put(`/qs/tasks/${id}`, data),
+        deleteTask: (id) => API.delete(`/qs/tasks/${id}`),
+        archiveTask: (id) => API.put(`/qs/tasks/${id}/archive`),
+        restoreTask: (id) => API.put(`/qs/tasks/${id}/restore`),
+
+        // Check Categories
+        getCheckCategories: (teamId) => API.get(`/qs/teams/${teamId}/check-categories`),
+        createCheckCategory: (teamId, data) => API.post(`/qs/teams/${teamId}/check-categories`, data),
+        updateCheckCategory: (id, data) => API.put(`/qs/check-categories/${id}`, data),
+        deleteCheckCategory: (id) => API.delete(`/qs/check-categories/${id}`),
+
+        // Checks
+        getChecks: (teamId, filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/qs/teams/${teamId}/checks${params ? '?' + params : ''}`);
+        },
+        getCheckById: (id, includeTasks = true) => API.get(`/qs/checks/${id}?includeTasks=${includeTasks}`),
+        createCheck: (teamId, data) => API.post(`/qs/teams/${teamId}/checks`, data),
+        updateCheck: (id, data) => API.put(`/qs/checks/${id}`, data),
+        deleteCheck: (id) => API.delete(`/qs/checks/${id}`),
+        archiveCheck: (id) => API.put(`/qs/checks/${id}/archive`),
+        restoreCheck: (id) => API.put(`/qs/checks/${id}/restore`),
+
+        // Evaluations
+        getEvaluations: (teamId, filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/qs/teams/${teamId}/evaluations${params ? '?' + params : ''}`);
+        },
+        getEvaluationById: (id) => API.get(`/qs/evaluations/${id}`),
+        createEvaluation: (teamId, data) => API.post(`/qs/teams/${teamId}/evaluations`, data),
+        createRandomEvaluation: (teamId, data) => API.post(`/qs/teams/${teamId}/evaluations/random`, data),
+        submitEvaluation: (id, data) => API.put(`/qs/evaluations/${id}/submit`, data),
+        updateEvaluationNotes: (id, notes) => API.put(`/qs/evaluations/${id}/notes`, { notes }),
+        deleteEvaluation: (id) => API.delete(`/qs/evaluations/${id}`),
+
+        // Evidence
+        uploadEvidence: async (evaluationId, file, evidenceType, answerId = null) => {
+            const formData = new FormData();
+            if (file) formData.append('file', file);
+            formData.append('evidenceType', evidenceType);
+            if (answerId) formData.append('answerId', answerId);
+            
+            const token = API.getAccessToken();
+            const response = await fetch(`${API.baseUrl}/qs/evaluations/${evaluationId}/evidence`, {
+                method: 'POST',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                body: formData
+            });
+            return response.json();
+        },
+        deleteEvidence: (id) => API.delete(`/qs/evidence/${id}`),
+
+        // Quotas
+        getQuotas: (teamId) => API.get(`/qs/teams/${teamId}/quotas`),
+        setQuota: (teamId, data) => API.put(`/qs/teams/${teamId}/quotas`, data),
+
+        // Settings
+        getTeamSettings: (teamId) => API.get(`/qs/teams/${teamId}/settings`),
+        updateTeamSettings: (teamId, settings) => API.put(`/qs/teams/${teamId}/settings`, settings),
+
+        // Tracking (Global)
+        getTrackingEvaluations: (filters = {}) => {
+            const params = new URLSearchParams(filters).toString();
+            return API.get(`/qs/tracking/evaluations${params ? '?' + params : ''}`);
+        },
+        getTrackingStatistics: () => API.get('/qs/tracking/statistics'),
+
+        // Agent Results
+        getMyResults: () => API.get('/qs/my-results'),
+        getAgentStatistics: (agentId, teamId = null) => {
+            const params = teamId ? `?teamId=${teamId}` : '';
+            return API.get(`/qs/agents/${agentId}/statistics${params}`);
+        }
+    },
+
     settings: {
         get: (key) => API.get(`/settings/${key}`),
         set: (key, value) => API.put(`/settings/${key}`, { value }),
