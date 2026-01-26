@@ -1250,6 +1250,413 @@ const QualitySystemViews = {
         }
     },
     
+    // ============================================
+    // CHECK MODAL & DETAILS
+    // ============================================
+    
+    async showCheckModal(checkId = null) {
+        // Load categories and tasks for selection
+        const catResult = await api.qs.getCheckCategories(this.currentTeamId);
+        const tasksResult = await api.qs.getTasks(this.currentTeamId, { includeInactive: false });
+        
+        const categories = catResult.success ? catResult.categories : [];
+        const availableTasks = tasksResult.success ? tasksResult.tasks : [];
+        
+        let check = null;
+        if (checkId) {
+            const checkResult = await api.qs.getCheckById(checkId, true);
+            if (checkResult.success) {
+                check = checkResult.check;
+            }
+        }
+        
+        this.checkBuilderTasks = check?.tasks?.map(t => ({ ...t })) || [];
+        
+        const content = `
+            <form id="check-form">
+                <div class="form-row">
+                    <div class="form-group flex-2">
+                        <label for="check-name">Name *</label>
+                        <input type="text" id="check-name" class="form-input" value="${check?.name || ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="check-passing">Bestehensgrenze (%)</label>
+                        <input type="number" id="check-passing" class="form-input" min="0" max="100" value="${check?.passingScore || 80}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="check-description">Beschreibung</label>
+                    <textarea id="check-description" class="form-textarea" rows="2">${check?.description || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="check-category">Kategorie</label>
+                    <select id="check-category" class="form-select">
+                        <option value="">Keine Kategorie</option>
+                        ${categories.map(c => `
+                            <option value="${c.id}" ${check?.categoryId === c.id ? 'selected' : ''}>${c.name}</option>
+                        `).join('')}
+                    </select>
+                </div>
+                
+                <hr>
+                <h4>Aufgaben</h4>
+                <p class="text-muted text-sm">Wählen Sie Aufgaben aus dem Katalog um sie zum Check hinzuzufügen.</p>
+                
+                <div class="form-group">
+                    <label for="check-task-select">Aufgabe hinzufügen</label>
+                    <div class="d-flex gap-sm">
+                        <select id="check-task-select" class="form-select flex-1">
+                            <option value="">Aufgabe auswählen...</option>
+                            ${availableTasks.map(t => `
+                                <option value="${t.id}">${t.title || t.taskText.substring(0, 50)}... (${t.taskNumber})</option>
+                            `).join('')}
+                        </select>
+                        <button type="button" class="btn btn-secondary" onclick="QualitySystemViews.addTaskToCheck()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="check-builder-tasks" id="check-builder-tasks">
+                    ${this.renderCheckBuilderTasks(availableTasks)}
+                </div>
+                
+                <div class="check-builder-stats mt-md">
+                    <span id="check-task-count">${this.checkBuilderTasks.length} Aufgaben</span>
+                </div>
+            </form>
+        `;
+        
+        Modal.show({
+            title: check ? 'Check bearbeiten' : 'Neuer Check',
+            content,
+            size: 'large',
+            buttons: [
+                { text: 'Abbrechen', className: 'btn-secondary', action: 'close' },
+                { text: 'Speichern', className: 'btn-primary', action: () => this.saveCheck(checkId) }
+            ]
+        });
+    },
+    
+    renderCheckBuilderTasks(availableTasks) {
+        if (this.checkBuilderTasks.length === 0) {
+            return '<p class="text-muted text-center">Noch keine Aufgaben hinzugefügt</p>';
+        }
+        
+        return this.checkBuilderTasks.map((ct, idx) => {
+            const task = ct.task || availableTasks.find(t => t.id === ct.taskId);
+            if (!task) return '';
+            
+            return `
+                <div class="check-builder-task" data-index="${idx}">
+                    <div class="check-builder-task-drag">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <line x1="8" y1="6" x2="8" y2="6"></line>
+                            <line x1="16" y1="6" x2="16" y2="6"></line>
+                            <line x1="8" y1="12" x2="8" y2="12"></line>
+                            <line x1="16" y1="12" x2="16" y2="12"></line>
+                            <line x1="8" y1="18" x2="8" y2="18"></line>
+                            <line x1="16" y1="18" x2="16" y2="18"></line>
+                        </svg>
+                    </div>
+                    <div class="check-builder-task-content">
+                        <strong>${task.title || task.taskText?.substring(0, 50) || 'Aufgabe'}</strong>
+                        <span class="text-muted">${task.taskNumber || ''}</span>
+                        <span class="scoring-badge ${task.scoringType}">${this.getScoringTypeLabel(task)}</span>
+                    </div>
+                    <button type="button" class="btn btn-icon btn-sm btn-danger" onclick="QualitySystemViews.removeTaskFromCheck(${idx})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    },
+    
+    async addTaskToCheck() {
+        const select = document.getElementById('check-task-select');
+        const taskId = select.value;
+        if (!taskId) return;
+        
+        // Get task details
+        const result = await api.qs.getTaskById(taskId);
+        if (!result.success) {
+            Toast.error('Aufgabe nicht gefunden');
+            return;
+        }
+        
+        // Check if already added
+        if (this.checkBuilderTasks.some(t => t.taskId === taskId)) {
+            Toast.warning('Aufgabe bereits hinzugefügt');
+            return;
+        }
+        
+        this.checkBuilderTasks.push({
+            taskId,
+            task: result.task,
+            sortOrder: this.checkBuilderTasks.length
+        });
+        
+        // Refresh tasks list
+        const tasksResult = await api.qs.getTasks(this.currentTeamId, { includeInactive: false });
+        const availableTasks = tasksResult.success ? tasksResult.tasks : [];
+        document.getElementById('check-builder-tasks').innerHTML = this.renderCheckBuilderTasks(availableTasks);
+        document.getElementById('check-task-count').textContent = `${this.checkBuilderTasks.length} Aufgaben`;
+        
+        // Reset select
+        select.value = '';
+    },
+    
+    removeTaskFromCheck(index) {
+        this.checkBuilderTasks.splice(index, 1);
+        
+        // Refresh (simplified - would need availableTasks)
+        document.querySelectorAll('.check-builder-task').forEach((el, idx) => {
+            if (idx === index) el.remove();
+        });
+        document.getElementById('check-task-count').textContent = `${this.checkBuilderTasks.length} Aufgaben`;
+    },
+    
+    async saveCheck(checkId = null) {
+        const data = {
+            name: document.getElementById('check-name').value,
+            description: document.getElementById('check-description').value,
+            categoryId: document.getElementById('check-category').value || null,
+            passingScore: parseInt(document.getElementById('check-passing').value) || 80,
+            tasks: this.checkBuilderTasks.map((ct, idx) => ({
+                taskId: ct.taskId,
+                sortOrder: idx
+            }))
+        };
+        
+        if (!data.name) {
+            Toast.error('Bitte Name eingeben');
+            return;
+        }
+        
+        let result;
+        if (checkId) {
+            result = await api.qs.updateCheck(checkId, data);
+        } else {
+            result = await api.qs.createCheck(this.currentTeamId, data);
+        }
+        
+        if (result.success) {
+            Modal.close();
+            Toast.success(checkId ? 'Check aktualisiert' : 'Check erstellt');
+            await this.loadChecks();
+        } else {
+            Toast.error(result.error || 'Fehler beim Speichern');
+        }
+    },
+    
+    async showCheckDetails(checkId) {
+        const result = await api.qs.getCheckById(checkId, true);
+        if (!result.success) {
+            Toast.error('Fehler beim Laden des Checks');
+            return;
+        }
+        
+        const check = result.check;
+        
+        const content = `
+            <div class="check-details">
+                <div class="check-details-header">
+                    <h3>${check.name}</h3>
+                    <span class="badge">${check.checkNumber}</span>
+                </div>
+                <p class="text-muted">${check.description || 'Keine Beschreibung'}</p>
+                
+                <div class="check-details-stats">
+                    <div class="stat">
+                        <span class="stat-value">${check.taskCount}</span>
+                        <span class="stat-label">Aufgaben</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">${check.passingScore}%</span>
+                        <span class="stat-label">Bestehensgrenze</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">${check.maxScore?.toFixed(1) || 0}</span>
+                        <span class="stat-label">Max. Punkte</span>
+                    </div>
+                </div>
+                
+                <h4>Aufgaben</h4>
+                <div class="check-tasks-preview">
+                    ${check.tasks?.map((ct, idx) => `
+                        <div class="check-task-preview">
+                            <span class="task-number">${idx + 1}.</span>
+                            <span class="task-text">${ct.task?.title || ct.task?.taskText?.substring(0, 60) || 'Aufgabe'}...</span>
+                            <span class="scoring-badge ${ct.task?.scoringType}">${this.getScoringTypeLabel(ct.task)}</span>
+                        </div>
+                    `).join('') || '<p class="text-muted">Keine Aufgaben</p>'}
+                </div>
+            </div>
+        `;
+        
+        Modal.show({
+            title: 'Check Details',
+            content,
+            size: 'medium',
+            buttons: [
+                { text: 'Schließen', className: 'btn-secondary', action: 'close' },
+                { text: 'Bearbeiten', className: 'btn-primary', action: () => { Modal.close(); this.showCheckModal(checkId); }, permission: 'qs_checks_edit' },
+                { text: 'Check starten', className: 'btn-success', action: () => this.startCheckFromDetails(checkId), permission: 'qs_evaluate' }
+            ]
+        });
+    },
+    
+    async startCheckFromDetails(checkId) {
+        Modal.close();
+        await this.showNewEvaluationModal();
+        setTimeout(() => {
+            document.getElementById('eval-check').value = checkId;
+        }, 100);
+    },
+    
+    // ============================================
+    // CATEGORY MANAGEMENT MODALS
+    // ============================================
+    
+    async showManageCategoriesModal(type) {
+        const isTask = type === 'task';
+        const categories = isTask ? 
+            await api.qs.getTaskCategories(this.currentTeamId) : 
+            await api.qs.getCheckCategories(this.currentTeamId);
+        
+        if (!categories.success) {
+            Toast.error('Fehler beim Laden der Kategorien');
+            return;
+        }
+        
+        const content = `
+            <div class="categories-manager">
+                <div class="categories-list" id="categories-manager-list">
+                    ${categories.categories.map(c => `
+                        <div class="category-item" data-id="${c.id}">
+                            <span class="category-name">${c.name}</span>
+                            ${isTask ? `<span class="category-weight">Gewichtung: ${c.defaultWeight}</span>` : ''}
+                            <div class="category-actions">
+                                <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.editCategory('${type}', '${c.id}', '${c.name}', ${c.defaultWeight || 1})">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </button>
+                                <button class="btn btn-icon btn-sm btn-danger" onclick="QualitySystemViews.deleteCategory('${type}', '${c.id}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') || '<p class="text-muted">Keine Kategorien vorhanden</p>'}
+                </div>
+                
+                <hr>
+                <h4>Neue Kategorie</h4>
+                <form id="add-category-form" class="d-flex gap-sm align-items-end">
+                    <div class="form-group flex-1 mb-0">
+                        <label for="new-category-name">Name</label>
+                        <input type="text" id="new-category-name" class="form-input" required>
+                    </div>
+                    ${isTask ? `
+                        <div class="form-group mb-0" style="width: 120px;">
+                            <label for="new-category-weight">Gewichtung</label>
+                            <input type="number" id="new-category-weight" class="form-input" value="1" min="0.1" step="0.1">
+                        </div>
+                    ` : ''}
+                    <button type="submit" class="btn btn-primary">Hinzufügen</button>
+                </form>
+            </div>
+        `;
+        
+        Modal.show({
+            title: `${isTask ? 'Aufgaben' : 'Check'}-Kategorien verwalten`,
+            content,
+            size: 'medium',
+            buttons: [
+                { text: 'Schließen', className: 'btn-secondary', action: 'close' }
+            ]
+        });
+        
+        // Setup form submit
+        document.getElementById('add-category-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('new-category-name').value;
+            const weight = isTask ? parseFloat(document.getElementById('new-category-weight').value) : 1;
+            
+            let result;
+            if (isTask) {
+                result = await api.qs.createTaskCategory(this.currentTeamId, { name, defaultWeight: weight });
+            } else {
+                result = await api.qs.createCheckCategory(this.currentTeamId, { name });
+            }
+            
+            if (result.success) {
+                Toast.success('Kategorie erstellt');
+                Modal.close();
+                this.showManageCategoriesModal(type);
+                if (isTask) this.loadTaskCategories();
+                else this.loadCheckCategories();
+            } else {
+                Toast.error(result.error || 'Fehler beim Erstellen');
+            }
+        };
+    },
+    
+    async editCategory(type, id, currentName, currentWeight) {
+        const isTask = type === 'task';
+        const newName = prompt('Neuer Name:', currentName);
+        if (!newName || newName === currentName) return;
+        
+        let result;
+        if (isTask) {
+            const newWeight = prompt('Neue Gewichtung:', currentWeight);
+            result = await api.qs.updateTaskCategory(id, { name: newName, defaultWeight: parseFloat(newWeight) || currentWeight });
+        } else {
+            result = await api.qs.updateCheckCategory(id, { name: newName });
+        }
+        
+        if (result.success) {
+            Toast.success('Kategorie aktualisiert');
+            Modal.close();
+            this.showManageCategoriesModal(type);
+            if (isTask) this.loadTaskCategories();
+            else this.loadCheckCategories();
+        } else {
+            Toast.error(result.error || 'Fehler beim Aktualisieren');
+        }
+    },
+    
+    async deleteCategory(type, id) {
+        if (!confirm('Kategorie wirklich löschen?')) return;
+        
+        let result;
+        if (type === 'task') {
+            result = await api.qs.deleteTaskCategory(id);
+        } else {
+            result = await api.qs.deleteCheckCategory(id);
+        }
+        
+        if (result.success) {
+            Toast.success('Kategorie gelöscht');
+            Modal.close();
+            this.showManageCategoriesModal(type);
+            if (type === 'task') this.loadTaskCategories();
+            else this.loadCheckCategories();
+        } else {
+            Toast.error(result.error || 'Fehler beim Löschen');
+        }
+    },
+    
     async deleteEvaluation(evaluationId) {
         if (!confirm('Evaluierung wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) return;
         
