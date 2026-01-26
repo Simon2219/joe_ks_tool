@@ -588,46 +588,58 @@ function createTables(db) {
 
 /**
  * Creates database indexes for performance
+ * Safely handles cases where tables/columns may not exist in older databases
  * @param {Object} db - Database instance with run method
  */
 function createIndexes(db) {
     console.log('Creating database indexes...');
+    
+    // Helper to safely create an index (ignores errors if table/column doesn't exist)
+    function safeCreateIndex(sql) {
+        try {
+            db.run(sql);
+        } catch (e) {
+            // Index creation failed - likely table or column doesn't exist
+            // This is expected for older databases, silently ignore
+        }
+    }
 
     // User & Auth indexes
-    db.run('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_users_team ON users(team_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)');
 
     // Ticket indexes
-    db.run('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_tickets_created_by ON tickets(created_by)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_ticket_comments_ticket ON ticket_comments(ticket_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_ticket_history_ticket ON ticket_history(ticket_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_tickets_created_by ON tickets(created_by)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_ticket_comments_ticket ON ticket_comments(ticket_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_ticket_history_ticket ON ticket_history(ticket_id)');
 
-    // Quality indexes
-    db.run('CREATE INDEX IF NOT EXISTS idx_quality_reports_agent ON quality_reports(agent_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_quality_reports_ticket ON quality_reports(ticket_id)');
+    // Quality (legacy) indexes
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_quality_reports_agent ON quality_reports(agent_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_quality_reports_ticket ON quality_reports(ticket_id)');
 
     // Knowledge Check indexes
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_questions_category ON kc_questions(category_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_test_questions_test ON kc_test_questions(test_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_user ON kc_test_assignments(user_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_test ON kc_test_assignments(test_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_test ON kc_test_results(test_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_user ON kc_test_results(user_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_test_results_run ON kc_test_results(run_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_kc_test_answers_result ON kc_test_answers(result_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_questions_category ON kc_questions(category_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_test_questions_test ON kc_test_questions(test_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_user ON kc_test_assignments(user_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_test ON kc_test_assignments(test_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_test_assignments_run ON kc_test_assignments(run_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_test_results_test ON kc_test_results(test_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_test_results_user ON kc_test_results(user_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_test_results_run ON kc_test_results(run_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_kc_test_answers_result ON kc_test_answers(result_id)');
 
     // Quality System v2 indexes
-    db.run('CREATE INDEX IF NOT EXISTS idx_qs_tasks_team ON qs_tasks(team_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_qs_tasks_category ON qs_tasks(category_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_qs_quality_checks_team ON qs_quality_checks(team_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_qs_check_tasks_check ON qs_check_tasks(check_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_team ON qs_evaluations(team_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_agent ON qs_evaluations(agent_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_evaluator ON qs_evaluations(evaluator_id)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluation_answers_eval ON qs_evaluation_answers(evaluation_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_qs_tasks_team ON qs_tasks(team_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_qs_tasks_category ON qs_tasks(category_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_qs_quality_checks_team ON qs_quality_checks(team_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_qs_check_tasks_check ON qs_check_tasks(check_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_team ON qs_evaluations(team_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_agent ON qs_evaluations(agent_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_evaluator ON qs_evaluations(evaluator_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_qs_evaluation_answers_eval ON qs_evaluation_answers(evaluation_id)');
 
     console.log('Indexes created successfully');
 }
