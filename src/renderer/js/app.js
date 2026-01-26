@@ -429,6 +429,21 @@ const App = {
                 case 'kcAssigned':
                     await KCAssignedView.init();
                     break;
+                case 'qualitySystem':
+                    await QualitySystemViews.showMainPage();
+                    break;
+                case 'qsTeamBilla':
+                    await QualitySystemViews.showTeamView('billa');
+                    break;
+                case 'qsTeamSocial':
+                    await QualitySystemViews.showTeamView('social_media');
+                    break;
+                case 'qsTracking':
+                    await QualitySystemViews.showTrackingView();
+                    break;
+                case 'qsMyResults':
+                    await QualitySystemViews.showMyResultsView();
+                    break;
                 case 'roles':
                     await RolesView.init();
                     break;
