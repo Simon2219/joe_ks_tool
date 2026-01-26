@@ -276,6 +276,268 @@ function initSchema() {
             max_score INTEGER DEFAULT 10
         )
     `);
+
+    // ============================================
+    // QUALITY SYSTEM (QS) TABLES - New Comprehensive System
+    // ============================================
+
+    // Teams (e.g., BILLA, Social Media) - configurable quality check groups
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_teams (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            team_code TEXT UNIQUE NOT NULL,
+            default_interaction_channel TEXT DEFAULT 'ticket',
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    `);
+
+    // Team role mappings - which roles belong to which teams
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_team_roles (
+            id TEXT PRIMARY KEY,
+            team_id TEXT NOT NULL,
+            role_id TEXT NOT NULL,
+            role_type TEXT DEFAULT 'agent',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE,
+            FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Task categories - for grouping Quality Tasks with default weighting
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_task_categories (
+            id TEXT PRIMARY KEY,
+            team_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            default_weight REAL DEFAULT 1.0,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Quality Tasks catalog
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_tasks (
+            id TEXT PRIMARY KEY,
+            task_number TEXT UNIQUE NOT NULL,
+            team_id TEXT NOT NULL,
+            category_id TEXT,
+            title TEXT DEFAULT '',
+            task_text TEXT NOT NULL,
+            scoring_type TEXT DEFAULT 'points',
+            max_points INTEGER DEFAULT 10,
+            scale_size INTEGER DEFAULT 5,
+            scale_inverted INTEGER DEFAULT 0,
+            weight_override REAL DEFAULT NULL,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            is_archived INTEGER DEFAULT 0,
+            archived_at TEXT DEFAULT NULL,
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES qs_teams(id),
+            FOREIGN KEY (category_id) REFERENCES qs_task_categories(id),
+            FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+    `);
+
+    // Task references - templates attached to tasks (guidelines, examples)
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_task_references (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL,
+            reference_type TEXT NOT NULL,
+            reference_text TEXT DEFAULT '',
+            file_path TEXT DEFAULT '',
+            file_name TEXT DEFAULT '',
+            url TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (task_id) REFERENCES qs_tasks(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Check categories - for organizing Quality Checks
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_check_categories (
+            id TEXT PRIMARY KEY,
+            team_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Quality Checks catalog - groupings of tasks
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_checks (
+            id TEXT PRIMARY KEY,
+            check_number TEXT UNIQUE NOT NULL,
+            team_id TEXT NOT NULL,
+            category_id TEXT,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            passing_score INTEGER DEFAULT 80,
+            is_active INTEGER DEFAULT 1,
+            is_archived INTEGER DEFAULT 0,
+            archived_at TEXT DEFAULT NULL,
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES qs_teams(id),
+            FOREIGN KEY (category_id) REFERENCES qs_check_categories(id),
+            FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+    `);
+
+    // Check sections - for organizing tasks within a check
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_check_sections (
+            id TEXT PRIMARY KEY,
+            check_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            weight REAL DEFAULT 1.0,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (check_id) REFERENCES qs_checks(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Check tasks - junction table linking tasks to checks (optionally via sections)
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_check_tasks (
+            id TEXT PRIMARY KEY,
+            check_id TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            section_id TEXT DEFAULT NULL,
+            weight_override REAL DEFAULT NULL,
+            sort_order INTEGER DEFAULT 0,
+            FOREIGN KEY (check_id) REFERENCES qs_checks(id) ON DELETE CASCADE,
+            FOREIGN KEY (task_id) REFERENCES qs_tasks(id),
+            FOREIGN KEY (section_id) REFERENCES qs_check_sections(id) ON DELETE SET NULL
+        )
+    `);
+
+    // Evaluations - filled out quality checks
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_evaluations (
+            id TEXT PRIMARY KEY,
+            evaluation_number TEXT UNIQUE NOT NULL,
+            team_id TEXT NOT NULL,
+            check_id TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            evaluator_id TEXT NOT NULL,
+            interaction_channel TEXT DEFAULT 'ticket',
+            interaction_reference TEXT DEFAULT '',
+            started_at TEXT NOT NULL,
+            completed_at TEXT,
+            total_score REAL DEFAULT 0,
+            max_score REAL DEFAULT 0,
+            percentage REAL DEFAULT 0,
+            passed INTEGER DEFAULT 0,
+            supervisor_notes TEXT DEFAULT '',
+            status TEXT DEFAULT 'in_progress',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES qs_teams(id),
+            FOREIGN KEY (check_id) REFERENCES qs_checks(id),
+            FOREIGN KEY (agent_id) REFERENCES users(id),
+            FOREIGN KEY (evaluator_id) REFERENCES users(id)
+        )
+    `);
+
+    // Evaluation answers - scores for each task
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_evaluation_answers (
+            id TEXT PRIMARY KEY,
+            evaluation_id TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            check_task_id TEXT NOT NULL,
+            section_id TEXT DEFAULT NULL,
+            score REAL DEFAULT 0,
+            max_score REAL DEFAULT 0,
+            raw_value TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (evaluation_id) REFERENCES qs_evaluations(id) ON DELETE CASCADE,
+            FOREIGN KEY (task_id) REFERENCES qs_tasks(id),
+            FOREIGN KEY (check_task_id) REFERENCES qs_check_tasks(id),
+            FOREIGN KEY (section_id) REFERENCES qs_check_sections(id)
+        )
+    `);
+
+    // Evaluation evidence - attachments added during evaluation
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_evaluation_evidence (
+            id TEXT PRIMARY KEY,
+            evaluation_id TEXT NOT NULL,
+            answer_id TEXT DEFAULT NULL,
+            evidence_type TEXT NOT NULL,
+            evidence_text TEXT DEFAULT '',
+            file_path TEXT DEFAULT '',
+            file_name TEXT DEFAULT '',
+            url TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (evaluation_id) REFERENCES qs_evaluations(id) ON DELETE CASCADE,
+            FOREIGN KEY (answer_id) REFERENCES qs_evaluation_answers(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Evaluation quotas - how many evaluations required per team/period
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_quotas (
+            id TEXT PRIMARY KEY,
+            team_id TEXT NOT NULL,
+            quota_type TEXT NOT NULL,
+            target_count INTEGER DEFAULT 0,
+            period_type TEXT DEFAULT 'week',
+            period_value INTEGER DEFAULT 1,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Team-specific settings
+    database.run(`
+        CREATE TABLE IF NOT EXISTS qs_team_settings (
+            id TEXT PRIMARY KEY,
+            team_id TEXT NOT NULL,
+            setting_key TEXT NOT NULL,
+            setting_value TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (team_id) REFERENCES qs_teams(id) ON DELETE CASCADE,
+            UNIQUE(team_id, setting_key)
+        )
+    `);
+
+    // QS indexes
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_tasks_team ON qs_tasks(team_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_tasks_category ON qs_tasks(category_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_checks_team ON qs_checks(team_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_check_tasks_check ON qs_check_tasks(check_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_team ON qs_evaluations(team_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_agent ON qs_evaluations(agent_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluations_evaluator ON qs_evaluations(evaluator_id)');
+    database.run('CREATE INDEX IF NOT EXISTS idx_qs_evaluation_answers_eval ON qs_evaluation_answers(evaluation_id)');
     
     database.run(`
         CREATE TABLE IF NOT EXISTS settings (
@@ -639,7 +901,42 @@ function ensurePermissions() {
         { id: 'settings_view', name: 'View Settings', module: 'settings' },
         { id: 'settings_edit', name: 'Edit Settings', module: 'settings' },
         { id: 'admin_access', name: 'Admin Access', module: 'admin' },
-        { id: 'integration_access', name: 'Integration Access', module: 'integrations' }
+        { id: 'integration_access', name: 'Integration Access', module: 'integrations' },
+        // Quality System (QS) - Tab Access
+        { id: 'qs_view', name: 'View Quality System Tab', module: 'quality_system' },
+        // Quality System - Team Access
+        { id: 'qs_team_billa_access', name: 'Access BILLA Team', module: 'quality_system' },
+        { id: 'qs_team_social_access', name: 'Access Social Media Team', module: 'quality_system' },
+        // Quality System - Tracking Overview
+        { id: 'qs_tracking_view', name: 'View Quality Tracking', module: 'quality_system' },
+        { id: 'qs_tracking_view_all', name: 'View All Teams in Tracking', module: 'quality_system' },
+        // Quality System - Task Catalog (Delete > Create > Edit > View)
+        { id: 'qs_tasks_delete', name: 'Delete Quality Tasks', module: 'quality_system' },
+        { id: 'qs_tasks_create', name: 'Create Quality Tasks', module: 'quality_system' },
+        { id: 'qs_tasks_edit', name: 'Edit Quality Tasks', module: 'quality_system' },
+        { id: 'qs_tasks_view', name: 'View Task Catalog', module: 'quality_system' },
+        // Quality System - Check Catalog (Delete > Create > Edit > View)
+        { id: 'qs_checks_delete', name: 'Delete Quality Checks', module: 'quality_system' },
+        { id: 'qs_checks_create', name: 'Create Quality Checks', module: 'quality_system' },
+        { id: 'qs_checks_edit', name: 'Edit Quality Checks', module: 'quality_system' },
+        { id: 'qs_checks_view', name: 'View Check Catalog', module: 'quality_system' },
+        // Quality System - Categories (Delete > Create > Edit)
+        { id: 'qs_categories_delete', name: 'Delete QS Categories', module: 'quality_system' },
+        { id: 'qs_categories_create', name: 'Create QS Categories', module: 'quality_system' },
+        { id: 'qs_categories_edit', name: 'Edit QS Categories', module: 'quality_system' },
+        // Quality System - Evaluations
+        { id: 'qs_evaluate', name: 'Conduct Evaluations', module: 'quality_system' },
+        { id: 'qs_evaluate_random', name: 'Create Random Evaluations', module: 'quality_system' },
+        // Quality System - Results
+        { id: 'qs_results_view_own', name: 'View Own Results', module: 'quality_system' },
+        { id: 'qs_results_view_team', name: 'View Team Results', module: 'quality_system' },
+        { id: 'qs_results_delete', name: 'Delete Evaluation Results', module: 'quality_system' },
+        // Quality System - Supervisor Notes
+        { id: 'qs_supervisor_notes_view', name: 'View Supervisor Notes', module: 'quality_system' },
+        // Quality System - Management
+        { id: 'qs_settings_manage', name: 'Manage QS Settings', module: 'quality_system' },
+        { id: 'qs_quotas_manage', name: 'Manage Evaluation Quotas', module: 'quality_system' },
+        { id: 'qs_team_config_manage', name: 'Configure Team Roles', module: 'quality_system' }
     ];
     
     let addedCount = 0;
@@ -651,11 +948,15 @@ function ensurePermissions() {
         }
     });
     
-    // Grant all KC permissions to admin role if it exists
+    // Grant all KC and QS permissions to admin role if it exists
     const adminRole = get('SELECT id FROM roles WHERE id = ? OR name = ?', ['admin', 'Administrator']);
     if (adminRole) {
         const kcPermIds = permissions.filter(p => p.module === 'knowledge_check').map(p => p.id);
         kcPermIds.forEach(permId => {
+            run('INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [adminRole.id, permId]);
+        });
+        const qsPermIds = permissions.filter(p => p.module === 'quality_system').map(p => p.id);
+        qsPermIds.forEach(permId => {
             run('INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [adminRole.id, permId]);
         });
     }
@@ -731,7 +1032,42 @@ async function seedData() {
         { id: 'settings_view', name: 'View Settings', module: 'settings' },
         { id: 'settings_edit', name: 'Edit Settings', module: 'settings' },
         { id: 'admin_access', name: 'Admin Access', module: 'admin' },
-        { id: 'integration_access', name: 'Integration Access', module: 'integrations' }
+        { id: 'integration_access', name: 'Integration Access', module: 'integrations' },
+        // Quality System (QS) - Tab Access
+        { id: 'qs_view', name: 'View Quality System Tab', module: 'quality_system' },
+        // Quality System - Team Access
+        { id: 'qs_team_billa_access', name: 'Access BILLA Team', module: 'quality_system' },
+        { id: 'qs_team_social_access', name: 'Access Social Media Team', module: 'quality_system' },
+        // Quality System - Tracking Overview
+        { id: 'qs_tracking_view', name: 'View Quality Tracking', module: 'quality_system' },
+        { id: 'qs_tracking_view_all', name: 'View All Teams in Tracking', module: 'quality_system' },
+        // Quality System - Task Catalog (Delete > Create > Edit > View)
+        { id: 'qs_tasks_delete', name: 'Delete Quality Tasks', module: 'quality_system' },
+        { id: 'qs_tasks_create', name: 'Create Quality Tasks', module: 'quality_system' },
+        { id: 'qs_tasks_edit', name: 'Edit Quality Tasks', module: 'quality_system' },
+        { id: 'qs_tasks_view', name: 'View Task Catalog', module: 'quality_system' },
+        // Quality System - Check Catalog (Delete > Create > Edit > View)
+        { id: 'qs_checks_delete', name: 'Delete Quality Checks', module: 'quality_system' },
+        { id: 'qs_checks_create', name: 'Create Quality Checks', module: 'quality_system' },
+        { id: 'qs_checks_edit', name: 'Edit Quality Checks', module: 'quality_system' },
+        { id: 'qs_checks_view', name: 'View Check Catalog', module: 'quality_system' },
+        // Quality System - Categories (Delete > Create > Edit)
+        { id: 'qs_categories_delete', name: 'Delete QS Categories', module: 'quality_system' },
+        { id: 'qs_categories_create', name: 'Create QS Categories', module: 'quality_system' },
+        { id: 'qs_categories_edit', name: 'Edit QS Categories', module: 'quality_system' },
+        // Quality System - Evaluations
+        { id: 'qs_evaluate', name: 'Conduct Evaluations', module: 'quality_system' },
+        { id: 'qs_evaluate_random', name: 'Create Random Evaluations', module: 'quality_system' },
+        // Quality System - Results
+        { id: 'qs_results_view_own', name: 'View Own Results', module: 'quality_system' },
+        { id: 'qs_results_view_team', name: 'View Team Results', module: 'quality_system' },
+        { id: 'qs_results_delete', name: 'Delete Evaluation Results', module: 'quality_system' },
+        // Quality System - Supervisor Notes
+        { id: 'qs_supervisor_notes_view', name: 'View Supervisor Notes', module: 'quality_system' },
+        // Quality System - Management
+        { id: 'qs_settings_manage', name: 'Manage QS Settings', module: 'quality_system' },
+        { id: 'qs_quotas_manage', name: 'Manage Evaluation Quotas', module: 'quality_system' },
+        { id: 'qs_team_config_manage', name: 'Configure Team Roles', module: 'quality_system' }
     ];
     
     permissions.forEach(p => {
@@ -755,21 +1091,49 @@ async function seedData() {
                           'kc_assign_tests', 'kc_assigned_view'];
     const kcUserPerms = ['kc_view', 'kc_assigned_view']; // Can see the tab and their assigned tests
     
+    // Quality System permission sets
+    const qsSupervisorPerms = ['qs_view', 'qs_team_billa_access', 'qs_team_social_access', 
+                               'qs_tracking_view', 'qs_tracking_view_all',
+                               'qs_tasks_view', 'qs_tasks_create', 'qs_tasks_edit', 'qs_tasks_delete',
+                               'qs_checks_view', 'qs_checks_create', 'qs_checks_edit', 'qs_checks_delete',
+                               'qs_categories_create', 'qs_categories_edit', 'qs_categories_delete',
+                               'qs_evaluate', 'qs_evaluate_random',
+                               'qs_results_view_team', 'qs_results_delete',
+                               'qs_supervisor_notes_view',
+                               'qs_settings_manage', 'qs_quotas_manage', 'qs_team_config_manage'];
+    const qsEvaluatorPerms = ['qs_view', 'qs_team_billa_access', 'qs_team_social_access',
+                              'qs_tracking_view',
+                              'qs_tasks_view', 'qs_checks_view',
+                              'qs_evaluate',
+                              'qs_results_view_team',
+                              'qs_supervisor_notes_view'];
+    const qsAgentPerms = ['qs_view', 'qs_results_view_own']; // Agents only see their own results
+    
     const roles = [
         { id: 'admin', name: 'Administrator', description: 'Full system access', isAdmin: 1, isSystem: 1, permissions: allPermIds },
         { id: 'supervisor', name: 'Supervisor', description: 'Team management', isAdmin: 0, isSystem: 1, 
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 'quality_view', 'quality_view_all', 'quality_create', ...kcEditorPerms, 'role_view', 'settings_view'] },
+          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'ticket_create', 'ticket_edit', 'ticket_assign', 'quality_view', 'quality_view_all', 'quality_create', ...kcEditorPerms, ...qsSupervisorPerms, 'role_view', 'settings_view'] },
         { id: 'qa_analyst', name: 'QA Analyst', description: 'Quality evaluations', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage', ...kcEditorPerms] },
+          permissions: ['user_view', 'ticket_view', 'ticket_view_all', 'quality_view', 'quality_view_all', 'quality_create', 'quality_edit', 'quality_manage', ...kcEditorPerms, ...qsEvaluatorPerms] },
         { id: 'agent', name: 'Support Agent', description: 'Ticket handling', isAdmin: 0, isSystem: 1,
-          permissions: ['ticket_view', 'ticket_create', 'ticket_edit', 'quality_view', ...kcUserPerms] },
+          permissions: ['ticket_view', 'ticket_create', 'ticket_edit', 'quality_view', ...kcUserPerms, ...qsAgentPerms] },
         // Knowledge Check specific roles
         { id: 'kc_manager', name: 'Knowledge Manager', description: 'Full Knowledge Check management including delete', isAdmin: 0, isSystem: 1,
           permissions: ['user_view', ...kcManagerPerms] },
         { id: 'kc_editor', name: 'Knowledge Editor', description: 'Create and edit Knowledge Check content', isAdmin: 0, isSystem: 1,
           permissions: ['user_view', ...kcEditorPerms] },
         { id: 'kc_user', name: 'Knowledge User', description: 'View Knowledge Check (no content access)', isAdmin: 0, isSystem: 1,
-          permissions: ['user_view', ...kcUserPerms] }
+          permissions: ['user_view', ...kcUserPerms] },
+        // Quality System specific roles
+        { id: 'qs_supervisor', name: 'QS Supervisor', description: 'Full Quality System management', isAdmin: 0, isSystem: 1,
+          permissions: ['user_view', ...qsSupervisorPerms] },
+        { id: 'qs_evaluator', name: 'QS Evaluator', description: 'Conduct quality evaluations', isAdmin: 0, isSystem: 1,
+          permissions: ['user_view', ...qsEvaluatorPerms] },
+        // Team-specific roles for filtering agents
+        { id: 'billa', name: 'BILLA', description: 'BILLA team member', isAdmin: 0, isSystem: 0,
+          permissions: [...qsAgentPerms] },
+        { id: 'social_media', name: 'Social Media', description: 'Social Media team member', isAdmin: 0, isSystem: 0,
+          permissions: [...qsAgentPerms] }
     ];
     
     roles.forEach(r => {
@@ -832,6 +1196,47 @@ async function seedData() {
          VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
         [defaultKcCategory.id, defaultKcCategory.name, defaultKcCategory.description, 
          defaultKcCategory.defaultWeighting, defaultKcCategory.sortOrder, now, now]);
+    
+    // Default Quality System teams
+    const qsTeams = [
+        { id: uuidv4(), name: 'BILLA', description: 'BILLA Partner Quality Checks', teamCode: 'billa', sortOrder: 0 },
+        { id: uuidv4(), name: 'Social Media', description: 'Social Media Team Quality Checks', teamCode: 'social_media', sortOrder: 1 }
+    ];
+    
+    qsTeams.forEach(team => {
+        run(`INSERT OR IGNORE INTO qs_teams (id, name, description, team_code, default_interaction_channel, is_active, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, 'ticket', 1, ?, ?, ?)`,
+            [team.id, team.name, team.description, team.teamCode, team.sortOrder, now, now]);
+        
+        // Link the team-specific roles
+        const roleId = team.teamCode === 'billa' ? 'billa' : 'social_media';
+        run(`INSERT OR IGNORE INTO qs_team_roles (id, team_id, role_id, role_type, created_at)
+             VALUES (?, ?, ?, 'agent', ?)`,
+            [uuidv4(), team.id, roleId, now]);
+        
+        // Add default task category for each team
+        const catId = uuidv4();
+        run(`INSERT OR IGNORE INTO qs_task_categories (id, team_id, name, description, default_weight, sort_order, is_active, created_at, updated_at)
+             VALUES (?, ?, 'Allgemein', 'Allgemeine Aufgaben', 1.0, 0, 1, ?, ?)`,
+            [catId, team.id, now, now]);
+        
+        // Add default check category for each team
+        run(`INSERT OR IGNORE INTO qs_check_categories (id, team_id, name, description, sort_order, is_active, created_at, updated_at)
+             VALUES (?, ?, 'Standard', 'Standard Quality Checks', 0, 1, ?, ?)`,
+            [uuidv4(), team.id, now, now]);
+    });
+    
+    // Default QS settings
+    const qsDefaultSettings = {
+        'qs.passingScore': '80',
+        'qs.defaultScoringType': 'points',
+        'qs.supervisorNotesRoles': JSON.stringify(['admin', 'supervisor', 'qs_supervisor']),
+        'qs.evaluationQuotaEnabled': 'true'
+    };
+    
+    Object.entries(qsDefaultSettings).forEach(([k, v]) => {
+        run('INSERT OR IGNORE INTO settings (key, value, encrypted, updated_at) VALUES (?, ?, ?, ?)', [k, v, 0, now]);
+    });
     
     saveDb();
     console.log('Database seeding complete');
@@ -1409,6 +1814,1190 @@ const QualitySystem = {
             averageScore: reports.length ? Math.round(reports.reduce((sum, r) => sum + r.overall_score, 0) / reports.length) : 0,
             passingRate: reports.length ? Math.round(reports.filter(r => r.passed).length / reports.length * 100) : 0,
             categoryCount: get('SELECT COUNT(*) as c FROM quality_categories WHERE is_active = 1').c
+        };
+    }
+};
+
+// ============================================
+// QUALITY SYSTEM v2 (QS) - Comprehensive Quality Management
+// ============================================
+
+const QS = {
+    // ============================================
+    // ID GENERATION HELPERS
+    // ============================================
+    generateTaskNumber() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let id = '';
+        for (let i = 0; i < 4; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `QT-${id}`;
+    },
+    
+    generateCheckNumber() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let id = '';
+        for (let i = 0; i < 4; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `QC-${id}`;
+    },
+    
+    generateEvaluationNumber() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let id = '';
+        for (let i = 0; i < 6; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `QE-${id}`;
+    },
+
+    // ============================================
+    // TEAM MANAGEMENT
+    // ============================================
+    getAllTeams() {
+        const teams = all('SELECT * FROM qs_teams WHERE is_active = 1 ORDER BY sort_order, name');
+        return teams.map(t => ({
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            teamCode: t.team_code,
+            defaultInteractionChannel: t.default_interaction_channel,
+            isActive: !!t.is_active,
+            sortOrder: t.sort_order,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at,
+            roles: this.getTeamRoles(t.id)
+        }));
+    },
+    
+    getTeamById(id) {
+        const t = get('SELECT * FROM qs_teams WHERE id = ?', [id]);
+        if (!t) return null;
+        return {
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            teamCode: t.team_code,
+            defaultInteractionChannel: t.default_interaction_channel,
+            isActive: !!t.is_active,
+            sortOrder: t.sort_order,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at,
+            roles: this.getTeamRoles(t.id)
+        };
+    },
+    
+    getTeamByCode(code) {
+        const t = get('SELECT * FROM qs_teams WHERE team_code = ?', [code]);
+        if (!t) return null;
+        return this.getTeamById(t.id);
+    },
+    
+    getTeamRoles(teamId) {
+        return all(`
+            SELECT tr.*, r.name as role_name 
+            FROM qs_team_roles tr 
+            LEFT JOIN roles r ON tr.role_id = r.id 
+            WHERE tr.team_id = ?
+        `, [teamId]);
+    },
+    
+    updateTeamRoles(teamId, roleIds, roleType = 'agent') {
+        const now = new Date().toISOString();
+        // Remove existing roles of this type
+        run('DELETE FROM qs_team_roles WHERE team_id = ? AND role_type = ?', [teamId, roleType]);
+        // Add new roles
+        roleIds.forEach(roleId => {
+            run('INSERT INTO qs_team_roles (id, team_id, role_id, role_type, created_at) VALUES (?, ?, ?, ?, ?)',
+                [uuidv4(), teamId, roleId, roleType, now]);
+        });
+        saveDb();
+        return this.getTeamRoles(teamId);
+    },
+    
+    getTeamAgents(teamId) {
+        const roles = this.getTeamRoles(teamId).filter(r => r.role_type === 'agent');
+        if (roles.length === 0) return [];
+        
+        const roleIds = roles.map(r => r.role_id);
+        const placeholders = roleIds.map(() => '?').join(',');
+        
+        return all(`
+            SELECT u.*, r.name as role_name 
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id
+            WHERE u.role_id IN (${placeholders}) AND u.is_active = 1
+            ORDER BY u.first_name, u.last_name
+        `, roleIds);
+    },
+
+    // ============================================
+    // TASK CATEGORIES
+    // ============================================
+    getTaskCategories(teamId) {
+        const cats = all('SELECT * FROM qs_task_categories WHERE team_id = ? AND is_active = 1 ORDER BY sort_order, name', [teamId]);
+        return cats.map(c => ({
+            id: c.id,
+            teamId: c.team_id,
+            name: c.name,
+            description: c.description,
+            defaultWeight: c.default_weight,
+            sortOrder: c.sort_order,
+            isActive: !!c.is_active,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at
+        }));
+    },
+    
+    getTaskCategoryById(id) {
+        const c = get('SELECT * FROM qs_task_categories WHERE id = ?', [id]);
+        if (!c) return null;
+        return {
+            id: c.id,
+            teamId: c.team_id,
+            name: c.name,
+            description: c.description,
+            defaultWeight: c.default_weight,
+            sortOrder: c.sort_order,
+            isActive: !!c.is_active,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at
+        };
+    },
+    
+    createTaskCategory(teamId, data) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const maxSort = get('SELECT MAX(sort_order) as m FROM qs_task_categories WHERE team_id = ?', [teamId])?.m || 0;
+        
+        run(`INSERT INTO qs_task_categories (id, team_id, name, description, default_weight, sort_order, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+            [id, teamId, data.name, data.description || '', data.defaultWeight || 1.0, maxSort + 1, now, now]);
+        
+        saveDb();
+        return this.getTaskCategoryById(id);
+    },
+    
+    updateTaskCategory(id, data) {
+        const now = new Date().toISOString();
+        const existing = this.getTaskCategoryById(id);
+        if (!existing) return null;
+        
+        run(`UPDATE qs_task_categories SET 
+             name = ?, description = ?, default_weight = ?, sort_order = ?, updated_at = ?
+             WHERE id = ?`,
+            [data.name ?? existing.name, data.description ?? existing.description, 
+             data.defaultWeight ?? existing.defaultWeight, data.sortOrder ?? existing.sortOrder, now, id]);
+        
+        saveDb();
+        return this.getTaskCategoryById(id);
+    },
+    
+    deleteTaskCategory(id) {
+        const tasksUsing = get('SELECT COUNT(*) as c FROM qs_tasks WHERE category_id = ? AND is_archived = 0', [id])?.c || 0;
+        if (tasksUsing > 0) {
+            return { success: false, error: `Category is used by ${tasksUsing} active task(s)` };
+        }
+        run('DELETE FROM qs_task_categories WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
+    // QUALITY TASKS
+    // ============================================
+    getTasks(teamId, options = {}) {
+        let sql = `SELECT t.*, c.name as category_name, c.default_weight as category_weight,
+                   (SELECT first_name || ' ' || last_name FROM users WHERE id = t.created_by) as created_by_name
+                   FROM qs_tasks t 
+                   LEFT JOIN qs_task_categories c ON t.category_id = c.id
+                   WHERE t.team_id = ?`;
+        const params = [teamId];
+        
+        if (!options.includeArchived) {
+            sql += ' AND t.is_archived = 0';
+        }
+        if (options.categoryId) {
+            sql += ' AND t.category_id = ?';
+            params.push(options.categoryId);
+        }
+        if (!options.includeInactive) {
+            sql += ' AND t.is_active = 1';
+        }
+        
+        sql += ' ORDER BY t.sort_order, t.created_at DESC';
+        
+        const tasks = all(sql, params);
+        return tasks.map(t => this.formatTask(t));
+    },
+    
+    getTaskById(id) {
+        const t = get(`
+            SELECT t.*, c.name as category_name, c.default_weight as category_weight,
+            (SELECT first_name || ' ' || last_name FROM users WHERE id = t.created_by) as created_by_name
+            FROM qs_tasks t 
+            LEFT JOIN qs_task_categories c ON t.category_id = c.id
+            WHERE t.id = ?
+        `, [id]);
+        if (!t) return null;
+        return this.formatTask(t);
+    },
+    
+    formatTask(t) {
+        return {
+            id: t.id,
+            taskNumber: t.task_number,
+            teamId: t.team_id,
+            categoryId: t.category_id,
+            categoryName: t.category_name,
+            categoryWeight: t.category_weight,
+            title: t.title,
+            taskText: t.task_text,
+            scoringType: t.scoring_type,
+            maxPoints: t.max_points,
+            scaleSize: t.scale_size,
+            scaleInverted: !!t.scale_inverted,
+            weightOverride: t.weight_override,
+            effectiveWeight: t.weight_override ?? t.category_weight ?? 1.0,
+            sortOrder: t.sort_order,
+            isActive: !!t.is_active,
+            isArchived: !!t.is_archived,
+            archivedAt: t.archived_at,
+            createdBy: t.created_by,
+            createdByName: t.created_by_name,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at,
+            references: this.getTaskReferences(t.id)
+        };
+    },
+    
+    createTask(teamId, data, userId) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        let taskNumber = this.generateTaskNumber();
+        
+        // Ensure unique task number
+        while (get('SELECT id FROM qs_tasks WHERE task_number = ?', [taskNumber])) {
+            taskNumber = this.generateTaskNumber();
+        }
+        
+        const maxSort = get('SELECT MAX(sort_order) as m FROM qs_tasks WHERE team_id = ?', [teamId])?.m || 0;
+        
+        run(`INSERT INTO qs_tasks (id, task_number, team_id, category_id, title, task_text, scoring_type, 
+             max_points, scale_size, scale_inverted, weight_override, sort_order, is_active, created_by, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+            [id, taskNumber, teamId, data.categoryId || null, data.title || '', data.taskText,
+             data.scoringType || 'points', data.maxPoints || 10, data.scaleSize || 5,
+             data.scaleInverted ? 1 : 0, data.weightOverride || null, maxSort + 1, userId, now, now]);
+        
+        // Add references if provided
+        if (data.references?.length) {
+            data.references.forEach((ref, idx) => {
+                this.addTaskReference(id, ref, idx);
+            });
+        }
+        
+        saveDb();
+        return this.getTaskById(id);
+    },
+    
+    updateTask(id, data) {
+        const now = new Date().toISOString();
+        const existing = this.getTaskById(id);
+        if (!existing) return null;
+        
+        run(`UPDATE qs_tasks SET 
+             category_id = ?, title = ?, task_text = ?, scoring_type = ?, max_points = ?,
+             scale_size = ?, scale_inverted = ?, weight_override = ?, sort_order = ?, updated_at = ?
+             WHERE id = ?`,
+            [data.categoryId ?? existing.categoryId, data.title ?? existing.title, 
+             data.taskText ?? existing.taskText, data.scoringType ?? existing.scoringType,
+             data.maxPoints ?? existing.maxPoints, data.scaleSize ?? existing.scaleSize,
+             data.scaleInverted !== undefined ? (data.scaleInverted ? 1 : 0) : (existing.scaleInverted ? 1 : 0),
+             data.weightOverride ?? existing.weightOverride, data.sortOrder ?? existing.sortOrder, now, id]);
+        
+        // Update references if provided
+        if (data.references !== undefined) {
+            run('DELETE FROM qs_task_references WHERE task_id = ?', [id]);
+            if (data.references?.length) {
+                data.references.forEach((ref, idx) => {
+                    this.addTaskReference(id, ref, idx);
+                });
+            }
+        }
+        
+        saveDb();
+        return this.getTaskById(id);
+    },
+    
+    archiveTask(id) {
+        const now = new Date().toISOString();
+        run('UPDATE qs_tasks SET is_archived = 1, archived_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+        saveDb();
+        return this.getTaskById(id);
+    },
+    
+    restoreTask(id) {
+        const now = new Date().toISOString();
+        run('UPDATE qs_tasks SET is_archived = 0, archived_at = NULL, updated_at = ? WHERE id = ?', [now, id]);
+        saveDb();
+        return this.getTaskById(id);
+    },
+    
+    deleteTask(id) {
+        // Check if used in any checks
+        const usedInChecks = get('SELECT COUNT(*) as c FROM qs_check_tasks WHERE task_id = ?', [id])?.c || 0;
+        if (usedInChecks > 0) {
+            // Archive instead
+            return { success: false, archived: true, error: 'Task is used in checks, archived instead', task: this.archiveTask(id) };
+        }
+        
+        run('DELETE FROM qs_task_references WHERE task_id = ?', [id]);
+        run('DELETE FROM qs_tasks WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
+    // TASK REFERENCES
+    // ============================================
+    getTaskReferences(taskId) {
+        return all('SELECT * FROM qs_task_references WHERE task_id = ? ORDER BY sort_order', [taskId]).map(r => ({
+            id: r.id,
+            taskId: r.task_id,
+            referenceType: r.reference_type,
+            referenceText: r.reference_text,
+            filePath: r.file_path,
+            fileName: r.file_name,
+            url: r.url,
+            sortOrder: r.sort_order,
+            createdAt: r.created_at
+        }));
+    },
+    
+    addTaskReference(taskId, data, sortOrder = 0) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        
+        run(`INSERT INTO qs_task_references (id, task_id, reference_type, reference_text, file_path, file_name, url, sort_order, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, taskId, data.referenceType, data.referenceText || '', data.filePath || '', 
+             data.fileName || '', data.url || '', sortOrder, now]);
+        
+        return id;
+    },
+
+    // ============================================
+    // CHECK CATEGORIES
+    // ============================================
+    getCheckCategories(teamId) {
+        const cats = all('SELECT * FROM qs_check_categories WHERE team_id = ? AND is_active = 1 ORDER BY sort_order, name', [teamId]);
+        return cats.map(c => ({
+            id: c.id,
+            teamId: c.team_id,
+            name: c.name,
+            description: c.description,
+            sortOrder: c.sort_order,
+            isActive: !!c.is_active,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at
+        }));
+    },
+    
+    createCheckCategory(teamId, data) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const maxSort = get('SELECT MAX(sort_order) as m FROM qs_check_categories WHERE team_id = ?', [teamId])?.m || 0;
+        
+        run(`INSERT INTO qs_check_categories (id, team_id, name, description, sort_order, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+            [id, teamId, data.name, data.description || '', maxSort + 1, now, now]);
+        
+        saveDb();
+        return this.getCheckCategoryById(id);
+    },
+    
+    getCheckCategoryById(id) {
+        const c = get('SELECT * FROM qs_check_categories WHERE id = ?', [id]);
+        if (!c) return null;
+        return {
+            id: c.id,
+            teamId: c.team_id,
+            name: c.name,
+            description: c.description,
+            sortOrder: c.sort_order,
+            isActive: !!c.is_active,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at
+        };
+    },
+    
+    updateCheckCategory(id, data) {
+        const now = new Date().toISOString();
+        run('UPDATE qs_check_categories SET name = ?, description = ?, sort_order = ?, updated_at = ? WHERE id = ?',
+            [data.name, data.description || '', data.sortOrder || 0, now, id]);
+        saveDb();
+        return this.getCheckCategoryById(id);
+    },
+    
+    deleteCheckCategory(id) {
+        const checksUsing = get('SELECT COUNT(*) as c FROM qs_checks WHERE category_id = ? AND is_archived = 0', [id])?.c || 0;
+        if (checksUsing > 0) {
+            return { success: false, error: `Category is used by ${checksUsing} active check(s)` };
+        }
+        run('DELETE FROM qs_check_categories WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
+    // QUALITY CHECKS
+    // ============================================
+    getChecks(teamId, options = {}) {
+        let sql = `SELECT ch.*, cat.name as category_name,
+                   (SELECT first_name || ' ' || last_name FROM users WHERE id = ch.created_by) as created_by_name,
+                   (SELECT COUNT(*) FROM qs_check_tasks WHERE check_id = ch.id) as task_count
+                   FROM qs_checks ch
+                   LEFT JOIN qs_check_categories cat ON ch.category_id = cat.id
+                   WHERE ch.team_id = ?`;
+        const params = [teamId];
+        
+        if (!options.includeArchived) {
+            sql += ' AND ch.is_archived = 0';
+        }
+        if (options.categoryId) {
+            sql += ' AND ch.category_id = ?';
+            params.push(options.categoryId);
+        }
+        if (!options.includeInactive) {
+            sql += ' AND ch.is_active = 1';
+        }
+        
+        sql += ' ORDER BY ch.created_at DESC';
+        
+        const checks = all(sql, params);
+        return checks.map(ch => this.formatCheck(ch, options.includeTasks));
+    },
+    
+    getCheckById(id, includeTasks = true) {
+        const ch = get(`
+            SELECT ch.*, cat.name as category_name,
+            (SELECT first_name || ' ' || last_name FROM users WHERE id = ch.created_by) as created_by_name,
+            (SELECT COUNT(*) FROM qs_check_tasks WHERE check_id = ch.id) as task_count
+            FROM qs_checks ch
+            LEFT JOIN qs_check_categories cat ON ch.category_id = cat.id
+            WHERE ch.id = ?
+        `, [id]);
+        if (!ch) return null;
+        return this.formatCheck(ch, includeTasks);
+    },
+    
+    formatCheck(ch, includeTasks = false) {
+        const check = {
+            id: ch.id,
+            checkNumber: ch.check_number,
+            teamId: ch.team_id,
+            categoryId: ch.category_id,
+            categoryName: ch.category_name,
+            name: ch.name,
+            description: ch.description,
+            passingScore: ch.passing_score,
+            isActive: !!ch.is_active,
+            isArchived: !!ch.is_archived,
+            archivedAt: ch.archived_at,
+            createdBy: ch.created_by,
+            createdByName: ch.created_by_name,
+            createdAt: ch.created_at,
+            updatedAt: ch.updated_at,
+            taskCount: ch.task_count || 0
+        };
+        
+        if (includeTasks) {
+            check.sections = this.getCheckSections(ch.id);
+            check.tasks = this.getCheckTasks(ch.id);
+            check.maxScore = this.calculateCheckMaxScore(check.tasks);
+        }
+        
+        return check;
+    },
+    
+    calculateCheckMaxScore(tasks) {
+        return tasks.reduce((sum, t) => {
+            const task = t.task || t;
+            const weight = t.weightOverride ?? task.effectiveWeight ?? 1.0;
+            let maxPts = 0;
+            
+            switch (task.scoringType) {
+                case 'points':
+                    maxPts = task.maxPoints || 10;
+                    break;
+                case 'scale':
+                    maxPts = task.scaleSize || 5;
+                    break;
+                case 'checkbox':
+                    maxPts = 1;
+                    break;
+                default:
+                    maxPts = task.maxPoints || 10;
+            }
+            
+            return sum + (maxPts * weight);
+        }, 0);
+    },
+    
+    createCheck(teamId, data, userId) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        let checkNumber = this.generateCheckNumber();
+        
+        while (get('SELECT id FROM qs_checks WHERE check_number = ?', [checkNumber])) {
+            checkNumber = this.generateCheckNumber();
+        }
+        
+        run(`INSERT INTO qs_checks (id, check_number, team_id, category_id, name, description, passing_score, 
+             is_active, created_by, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+            [id, checkNumber, teamId, data.categoryId || null, data.name, data.description || '',
+             data.passingScore || 80, userId, now, now]);
+        
+        // Add sections if provided
+        if (data.sections?.length) {
+            data.sections.forEach((section, idx) => {
+                this.addCheckSection(id, section, idx);
+            });
+        }
+        
+        // Add tasks if provided
+        if (data.tasks?.length) {
+            data.tasks.forEach((task, idx) => {
+                this.addCheckTask(id, task, idx);
+            });
+        }
+        
+        saveDb();
+        return this.getCheckById(id);
+    },
+    
+    updateCheck(id, data) {
+        const now = new Date().toISOString();
+        const existing = this.getCheckById(id);
+        if (!existing) return null;
+        
+        run(`UPDATE qs_checks SET 
+             category_id = ?, name = ?, description = ?, passing_score = ?, updated_at = ?
+             WHERE id = ?`,
+            [data.categoryId ?? existing.categoryId, data.name ?? existing.name,
+             data.description ?? existing.description, data.passingScore ?? existing.passingScore, now, id]);
+        
+        // Update sections if provided
+        if (data.sections !== undefined) {
+            run('DELETE FROM qs_check_sections WHERE check_id = ?', [id]);
+            if (data.sections?.length) {
+                data.sections.forEach((section, idx) => {
+                    this.addCheckSection(id, section, idx);
+                });
+            }
+        }
+        
+        // Update tasks if provided
+        if (data.tasks !== undefined) {
+            run('DELETE FROM qs_check_tasks WHERE check_id = ?', [id]);
+            if (data.tasks?.length) {
+                data.tasks.forEach((task, idx) => {
+                    this.addCheckTask(id, task, idx);
+                });
+            }
+        }
+        
+        saveDb();
+        return this.getCheckById(id);
+    },
+    
+    archiveCheck(id) {
+        const now = new Date().toISOString();
+        run('UPDATE qs_checks SET is_archived = 1, archived_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+        saveDb();
+        return this.getCheckById(id);
+    },
+    
+    restoreCheck(id) {
+        const now = new Date().toISOString();
+        run('UPDATE qs_checks SET is_archived = 0, archived_at = NULL, updated_at = ? WHERE id = ?', [now, id]);
+        saveDb();
+        return this.getCheckById(id);
+    },
+    
+    deleteCheck(id) {
+        const evaluationsUsing = get('SELECT COUNT(*) as c FROM qs_evaluations WHERE check_id = ?', [id])?.c || 0;
+        if (evaluationsUsing > 0) {
+            return { success: false, archived: true, error: 'Check has evaluations, archived instead', check: this.archiveCheck(id) };
+        }
+        
+        run('DELETE FROM qs_check_tasks WHERE check_id = ?', [id]);
+        run('DELETE FROM qs_check_sections WHERE check_id = ?', [id]);
+        run('DELETE FROM qs_checks WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
+    // CHECK SECTIONS
+    // ============================================
+    getCheckSections(checkId) {
+        return all('SELECT * FROM qs_check_sections WHERE check_id = ? ORDER BY sort_order', [checkId]).map(s => ({
+            id: s.id,
+            checkId: s.check_id,
+            name: s.name,
+            description: s.description,
+            weight: s.weight,
+            sortOrder: s.sort_order,
+            createdAt: s.created_at
+        }));
+    },
+    
+    addCheckSection(checkId, data, sortOrder = 0) {
+        const now = new Date().toISOString();
+        const id = data.id || uuidv4();
+        
+        run(`INSERT INTO qs_check_sections (id, check_id, name, description, weight, sort_order, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, checkId, data.name, data.description || '', data.weight || 1.0, sortOrder, now]);
+        
+        return id;
+    },
+
+    // ============================================
+    // CHECK TASKS (junction)
+    // ============================================
+    getCheckTasks(checkId) {
+        const tasks = all(`
+            SELECT ct.*, t.task_number, t.title, t.task_text, t.scoring_type, t.max_points, 
+                   t.scale_size, t.scale_inverted, t.weight_override as task_weight_override,
+                   tc.name as task_category_name, tc.default_weight as task_category_weight,
+                   s.name as section_name
+            FROM qs_check_tasks ct
+            LEFT JOIN qs_tasks t ON ct.task_id = t.id
+            LEFT JOIN qs_task_categories tc ON t.category_id = tc.id
+            LEFT JOIN qs_check_sections s ON ct.section_id = s.id
+            WHERE ct.check_id = ?
+            ORDER BY ct.sort_order
+        `, [checkId]);
+        
+        return tasks.map(ct => ({
+            id: ct.id,
+            checkId: ct.check_id,
+            taskId: ct.task_id,
+            sectionId: ct.section_id,
+            sectionName: ct.section_name,
+            weightOverride: ct.weight_override,
+            sortOrder: ct.sort_order,
+            task: {
+                taskNumber: ct.task_number,
+                title: ct.title,
+                taskText: ct.task_text,
+                scoringType: ct.scoring_type,
+                maxPoints: ct.max_points,
+                scaleSize: ct.scale_size,
+                scaleInverted: !!ct.scale_inverted,
+                effectiveWeight: ct.weight_override ?? ct.task_weight_override ?? ct.task_category_weight ?? 1.0,
+                categoryName: ct.task_category_name,
+                references: this.getTaskReferences(ct.task_id)
+            }
+        }));
+    },
+    
+    addCheckTask(checkId, data, sortOrder = 0) {
+        const id = uuidv4();
+        
+        run(`INSERT INTO qs_check_tasks (id, check_id, task_id, section_id, weight_override, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [id, checkId, data.taskId, data.sectionId || null, data.weightOverride || null, sortOrder]);
+        
+        return id;
+    },
+
+    // ============================================
+    // EVALUATIONS
+    // ============================================
+    getEvaluations(teamId, options = {}) {
+        let sql = `SELECT e.*, ch.check_number, ch.name as check_name,
+                   (SELECT first_name || ' ' || last_name FROM users WHERE id = e.agent_id) as agent_name,
+                   (SELECT first_name || ' ' || last_name FROM users WHERE id = e.evaluator_id) as evaluator_name
+                   FROM qs_evaluations e
+                   LEFT JOIN qs_checks ch ON e.check_id = ch.id
+                   WHERE e.team_id = ?`;
+        const params = [teamId];
+        
+        if (options.agentId) {
+            sql += ' AND e.agent_id = ?';
+            params.push(options.agentId);
+        }
+        if (options.evaluatorId) {
+            sql += ' AND e.evaluator_id = ?';
+            params.push(options.evaluatorId);
+        }
+        if (options.status) {
+            sql += ' AND e.status = ?';
+            params.push(options.status);
+        }
+        if (options.startDate) {
+            sql += ' AND e.created_at >= ?';
+            params.push(options.startDate);
+        }
+        if (options.endDate) {
+            sql += ' AND e.created_at <= ?';
+            params.push(options.endDate);
+        }
+        
+        sql += ' ORDER BY e.created_at DESC';
+        
+        if (options.limit) {
+            sql += ' LIMIT ?';
+            params.push(options.limit);
+        }
+        
+        return all(sql, params).map(e => this.formatEvaluation(e));
+    },
+    
+    getEvaluationById(id, includeAnswers = true) {
+        const e = get(`
+            SELECT e.*, ch.check_number, ch.name as check_name, ch.passing_score,
+            (SELECT first_name || ' ' || last_name FROM users WHERE id = e.agent_id) as agent_name,
+            (SELECT first_name || ' ' || last_name FROM users WHERE id = e.evaluator_id) as evaluator_name
+            FROM qs_evaluations e
+            LEFT JOIN qs_checks ch ON e.check_id = ch.id
+            WHERE e.id = ?
+        `, [id]);
+        if (!e) return null;
+        return this.formatEvaluation(e, includeAnswers);
+    },
+    
+    formatEvaluation(e, includeAnswers = false) {
+        const evaluation = {
+            id: e.id,
+            evaluationNumber: e.evaluation_number,
+            teamId: e.team_id,
+            checkId: e.check_id,
+            checkNumber: e.check_number,
+            checkName: e.check_name,
+            agentId: e.agent_id,
+            agentName: e.agent_name,
+            evaluatorId: e.evaluator_id,
+            evaluatorName: e.evaluator_name,
+            interactionChannel: e.interaction_channel,
+            interactionReference: e.interaction_reference,
+            startedAt: e.started_at,
+            completedAt: e.completed_at,
+            totalScore: e.total_score,
+            maxScore: e.max_score,
+            percentage: e.percentage,
+            passed: !!e.passed,
+            passingScore: e.passing_score,
+            supervisorNotes: e.supervisor_notes,
+            status: e.status,
+            createdAt: e.created_at,
+            updatedAt: e.updated_at
+        };
+        
+        if (includeAnswers) {
+            evaluation.answers = this.getEvaluationAnswers(e.id);
+            evaluation.evidence = this.getEvaluationEvidence(e.id);
+        }
+        
+        return evaluation;
+    },
+    
+    createEvaluation(teamId, data, evaluatorId) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        let evalNumber = this.generateEvaluationNumber();
+        
+        while (get('SELECT id FROM qs_evaluations WHERE evaluation_number = ?', [evalNumber])) {
+            evalNumber = this.generateEvaluationNumber();
+        }
+        
+        run(`INSERT INTO qs_evaluations (id, evaluation_number, team_id, check_id, agent_id, evaluator_id,
+             interaction_channel, interaction_reference, started_at, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?)`,
+            [id, evalNumber, teamId, data.checkId, data.agentId, evaluatorId,
+             data.interactionChannel || 'ticket', data.interactionReference || '', now, now, now]);
+        
+        saveDb();
+        return this.getEvaluationById(id);
+    },
+    
+    submitEvaluation(id, data) {
+        const now = new Date().toISOString();
+        const evaluation = this.getEvaluationById(id, false);
+        if (!evaluation) return null;
+        
+        // Calculate scores
+        let totalScore = 0;
+        let maxScore = 0;
+        
+        // Save answers
+        if (data.answers?.length) {
+            data.answers.forEach(answer => {
+                const answerId = uuidv4();
+                const task = this.getTaskById(answer.taskId);
+                if (!task) return;
+                
+                let answerScore = 0;
+                let answerMaxScore = 0;
+                const weight = answer.weightOverride ?? task.effectiveWeight ?? 1.0;
+                
+                switch (task.scoringType) {
+                    case 'points':
+                        answerMaxScore = (task.maxPoints || 10) * weight;
+                        answerScore = (parseFloat(answer.rawValue) || 0) * weight;
+                        break;
+                    case 'scale':
+                        answerMaxScore = (task.scaleSize || 5) * weight;
+                        let scaleValue = parseInt(answer.rawValue) || 0;
+                        if (task.scaleInverted) {
+                            // Invert: if 10 is worst, 1 is best, then selecting 3 on 1-10 = 10-3+1 = 8
+                            scaleValue = (task.scaleSize || 5) - scaleValue + 1;
+                        }
+                        answerScore = scaleValue * weight;
+                        break;
+                    case 'checkbox':
+                        answerMaxScore = 1 * weight;
+                        answerScore = (answer.rawValue === 'true' || answer.rawValue === '1' || answer.rawValue === true) ? weight : 0;
+                        break;
+                }
+                
+                totalScore += answerScore;
+                maxScore += answerMaxScore;
+                
+                run(`INSERT INTO qs_evaluation_answers (id, evaluation_id, task_id, check_task_id, section_id, 
+                     score, max_score, raw_value, notes, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [answerId, id, answer.taskId, answer.checkTaskId, answer.sectionId || null,
+                     answerScore, answerMaxScore, String(answer.rawValue), answer.notes || '', now]);
+            });
+        }
+        
+        const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+        const check = this.getCheckById(evaluation.checkId, false);
+        const passed = percentage >= (check?.passingScore || 80);
+        
+        run(`UPDATE qs_evaluations SET 
+             total_score = ?, max_score = ?, percentage = ?, passed = ?, 
+             supervisor_notes = ?, status = 'completed', completed_at = ?, updated_at = ?
+             WHERE id = ?`,
+            [totalScore, maxScore, percentage, passed ? 1 : 0, data.supervisorNotes || '', now, now, id]);
+        
+        saveDb();
+        return this.getEvaluationById(id);
+    },
+    
+    updateEvaluationNotes(id, notes) {
+        const now = new Date().toISOString();
+        run('UPDATE qs_evaluations SET supervisor_notes = ?, updated_at = ? WHERE id = ?', [notes, now, id]);
+        saveDb();
+        return this.getEvaluationById(id);
+    },
+    
+    deleteEvaluation(id) {
+        run('DELETE FROM qs_evaluation_evidence WHERE evaluation_id = ?', [id]);
+        run('DELETE FROM qs_evaluation_answers WHERE evaluation_id = ?', [id]);
+        run('DELETE FROM qs_evaluations WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
+    // EVALUATION ANSWERS
+    // ============================================
+    getEvaluationAnswers(evaluationId) {
+        return all(`
+            SELECT ea.*, t.task_number, t.title, t.task_text, t.scoring_type, t.max_points, t.scale_size, t.scale_inverted,
+                   s.name as section_name
+            FROM qs_evaluation_answers ea
+            LEFT JOIN qs_tasks t ON ea.task_id = t.id
+            LEFT JOIN qs_check_sections s ON ea.section_id = s.id
+            WHERE ea.evaluation_id = ?
+            ORDER BY ea.created_at
+        `, [evaluationId]).map(a => ({
+            id: a.id,
+            evaluationId: a.evaluation_id,
+            taskId: a.task_id,
+            checkTaskId: a.check_task_id,
+            sectionId: a.section_id,
+            sectionName: a.section_name,
+            score: a.score,
+            maxScore: a.max_score,
+            rawValue: a.raw_value,
+            notes: a.notes,
+            task: {
+                taskNumber: a.task_number,
+                title: a.title,
+                taskText: a.task_text,
+                scoringType: a.scoring_type,
+                maxPoints: a.max_points,
+                scaleSize: a.scale_size,
+                scaleInverted: !!a.scale_inverted
+            },
+            createdAt: a.created_at
+        }));
+    },
+
+    // ============================================
+    // EVALUATION EVIDENCE
+    // ============================================
+    getEvaluationEvidence(evaluationId) {
+        return all('SELECT * FROM qs_evaluation_evidence WHERE evaluation_id = ? ORDER BY sort_order', [evaluationId]).map(e => ({
+            id: e.id,
+            evaluationId: e.evaluation_id,
+            answerId: e.answer_id,
+            evidenceType: e.evidence_type,
+            evidenceText: e.evidence_text,
+            filePath: e.file_path,
+            fileName: e.file_name,
+            url: e.url,
+            sortOrder: e.sort_order,
+            createdAt: e.created_at
+        }));
+    },
+    
+    addEvaluationEvidence(evaluationId, data, answerId = null) {
+        const now = new Date().toISOString();
+        const id = uuidv4();
+        const maxSort = get('SELECT MAX(sort_order) as m FROM qs_evaluation_evidence WHERE evaluation_id = ?', [evaluationId])?.m || 0;
+        
+        run(`INSERT INTO qs_evaluation_evidence (id, evaluation_id, answer_id, evidence_type, evidence_text, file_path, file_name, url, sort_order, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, evaluationId, answerId, data.evidenceType, data.evidenceText || '', 
+             data.filePath || '', data.fileName || '', data.url || '', maxSort + 1, now]);
+        
+        saveDb();
+        return id;
+    },
+    
+    deleteEvaluationEvidence(id) {
+        run('DELETE FROM qs_evaluation_evidence WHERE id = ?', [id]);
+        saveDb();
+        return { success: true };
+    },
+
+    // ============================================
+    // QUOTAS
+    // ============================================
+    getQuotas(teamId) {
+        return all('SELECT * FROM qs_quotas WHERE team_id = ? AND is_active = 1', [teamId]).map(q => ({
+            id: q.id,
+            teamId: q.team_id,
+            quotaType: q.quota_type,
+            targetCount: q.target_count,
+            periodType: q.period_type,
+            periodValue: q.period_value,
+            isActive: !!q.is_active,
+            createdAt: q.created_at,
+            updatedAt: q.updated_at
+        }));
+    },
+    
+    setQuota(teamId, data) {
+        const now = new Date().toISOString();
+        const existing = get('SELECT id FROM qs_quotas WHERE team_id = ? AND quota_type = ?', [teamId, data.quotaType]);
+        
+        if (existing) {
+            run(`UPDATE qs_quotas SET target_count = ?, period_type = ?, period_value = ?, is_active = ?, updated_at = ?
+                 WHERE id = ?`,
+                [data.targetCount, data.periodType || 'week', data.periodValue || 1, data.isActive !== false ? 1 : 0, now, existing.id]);
+        } else {
+            run(`INSERT INTO qs_quotas (id, team_id, quota_type, target_count, period_type, period_value, is_active, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+                [uuidv4(), teamId, data.quotaType, data.targetCount, data.periodType || 'week', data.periodValue || 1, now, now]);
+        }
+        
+        saveDb();
+        return this.getQuotas(teamId);
+    },
+
+    // ============================================
+    // TEAM SETTINGS
+    // ============================================
+    getTeamSetting(teamId, key, defaultValue = null) {
+        const setting = get('SELECT setting_value FROM qs_team_settings WHERE team_id = ? AND setting_key = ?', [teamId, key]);
+        return setting ? setting.setting_value : defaultValue;
+    },
+    
+    setTeamSetting(teamId, key, value) {
+        const now = new Date().toISOString();
+        run(`INSERT OR REPLACE INTO qs_team_settings (id, team_id, setting_key, setting_value, updated_at)
+             VALUES ((SELECT id FROM qs_team_settings WHERE team_id = ? AND setting_key = ?), ?, ?, ?, ?)`,
+            [teamId, key, teamId, key, String(value), now]);
+        saveDb();
+    },
+
+    // ============================================
+    // STATISTICS
+    // ============================================
+    getTeamStatistics(teamId, options = {}) {
+        const evaluations = this.getEvaluations(teamId, { ...options, status: 'completed' });
+        const agents = this.getTeamAgents(teamId);
+        
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        
+        const evalThisWeek = evaluations.filter(e => new Date(e.createdAt) >= weekStart).length;
+        const evalThisMonth = evaluations.filter(e => new Date(e.createdAt) >= monthStart).length;
+        
+        return {
+            totalEvaluations: evaluations.length,
+            evaluationsThisWeek: evalThisWeek,
+            evaluationsThisMonth: evalThisMonth,
+            totalAgents: agents.length,
+            averageScore: evaluations.length ? 
+                Math.round(evaluations.reduce((sum, e) => sum + e.percentage, 0) / evaluations.length) : 0,
+            passingRate: evaluations.length ? 
+                Math.round(evaluations.filter(e => e.passed).length / evaluations.length * 100) : 0,
+            taskCount: get('SELECT COUNT(*) as c FROM qs_tasks WHERE team_id = ? AND is_archived = 0', [teamId])?.c || 0,
+            checkCount: get('SELECT COUNT(*) as c FROM qs_checks WHERE team_id = ? AND is_archived = 0', [teamId])?.c || 0
+        };
+    },
+    
+    getAgentStatistics(agentId, teamId = null) {
+        let sql = `SELECT e.*, ch.name as check_name FROM qs_evaluations e
+                   LEFT JOIN qs_checks ch ON e.check_id = ch.id
+                   WHERE e.agent_id = ? AND e.status = 'completed'`;
+        const params = [agentId];
+        
+        if (teamId) {
+            sql += ' AND e.team_id = ?';
+            params.push(teamId);
+        }
+        
+        sql += ' ORDER BY e.created_at DESC';
+        
+        const evaluations = all(sql, params).map(e => this.formatEvaluation(e));
+        
+        return {
+            totalEvaluations: evaluations.length,
+            averageScore: evaluations.length ? 
+                Math.round(evaluations.reduce((sum, e) => sum + e.percentage, 0) / evaluations.length) : 0,
+            passingRate: evaluations.length ? 
+                Math.round(evaluations.filter(e => e.passed).length / evaluations.length * 100) : 0,
+            recentEvaluations: evaluations.slice(0, 10)
+        };
+    },
+
+    // ============================================
+    // RANDOM SELECTION
+    // ============================================
+    getRandomAgent(teamId, excludeRecentDays = 7) {
+        const recentCutoff = new Date();
+        recentCutoff.setDate(recentCutoff.getDate() - excludeRecentDays);
+        
+        const agents = this.getTeamAgents(teamId);
+        if (agents.length === 0) return null;
+        
+        // Get agents not recently evaluated
+        const recentlyEvaluated = all(`
+            SELECT DISTINCT agent_id FROM qs_evaluations 
+            WHERE team_id = ? AND created_at >= ?
+        `, [teamId, recentCutoff.toISOString()]).map(r => r.agent_id);
+        
+        const eligibleAgents = agents.filter(a => !recentlyEvaluated.includes(a.id));
+        
+        // If all agents were recently evaluated, use all agents
+        const pool = eligibleAgents.length > 0 ? eligibleAgents : agents;
+        
+        return pool[Math.floor(Math.random() * pool.length)];
+    },
+
+    // ============================================
+    // GLOBAL TRACKING (Cross-Team)
+    // ============================================
+    getAllEvaluations(options = {}) {
+        let sql = `SELECT e.*, ch.check_number, ch.name as check_name, t.name as team_name, t.team_code,
+                   (SELECT first_name || ' ' || last_name FROM users WHERE id = e.agent_id) as agent_name,
+                   (SELECT first_name || ' ' || last_name FROM users WHERE id = e.evaluator_id) as evaluator_name
+                   FROM qs_evaluations e
+                   LEFT JOIN qs_checks ch ON e.check_id = ch.id
+                   LEFT JOIN qs_teams t ON e.team_id = t.id
+                   WHERE 1=1`;
+        const params = [];
+        
+        if (options.teamIds?.length) {
+            const placeholders = options.teamIds.map(() => '?').join(',');
+            sql += ` AND e.team_id IN (${placeholders})`;
+            params.push(...options.teamIds);
+        }
+        if (options.agentId) {
+            sql += ' AND e.agent_id = ?';
+            params.push(options.agentId);
+        }
+        if (options.status) {
+            sql += ' AND e.status = ?';
+            params.push(options.status);
+        }
+        if (options.startDate) {
+            sql += ' AND e.created_at >= ?';
+            params.push(options.startDate);
+        }
+        if (options.endDate) {
+            sql += ' AND e.created_at <= ?';
+            params.push(options.endDate);
+        }
+        
+        sql += ' ORDER BY e.created_at DESC';
+        
+        if (options.limit) {
+            sql += ' LIMIT ?';
+            params.push(options.limit);
+        }
+        
+        return all(sql, params).map(e => ({
+            ...this.formatEvaluation(e),
+            teamName: e.team_name,
+            teamCode: e.team_code
+        }));
+    },
+    
+    getGlobalStatistics(teamIds = null) {
+        let teamFilter = '';
+        const params = [];
+        
+        if (teamIds?.length) {
+            const placeholders = teamIds.map(() => '?').join(',');
+            teamFilter = `WHERE team_id IN (${placeholders})`;
+            params.push(...teamIds);
+        }
+        
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        
+        const evaluations = all(`SELECT * FROM qs_evaluations ${teamFilter} AND status = 'completed'`, params);
+        const evalThisMonth = evaluations.filter(e => new Date(e.created_at) >= monthStart).length;
+        
+        const teams = teamIds ? 
+            all(`SELECT * FROM qs_teams WHERE id IN (${teamIds.map(() => '?').join(',')})`, teamIds) :
+            all('SELECT * FROM qs_teams WHERE is_active = 1');
+        
+        return {
+            totalEvaluations: evaluations.length,
+            evaluationsThisMonth: evalThisMonth,
+            averageScore: evaluations.length ? 
+                Math.round(evaluations.reduce((sum, e) => sum + e.percentage, 0) / evaluations.length) : 0,
+            passingRate: evaluations.length ? 
+                Math.round(evaluations.filter(e => e.passed).length / evaluations.length * 100) : 0,
+            teamCount: teams.length,
+            teamStats: teams.map(t => ({
+                teamId: t.id,
+                teamName: t.name,
+                teamCode: t.team_code,
+                ...this.getTeamStatistics(t.id)
+            }))
         };
     }
 };
@@ -3156,6 +4745,7 @@ module.exports = {
     RoleSystem,
     TicketSystem,
     QualitySystem,
+    QS, // Quality System v2
     KnowledgeCheckSystem,
     SettingsSystem,
     IntegrationSystem,
