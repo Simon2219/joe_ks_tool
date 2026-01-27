@@ -39,13 +39,6 @@ const QualitySystemViews = {
         return this.teams.find(t => t.teamCode === code || t.team_code === code);
     },
     
-    // Highlight the correct team in the sidebar navigation
-    highlightTeamNav(teamId, teamCode) {
-        document.querySelectorAll('.qs-team-nav-item').forEach(item => {
-            const isMatch = item.dataset.teamId === teamId || item.dataset.teamCode === teamCode;
-            item.classList.toggle('active', isMatch);
-        });
-    },
 
     // ============================================
     // MAIN TILES PAGE
@@ -265,9 +258,6 @@ const QualitySystemViews = {
         
         this.currentTeam = team;
         this.currentTeamId = team.id;
-        
-        // Ensure sidebar highlighting is correct for this team
-        this.highlightTeamNav(team.id, team.teamCode || team.team_code);
         
         const teamCode = team.teamCode || team.team_code;
         
@@ -497,9 +487,6 @@ const QualitySystemViews = {
         this.currentTeam = team;
         this.currentTeamId = team.id;
         const teamCodeVal = team.teamCode || team.team_code;
-        
-        // Ensure sidebar highlighting for this team
-        this.highlightTeamNav(team.id, teamCodeVal);
         
         // Load the template if not already loaded
         const container = document.getElementById('views-container');
@@ -819,9 +806,6 @@ const QualitySystemViews = {
         this.currentTeam = team;
         this.currentTeamId = team.id;
         const teamCodeVal = team.teamCode || team.team_code;
-        
-        // Ensure sidebar highlighting for this team
-        this.highlightTeamNav(team.id, teamCodeVal);
         
         // Load the template if not already loaded
         const container = document.getElementById('views-container');

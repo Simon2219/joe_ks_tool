@@ -110,16 +110,6 @@
     flex-shrink: 0;
 }
 
-/* Spacing in nav for qs teams container */
-#qs-nav-teams-container {
-    border-bottom: 1px solid var(--border);
-    margin-bottom: var(--space-xs);
-    padding-bottom: var(--space-xs);
-}
-
-#qs-nav-teams-container:empty {
-    display: none;
-}
 
 /* QS-specific icon colors that override the default gradient */
 .qs-tile .kc-tile-icon.qs-icon-billa {
