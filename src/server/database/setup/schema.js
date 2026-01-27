@@ -23,6 +23,7 @@ function createTables(db) {
             color TEXT DEFAULT '#3b82f6',
             is_active INTEGER DEFAULT 1,
             sort_order INTEGER DEFAULT 0,
+            qs_settings TEXT DEFAULT '{}',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )

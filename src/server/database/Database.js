@@ -2091,18 +2091,64 @@ const QS = {
     },
 
     // ============================================
-    // TEAM SETTINGS
+    // TEAM SETTINGS (stored as JSON in teams.qs_settings column)
     // ============================================
     getTeamSetting(teamId, key, defaultValue = null) {
-        const setting = get('SELECT setting_value FROM qs_team_settings WHERE team_id = ? AND setting_key = ?', [teamId, key]);
-        return setting ? setting.setting_value : defaultValue;
+        const team = get('SELECT qs_settings FROM teams WHERE id = ?', [teamId]);
+        if (!team || !team.qs_settings) {
+            return defaultValue;
+        }
+        try {
+            const settings = JSON.parse(team.qs_settings);
+            return settings[key] !== undefined ? settings[key] : defaultValue;
+        } catch (e) {
+            console.error('Error parsing team settings:', e);
+            return defaultValue;
+        }
     },
     
     setTeamSetting(teamId, key, value) {
+        const team = get('SELECT qs_settings FROM teams WHERE id = ?', [teamId]);
+        let settings = {};
+        
+        if (team && team.qs_settings) {
+            try {
+                settings = JSON.parse(team.qs_settings);
+            } catch (e) {
+                settings = {};
+            }
+        }
+        
+        settings[key] = String(value);
         const now = new Date().toISOString();
-        run(`INSERT OR REPLACE INTO qs_team_settings (id, team_id, setting_key, setting_value, updated_at)
-             VALUES ((SELECT id FROM qs_team_settings WHERE team_id = ? AND setting_key = ?), ?, ?, ?, ?)`,
-            [teamId, key, teamId, key, String(value), now]);
+        
+        run('UPDATE teams SET qs_settings = ?, updated_at = ? WHERE id = ?',
+            [JSON.stringify(settings), now, teamId]);
+        saveDb();
+    },
+    
+    // Get all QS settings for a team at once
+    getTeamSettings(teamId) {
+        const team = get('SELECT qs_settings FROM teams WHERE id = ?', [teamId]);
+        if (!team || !team.qs_settings) {
+            return {};
+        }
+        try {
+            return JSON.parse(team.qs_settings);
+        } catch (e) {
+            console.error('Error parsing team settings:', e);
+            return {};
+        }
+    },
+    
+    // Set multiple QS settings for a team at once
+    setTeamSettings(teamId, settings) {
+        const existingSettings = this.getTeamSettings(teamId);
+        const mergedSettings = { ...existingSettings, ...settings };
+        const now = new Date().toISOString();
+        
+        run('UPDATE teams SET qs_settings = ?, updated_at = ? WHERE id = ?',
+            [JSON.stringify(mergedSettings), now, teamId]);
         saveDb();
     },
 

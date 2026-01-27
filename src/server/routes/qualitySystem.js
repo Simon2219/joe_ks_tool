@@ -681,11 +681,15 @@ router.put('/teams/:teamId/quotas', requirePermission('qs_quotas_manage'), (req,
  */
 router.get('/teams/:teamId/settings', requirePermission('qs_view'), (req, res) => {
     try {
+        // Get all settings at once from the JSON column
+        const storedSettings = QS.getTeamSettings(req.params.teamId);
+        
+        // Merge with defaults
         const settings = {
-            passingScore: QS.getTeamSetting(req.params.teamId, 'passingScore', '80'),
-            defaultScoringType: QS.getTeamSetting(req.params.teamId, 'defaultScoringType', 'points'),
-            defaultScaleSize: QS.getTeamSetting(req.params.teamId, 'defaultScaleSize', '5'),
-            defaultInteractionChannel: QS.getTeamSetting(req.params.teamId, 'defaultInteractionChannel', 'ticket')
+            passingScore: storedSettings.passingScore || '80',
+            defaultScoringType: storedSettings.defaultScoringType || 'points',
+            defaultScaleSize: storedSettings.defaultScaleSize || '5',
+            defaultInteractionChannel: storedSettings.defaultInteractionChannel || 'ticket'
         };
         res.json({ success: true, settings });
     } catch (error) {
@@ -699,9 +703,8 @@ router.get('/teams/:teamId/settings', requirePermission('qs_view'), (req, res) =
  */
 router.put('/teams/:teamId/settings', requirePermission('qs_settings_manage'), (req, res) => {
     try {
-        Object.entries(req.body).forEach(([key, value]) => {
-            QS.setTeamSetting(req.params.teamId, key, value);
-        });
+        // Set all settings at once using the batch method
+        QS.setTeamSettings(req.params.teamId, req.body);
         res.json({ success: true });
     } catch (error) {
         console.error('Update settings error:', error);
