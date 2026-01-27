@@ -1055,15 +1055,20 @@
 }
 
 .team-row-content {
-    display: none;
-    padding: 0 var(--space-lg) var(--space-lg);
+    max-height: 0;
+    overflow: hidden;
+    padding: 0 var(--space-lg);
     padding-left: calc(var(--space-lg) + 24px + var(--space-md));
-    border-top: 1px solid var(--border);
+    border-top: 1px solid transparent;
     background: var(--bg-secondary);
+    transition: max-height 0.3s ease, padding 0.3s ease, border-color 0.3s ease;
 }
 
 .team-row.expanded .team-row-content {
-    display: block;
+    max-height: 1000px;
+    padding-top: var(--space-md);
+    padding-bottom: var(--space-lg);
+    border-top-color: var(--border);
 }
 
 .team-description {

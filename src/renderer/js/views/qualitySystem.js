@@ -437,7 +437,7 @@ const QualitySystemViews = {
         const evaluationsView = document.getElementById('qs-evaluations-view');
         const agentsBtn = document.getElementById('qs-view-agents-btn');
         const evaluationsBtn = document.getElementById('qs-view-evaluations-btn');
-        const statusFilter = document.getElementById('qs-filter-status-group');
+        const statusFilter = document.getElementById('qs-filter-status');
         const dateFilter = document.getElementById('qs-filter-date-group');
         
         if (view === 'agents') {
@@ -445,15 +445,15 @@ const QualitySystemViews = {
             evaluationsView.style.display = 'none';
             agentsBtn.classList.add('active');
             evaluationsBtn.classList.remove('active');
-            statusFilter.style.display = 'none';
-            dateFilter.style.display = 'none';
+            if (statusFilter) statusFilter.style.display = 'none';
+            if (dateFilter) dateFilter.style.display = 'none';
         } else {
             agentsView.style.display = 'none';
             evaluationsView.style.display = 'block';
             agentsBtn.classList.remove('active');
             evaluationsBtn.classList.add('active');
-            statusFilter.style.display = 'block';
-            dateFilter.style.display = 'block';
+            if (statusFilter) statusFilter.style.display = 'block';
+            if (dateFilter) dateFilter.style.display = 'flex';
         }
     },
     
@@ -502,7 +502,6 @@ const QualitySystemViews = {
         
         // Setup back button
         document.getElementById('qs-tasks-back-btn').onclick = () => {
-            // Navigate back to the team view with context
             App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCode });
         };
         
@@ -514,6 +513,15 @@ const QualitySystemViews = {
         const emptyAddBtn = document.getElementById('qs-tasks-empty-add-btn');
         if (emptyAddBtn) {
             emptyAddBtn.onclick = () => this.showTaskModal();
+        }
+        
+        // Setup collapsible sidebar
+        const categoryToggle = document.getElementById('qs-task-categories-toggle');
+        const categorySidebar = document.getElementById('qs-task-categories-sidebar');
+        if (categoryToggle && categorySidebar) {
+            categoryToggle.onclick = () => {
+                categorySidebar.classList.toggle('collapsed');
+            };
         }
         
         // Setup filters
@@ -721,7 +729,6 @@ const QualitySystemViews = {
         
         // Setup back button
         document.getElementById('qs-checks-back-btn').onclick = () => {
-            // Navigate back to the team view with context
             App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCode });
         };
         
@@ -733,6 +740,15 @@ const QualitySystemViews = {
         const emptyAddBtn = document.getElementById('qs-checks-empty-add-btn');
         if (emptyAddBtn) {
             emptyAddBtn.onclick = () => this.showCheckModal();
+        }
+        
+        // Setup collapsible sidebar
+        const categoryToggle = document.getElementById('qs-check-categories-toggle');
+        const categorySidebar = document.getElementById('qs-check-categories-sidebar');
+        if (categoryToggle && categorySidebar) {
+            categoryToggle.onclick = () => {
+                categorySidebar.classList.toggle('collapsed');
+            };
         }
         
         // Setup filters
@@ -799,43 +815,82 @@ const QualitySystemViews = {
     },
     
     renderChecks(checks) {
-        const grid = document.getElementById('qs-checks-grid');
+        // Use list container (qs-checks-list) - same layout as tasks
+        const list = document.getElementById('qs-checks-list') || document.getElementById('qs-checks-grid');
         const emptyState = document.getElementById('qs-checks-empty');
         
         if (checks.length === 0) {
-            grid.innerHTML = '';
-            emptyState.style.display = 'block';
+            if (list) list.innerHTML = '';
+            if (emptyState) emptyState.style.display = 'flex';
             return;
         }
         
-        emptyState.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'none';
         
-        grid.innerHTML = checks.map(check => `
-            <div class="qs-check-card ${check.isArchived ? 'archived' : ''}" data-check-id="${check.id}" onclick="QualitySystemViews.showCheckDetails('${check.id}')">
-                <div class="qs-check-header">
-                    <h4>${check.name}</h4>
-                    <span class="qs-check-number">${check.checkNumber}</span>
+        // Use list layout like tasks - clickable item + action buttons
+        list.innerHTML = checks.map(check => `
+            <div class="qs-task-item ${check.isArchived ? 'archived' : ''}" data-check-id="${check.id}">
+                <div class="qs-task-header">
+                    <h4 class="qs-task-clickable" onclick="QualitySystemViews.showCheckDetails('${check.id}')">
+                        ${check.name}
+                        <span class="qs-task-number">${check.checkNumber}</span>
+                    </h4>
+                    <div class="qs-task-actions">
+                        <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.showCheckDetails('${check.id}')" title="Details anzeigen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.showCheckModal('${check.id}')" title="Bearbeiten" data-permission="qs_checks_edit">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                        ${check.isArchived ? `
+                            <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.restoreCheck('${check.id}')" title="Wiederherstellen" data-permission="qs_checks_delete">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <polyline points="1 4 1 10 7 10"></polyline>
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                </svg>
+                            </button>
+                        ` : `
+                            <button class="btn btn-icon btn-sm btn-danger" onclick="QualitySystemViews.deleteCheck('${check.id}')" title="Löschen" data-permission="qs_checks_delete">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        `}
+                    </div>
                 </div>
-                <p class="qs-check-description">${check.description || 'Keine Beschreibung'}</p>
-                <div class="qs-check-stats">
-                    <span>
+                <div class="qs-task-body" onclick="QualitySystemViews.showCheckDetails('${check.id}')" style="cursor: pointer;">
+                    ${check.description || 'Keine Beschreibung'}
+                </div>
+                <div class="qs-task-meta">
+                    <span class="qs-task-meta-item">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <line x1="8" y1="6" x2="21" y2="6"></line>
                             <line x1="8" y1="12" x2="21" y2="12"></line>
                             <line x1="8" y1="18" x2="21" y2="18"></line>
                         </svg>
-                        ${check.taskCount} Aufgaben
+                        ${check.taskCount || 0} Aufgaben
                     </span>
-                    <span>
+                    <span class="qs-task-meta-item">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                             <polyline points="22 4 12 14.01 9 11.01"></polyline>
                         </svg>
                         ${check.passingScore}% zum Bestehen
                     </span>
+                    ${check.categoryName ? `<span class="qs-task-meta-item">Kategorie: ${check.categoryName}</span>` : ''}
                 </div>
             </div>
         `).join('');
+        
+        // Update permission-based visibility
+        Permissions.updateViewElements();
     },
     
     filterChecks() {
@@ -1442,6 +1497,31 @@ const QualitySystemViews = {
         if (result.success) {
             Toast.success('Aufgabe wiederhergestellt');
             await this.loadTasks();
+        } else {
+            Toast.error(result.error || 'Fehler beim Wiederherstellen');
+        }
+    },
+    
+    async deleteCheck(checkId) {
+        if (!confirm('Check wirklich löschen?')) return;
+        
+        const result = await api.qs.deleteCheck(checkId);
+        if (result.success) {
+            Toast.success('Check gelöscht');
+            await this.loadChecks();
+        } else if (result.archived) {
+            Toast.info('Check wurde archiviert (wird in Evaluierungen verwendet)');
+            await this.loadChecks();
+        } else {
+            Toast.error(result.error || 'Fehler beim Löschen');
+        }
+    },
+    
+    async restoreCheck(checkId) {
+        const result = await api.qs.restoreCheck(checkId);
+        if (result.success) {
+            Toast.success('Check wiederhergestellt');
+            await this.loadChecks();
         } else {
             Toast.error(result.error || 'Fehler beim Wiederherstellen');
         }

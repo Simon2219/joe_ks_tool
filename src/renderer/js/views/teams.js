@@ -176,15 +176,16 @@ const TeamsView = {
             this.expandedTeams.add(teamId);
             row.classList.add('expanded');
             
-            // Load members if not already loaded
-            if (!this.teamMembers[teamId]) {
-                const membersContainer = row.querySelector('.team-members-list');
-                if (membersContainer) {
-                    membersContainer.innerHTML = '<div class="loading-indicator">Lade Mitglieder...</div>';
-                }
-                await this.loadTeamMembers(teamId);
-                this.updateTeamMembersList(teamId);
+            // Always reload members when expanding to get fresh data
+            const membersContainer = row.querySelector('.team-members-list');
+            if (membersContainer) {
+                membersContainer.innerHTML = '<div class="loading-indicator">Lade Mitglieder...</div>';
             }
+            
+            // Clear cached members and reload
+            delete this.teamMembers[teamId];
+            await this.loadTeamMembers(teamId);
+            this.updateTeamMembersList(teamId);
         }
     },
 
