@@ -53,10 +53,12 @@ const QualitySystemViews = {
         // Update tracking stats
         try {
             const trackingStats = await api.qs.getTrackingStatistics();
-            if (trackingStats.success) {
+            if (trackingStats.success && trackingStats.statistics) {
                 const trackingEl = document.getElementById('qs-stat-tracking-total');
                 if (trackingEl) {
-                    trackingEl.textContent = `${trackingStats.statistics?.totalEvaluations || 0} Evaluierungen`;
+                    const avg = trackingStats.statistics.averageScore || 0;
+                    const pass = trackingStats.statistics.passingRate || 0;
+                    trackingEl.textContent = `Ø ${avg}% · ${pass}% bestanden`;
                 }
             }
         } catch (e) {
@@ -70,7 +72,9 @@ const QualitySystemViews = {
                 if (myResults.success) {
                     const myResultsEl = document.getElementById('qs-stat-my-results');
                     if (myResultsEl) {
-                        myResultsEl.textContent = `${myResults.totalEvaluations || 0} Checks`;
+                        const avg = myResults.statistics?.averageScore || 0;
+                        const pass = myResults.statistics?.passingRate || 0;
+                        myResultsEl.textContent = `Ø ${avg}% · ${pass}% bestanden`;
                     }
                 }
             } catch (e) {
@@ -187,22 +191,24 @@ const QualitySystemViews = {
     },
     
     updateTileVisibility() {
-        const container = document.getElementById('qs-tiles-container');
-        if (!container) return;
+        const toolsContainer = document.getElementById('qs-tools-tiles');
+        if (!toolsContainer) return;
         
         // Show/hide static tiles based on permissions
-        container.querySelectorAll('.kc-tile[data-permission]').forEach(tile => {
+        toolsContainer.querySelectorAll('.kc-tile[data-permission]').forEach(tile => {
             const perm = tile.dataset.permission;
             if (perm) {
                 tile.style.display = Permissions.hasPermission(perm) ? '' : 'none';
             }
         });
         
-        // Check if any tiles are visible
-        const visibleTiles = container.querySelectorAll('.kc-tile:not([style*="display: none"])');
+        // Check if any tiles are visible in both sections
+        const teamTiles = document.getElementById('qs-team-tiles-dynamic')?.querySelectorAll('.kc-tile') || [];
+        const toolsTiles = toolsContainer.querySelectorAll('.kc-tile:not([style*="display: none"])');
+        const totalVisible = teamTiles.length + toolsTiles.length;
         const noAccessMsg = document.getElementById('qs-no-access-message');
         if (noAccessMsg) {
-            noAccessMsg.style.display = visibleTiles.length === 0 ? 'block' : 'none';
+            noAccessMsg.style.display = totalVisible === 0 ? 'block' : 'none';
         }
     },
 
