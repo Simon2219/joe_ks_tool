@@ -305,19 +305,6 @@ const UsersView = {
                 placeholder: 'Select role'
             },
             { 
-                name: 'teamId', 
-                label: 'Team', 
-                type: 'select',
-                options: [{ value: '', label: 'No Team' }, ...this.teams.map(t => ({ value: t.id, label: t.name }))],
-                placeholder: 'Select team'
-            },
-            {
-                name: 'isSupervisor',
-                label: 'Supervisor',
-                type: 'checkbox',
-                description: 'User is a supervisor for their assigned team'
-            },
-            { 
                 name: 'phone', 
                 label: 'Phone', 
                 type: 'text',
@@ -416,8 +403,6 @@ const UsersView = {
                 firstName: user.firstName || user.first_name,
                 lastName: user.lastName || user.last_name,
                 roleId: user.roleId || user.role_id,
-                teamId: user.teamId || user.team_id || '',
-                isSupervisor: user.isSupervisor !== undefined ? user.isSupervisor : !!user.is_supervisor,
                 phone: user.phone || '',
                 isActive: user.isActive !== undefined ? user.isActive : !!user.is_active
             };

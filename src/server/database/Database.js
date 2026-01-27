@@ -559,15 +559,120 @@ const TeamsSystem = {
             return this.getAll();
         }
         
-        // Get teams where the user is assigned and is a supervisor
-        if (user.is_supervisor || (role && (role.is_supervisor || role.is_management))) {
-            if (user.team_id) {
-                const team = this.getById(user.team_id);
-                return team ? [team] : [];
-            }
+        // Get teams where the user is a supervisor via user_teams
+        return all(`
+            SELECT t.* 
+            FROM teams t
+            JOIN user_teams ut ON t.id = ut.team_id
+            WHERE ut.user_id = ? AND ut.is_supervisor = 1 AND t.is_active = 1
+            ORDER BY t.sort_order, t.name
+        `, [userId]);
+    },
+    
+    // ============================================
+    // USER-TEAM MEMBERSHIP METHODS
+    // ============================================
+    
+    getUserTeams(userId) {
+        return all(`
+            SELECT t.*, ut.is_supervisor
+            FROM teams t
+            JOIN user_teams ut ON t.id = ut.team_id
+            WHERE ut.user_id = ? AND t.is_active = 1
+            ORDER BY t.sort_order, t.name
+        `, [userId]);
+    },
+    
+    getTeamMembers(teamId) {
+        return all(`
+            SELECT u.*, r.name as role_name, r.is_admin, ut.is_supervisor
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            JOIN user_teams ut ON u.id = ut.user_id
+            WHERE ut.team_id = ? AND u.is_active = 1
+            ORDER BY ut.is_supervisor DESC, u.last_name, u.first_name
+        `, [teamId]);
+    },
+    
+    getTeamMemberCount(teamId) {
+        const result = get('SELECT COUNT(*) as count FROM user_teams WHERE team_id = ?', [teamId]);
+        return result ? result.count : 0;
+    },
+    
+    addUserToTeam(userId, teamId, isSupervisor = false) {
+        const existing = get('SELECT id FROM user_teams WHERE user_id = ? AND team_id = ?', [userId, teamId]);
+        if (existing) {
+            // Update supervisor status
+            run('UPDATE user_teams SET is_supervisor = ? WHERE user_id = ? AND team_id = ?', 
+                [isSupervisor ? 1 : 0, userId, teamId]);
+        } else {
+            const id = uuidv4();
+            const now = new Date().toISOString();
+            run(`INSERT INTO user_teams (id, user_id, team_id, is_supervisor, created_at) VALUES (?, ?, ?, ?, ?)`,
+                [id, userId, teamId, isSupervisor ? 1 : 0, now]);
         }
+        saveDb();
+        return this.getUserTeams(userId);
+    },
+    
+    removeUserFromTeam(userId, teamId) {
+        run('DELETE FROM user_teams WHERE user_id = ? AND team_id = ?', [userId, teamId]);
+        saveDb();
+        return true;
+    },
+    
+    setUserSupervisorStatus(userId, teamId, isSupervisor) {
+        run('UPDATE user_teams SET is_supervisor = ? WHERE user_id = ? AND team_id = ?',
+            [isSupervisor ? 1 : 0, userId, teamId]);
+        saveDb();
+        return this.getTeamMembers(teamId);
+    },
+    
+    isUserInTeam(userId, teamId) {
+        const result = get('SELECT id FROM user_teams WHERE user_id = ? AND team_id = ?', [userId, teamId]);
+        return !!result;
+    },
+    
+    isUserSupervisorInTeam(userId, teamId) {
+        const result = get('SELECT is_supervisor FROM user_teams WHERE user_id = ? AND team_id = ?', [userId, teamId]);
+        if (!result) return false;
+        return result.is_supervisor === 1;
+    },
+    
+    isUserSupervisorOfAnyTeam(userId) {
+        // Check if user is admin
+        const user = UserSystem.getById(userId);
+        if (!user) return false;
         
-        return [];
+        const role = RoleSystem.getById(user.role_id);
+        if (role && role.is_admin) return true;
+        
+        // Check user_teams for supervisor status
+        const result = get('SELECT id FROM user_teams WHERE user_id = ? AND is_supervisor = 1', [userId]);
+        return !!result;
+    },
+    
+    getTeamSupervisors(teamId) {
+        return all(`
+            SELECT u.*, r.name as role_name, r.is_admin
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            JOIN user_teams ut ON u.id = ut.user_id
+            WHERE ut.team_id = ? AND ut.is_supervisor = 1 AND u.is_active = 1
+            ORDER BY u.last_name, u.first_name
+        `, [teamId]);
+    },
+    
+    getAllUsersNotInTeam(teamId) {
+        return all(`
+            SELECT u.*, r.name as role_name
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            WHERE u.is_active = 1 AND u.id NOT IN (
+                SELECT user_id FROM user_teams WHERE team_id = ?
+            )
+            ORDER BY u.last_name, u.first_name
+        `, [teamId]);
     }
 };
 

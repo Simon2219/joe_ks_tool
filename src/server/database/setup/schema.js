@@ -28,15 +28,17 @@ function createTables(db) {
         )
     `);
 
-    // Team-specific permissions
+    // User-Team membership (many-to-many)
     db.run(`
-        CREATE TABLE IF NOT EXISTS team_permissions (
+        CREATE TABLE IF NOT EXISTS user_teams (
             id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
             team_id TEXT NOT NULL,
-            permission_id TEXT NOT NULL,
-            granted INTEGER DEFAULT 1,
+            is_supervisor INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
-            UNIQUE(team_id, permission_id)
+            UNIQUE(user_id, team_id)
         )
     `);
 
@@ -610,6 +612,8 @@ function createIndexes(db) {
     // User & Auth indexes
     safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)');
     safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_users_team ON users(team_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_user_teams_user ON user_teams(user_id)');
+    safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_user_teams_team ON user_teams(team_id)');
     safeCreateIndex('CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)');
 
     // Ticket indexes

@@ -43,9 +43,8 @@ router.get('/:id', requirePermission('teams_view'), (req, res) => {
             return res.status(404).json({ success: false, error: 'Team not found' });
         }
         
-        // Include additional data
-        team.memberCount = TeamsSystem.getMemberCount(team.id);
-        team.permissions = TeamsSystem.getPermissions(team.id);
+        // Include additional data (no permissions - roles handle permissions)
+        team.memberCount = TeamsSystem.getTeamMemberCount(team.id);
         team.statistics = TeamsSystem.getStatistics(team.id);
         
         res.json({ success: true, team });
@@ -56,7 +55,7 @@ router.get('/:id', requirePermission('teams_view'), (req, res) => {
 });
 
 /**
- * GET /api/teams/:id/members - Get team members
+ * GET /api/teams/:id/members - Get team members (legacy - redirects to team-members)
  */
 router.get('/:id/members', requirePermission('teams_view'), (req, res) => {
     try {
@@ -65,29 +64,12 @@ router.get('/:id/members', requirePermission('teams_view'), (req, res) => {
             return res.status(404).json({ success: false, error: 'Team not found' });
         }
         
-        const members = TeamsSystem.getMembers(req.params.id);
+        // Use new team-members method that uses user_teams table
+        const members = TeamsSystem.getTeamMembers(req.params.id);
         res.json({ success: true, members });
     } catch (error) {
         console.error('Get team members error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch team members' });
-    }
-});
-
-/**
- * GET /api/teams/:id/permissions - Get team permissions
- */
-router.get('/:id/permissions', requirePermission('teams_view'), (req, res) => {
-    try {
-        const team = TeamsSystem.getById(req.params.id);
-        if (!team) {
-            return res.status(404).json({ success: false, error: 'Team not found' });
-        }
-        
-        const permissions = TeamsSystem.getPermissions(req.params.id);
-        res.json({ success: true, permissions });
-    } catch (error) {
-        console.error('Get team permissions error:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch team permissions' });
     }
 });
 
@@ -163,29 +145,6 @@ router.delete('/:id', requirePermission('teams_delete'), (req, res) => {
 });
 
 /**
- * PUT /api/teams/:id/permissions - Set team permissions
- */
-router.put('/:id/permissions', requirePermission('teams_permissions_manage'), (req, res) => {
-    try {
-        const team = TeamsSystem.getById(req.params.id);
-        if (!team) {
-            return res.status(404).json({ success: false, error: 'Team not found' });
-        }
-        
-        const { permissions } = req.body;
-        if (!Array.isArray(permissions)) {
-            return res.status(400).json({ success: false, error: 'Permissions must be an array' });
-        }
-        
-        const updatedPermissions = TeamsSystem.setPermissions(req.params.id, permissions);
-        res.json({ success: true, permissions: updatedPermissions });
-    } catch (error) {
-        console.error('Set team permissions error:', error);
-        res.status(500).json({ success: false, error: 'Failed to set team permissions' });
-    }
-});
-
-/**
  * GET /api/teams/:id/statistics - Get team statistics
  */
 router.get('/:id/statistics', requirePermission('teams_view'), (req, res) => {
@@ -200,6 +159,118 @@ router.get('/:id/statistics', requirePermission('teams_view'), (req, res) => {
     } catch (error) {
         console.error('Get team statistics error:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch team statistics' });
+    }
+});
+
+/**
+ * GET /api/teams/:id/team-members - Get team members (via user_teams)
+ */
+router.get('/:id/team-members', requirePermission('teams_view'), (req, res) => {
+    try {
+        const team = TeamsSystem.getById(req.params.id);
+        if (!team) {
+            return res.status(404).json({ success: false, error: 'Team not found' });
+        }
+        
+        const members = TeamsSystem.getTeamMembers(req.params.id);
+        res.json({ success: true, members });
+    } catch (error) {
+        console.error('Get team members error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch team members' });
+    }
+});
+
+/**
+ * GET /api/teams/:id/available-users - Get users not in this team
+ */
+router.get('/:id/available-users', requirePermission('teams_edit'), (req, res) => {
+    try {
+        const team = TeamsSystem.getById(req.params.id);
+        if (!team) {
+            return res.status(404).json({ success: false, error: 'Team not found' });
+        }
+        
+        const users = TeamsSystem.getAllUsersNotInTeam(req.params.id);
+        res.json({ success: true, users });
+    } catch (error) {
+        console.error('Get available users error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch available users' });
+    }
+});
+
+/**
+ * POST /api/teams/:id/add-user - Add a user to the team
+ */
+router.post('/:id/add-user', requirePermission('teams_edit'), (req, res) => {
+    try {
+        const team = TeamsSystem.getById(req.params.id);
+        if (!team) {
+            return res.status(404).json({ success: false, error: 'Team not found' });
+        }
+        
+        const { userId, isSupervisor } = req.body;
+        if (!userId) {
+            return res.status(400).json({ success: false, error: 'User ID is required' });
+        }
+        
+        TeamsSystem.addUserToTeam(userId, req.params.id, isSupervisor || false);
+        const members = TeamsSystem.getTeamMembers(req.params.id);
+        res.json({ success: true, members });
+    } catch (error) {
+        console.error('Add user to team error:', error);
+        res.status(500).json({ success: false, error: 'Failed to add user to team' });
+    }
+});
+
+/**
+ * DELETE /api/teams/:id/remove-user/:userId - Remove a user from the team
+ */
+router.delete('/:id/remove-user/:userId', requirePermission('teams_edit'), (req, res) => {
+    try {
+        const team = TeamsSystem.getById(req.params.id);
+        if (!team) {
+            return res.status(404).json({ success: false, error: 'Team not found' });
+        }
+        
+        TeamsSystem.removeUserFromTeam(req.params.userId, req.params.id);
+        const members = TeamsSystem.getTeamMembers(req.params.id);
+        res.json({ success: true, members });
+    } catch (error) {
+        console.error('Remove user from team error:', error);
+        res.status(500).json({ success: false, error: 'Failed to remove user from team' });
+    }
+});
+
+/**
+ * PUT /api/teams/:id/set-supervisor/:userId - Set/unset user as supervisor
+ */
+router.put('/:id/set-supervisor/:userId', requirePermission('teams_edit'), (req, res) => {
+    try {
+        const team = TeamsSystem.getById(req.params.id);
+        if (!team) {
+            return res.status(404).json({ success: false, error: 'Team not found' });
+        }
+        
+        const { isSupervisor } = req.body;
+        TeamsSystem.setUserSupervisorStatus(req.params.userId, req.params.id, isSupervisor);
+        const members = TeamsSystem.getTeamMembers(req.params.id);
+        res.json({ success: true, members });
+    } catch (error) {
+        console.error('Set supervisor status error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update supervisor status' });
+    }
+});
+
+/**
+ * GET /api/teams/user/:userId/teams - Get teams for a specific user
+ */
+router.get('/user/:userId/teams', requirePermission('teams_view'), (req, res) => {
+    try {
+        const teams = TeamsSystem.getUserTeams(req.params.userId);
+        res.json({ success: true, teams });
+    } catch (error) {
+        console.error('Get user teams error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch user teams' });
     }
 });
 

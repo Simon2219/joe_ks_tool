@@ -214,9 +214,14 @@ window.api = {
         update: (id, teamData) => API.put(`/teams/${id}`, teamData),
         delete: (id) => API.delete(`/teams/${id}`),
         getMembers: (id) => API.get(`/teams/${id}/members`),
-        getPermissions: (id) => API.get(`/teams/${id}/permissions`),
-        setPermissions: (id, permissions) => API.put(`/teams/${id}/permissions`, { permissions }),
+        getTeamMembers: (id) => API.get(`/teams/${id}/team-members`),
+        getAvailableUsers: (id) => API.get(`/teams/${id}/available-users`),
+        addUserToTeam: (teamId, userId, isSupervisor = false) => API.post(`/teams/${teamId}/add-user`, { userId, isSupervisor }),
+        removeUserFromTeam: (teamId, userId) => API.delete(`/teams/${teamId}/remove-user/${userId}`),
+        setUserSupervisor: (teamId, userId, isSupervisor) => API.put(`/teams/${teamId}/set-supervisor/${userId}`, { isSupervisor }),
+        getUserTeams: (userId) => API.get(`/teams/user/${userId}/teams`),
         getStatistics: (id) => API.get(`/teams/${id}/statistics`)
+        // Note: Team permissions removed - permissions are now only managed through Roles
     },
 
     tickets: {
