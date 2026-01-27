@@ -2,6 +2,11 @@
    QUALITY SYSTEM v2 STYLES
    ============================================ */
 
+/* Catalog views - reduce top space */
+.view.qs-catalog-view .view-header {
+    margin-bottom: var(--space-md);
+}
+
 /* ============================================
    MAIN TILES PAGE
    ============================================ */
@@ -119,11 +124,21 @@
    TEAM VIEW
    ============================================ */
 
+/* Team view specific styles */
+.view.qs-team-view .kc-results-overview {
+    margin-bottom: var(--space-md);
+}
+
+.view.qs-team-view .qs-agents-view,
+.view.qs-team-view .qs-evaluations-view {
+    padding: 0;
+}
+
 /* View Toggle Container - Centered */
 .qs-view-toggle-container {
     display: flex;
     justify-content: center;
-    padding: var(--space-md) var(--space-lg);
+    padding: var(--space-md) 0;
 }
 
 .qs-view-toggle {
@@ -164,10 +179,10 @@
     height: 16px;
 }
 
-/* Team Filters - Always inline */
+/* Team Filters - Responsive inline layout */
 .qs-team-filters {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: var(--space-md);
     padding: var(--space-md) var(--space-lg);
     align-items: center;
@@ -176,29 +191,31 @@
 .qs-team-filters .form-input,
 .qs-team-filters .form-select {
     height: 38px;
-    flex: 0 0 auto;
 }
 
 .qs-team-filters #qs-team-search {
-    flex: 1;
-    min-width: 180px;
-    max-width: 280px;
+    flex: 1 1 200px;
+    min-width: 150px;
+    max-width: 300px;
 }
 
 .qs-team-filters #qs-filter-status {
-    min-width: 160px;
+    flex: 0 1 auto;
+    min-width: 140px;
 }
 
-/* Date filters - inline side by side */
+/* Date filters - inline side by side, responsive */
 .qs-date-filters {
     display: flex;
     gap: var(--space-sm);
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .qs-date-filters input[type="date"] {
-    width: 150px;
-    min-width: 140px;
+    flex: 1 1 130px;
+    min-width: 120px;
+    max-width: 160px;
 }
 
 .qs-filter-group {
@@ -206,10 +223,11 @@
     flex-direction: row;
     gap: var(--space-sm);
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .qs-filter-group input[type="date"] {
-    min-width: 140px;
+    min-width: 120px;
 }
 
 /* Empty State - Properly centered with vertical layout */
@@ -253,7 +271,7 @@
 .qs-catalog-layout {
     display: flex;
     gap: var(--space-lg);
-    padding: 0 var(--space-lg) var(--space-lg);
+    padding: 0;
     min-height: 500px;
 }
 
@@ -265,14 +283,24 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
-    transition: width 0.2s ease;
+    transition: width 0.25s ease;
 }
 
 .qs-categories-sidebar.collapsed {
-    width: auto;
+    width: 48px;
 }
 
 .qs-categories-sidebar.collapsed .qs-categories-list {
+    display: none;
+}
+
+.qs-categories-sidebar.collapsed .qs-categories-header {
+    justify-content: center;
+    padding: var(--space-md) var(--space-sm);
+    border-bottom: none;
+}
+
+.qs-categories-sidebar.collapsed .qs-categories-header h3 {
     display: none;
 }
 
@@ -302,13 +330,16 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 .qs-categories-header .collapse-icon {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
     color: var(--text-muted);
     transition: transform 0.2s ease;
+    flex-shrink: 0;
 }
 
 .qs-categories-list {
@@ -364,10 +395,12 @@
     align-items: center;
     gap: var(--space-md);
     margin-bottom: var(--space-md);
+    flex-wrap: wrap;
 }
 
 .qs-catalog-filters .filter-search {
     flex: 1;
+    min-width: 200px;
     max-width: 300px;
 }
 
@@ -376,6 +409,7 @@
     align-items: center;
     gap: var(--space-md);
     margin-left: auto;
+    flex-wrap: wrap;
 }
 
 /* Custom Checkbox Inline - with green/red styling */
@@ -489,22 +523,23 @@
     gap: var(--space-md);
 }
 
-/* Task Item */
+/* Task Item - with contrast background */
 .qs-task-item {
-    background: var(--surface);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: var(--space-md);
-    transition: box-shadow 0.15s ease;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .qs-task-item:hover {
     box-shadow: var(--shadow-md);
+    border-color: var(--brand-primary);
 }
 
 .qs-task-item.archived {
     opacity: 0.6;
-    background: var(--bg-muted);
+    background: var(--bg-tertiary);
 }
 
 .qs-task-header {
@@ -587,7 +622,7 @@
 }
 
 .qs-check-card {
-    background: var(--surface);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
@@ -602,7 +637,7 @@
 
 .qs-check-card.archived {
     opacity: 0.6;
-    background: var(--bg-muted);
+    background: var(--bg-tertiary);
 }
 
 .qs-check-header {

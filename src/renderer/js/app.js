@@ -534,6 +534,34 @@ const App = {
                 case 'qsSettings':
                     await QualitySystemViews.showSettingsView();
                     break;
+                case 'qsTasks':
+                    // Tasks catalog - team ID/code passed via params
+                    if (this.currentViewParams?.teamId || this.currentViewParams?.teamCode) {
+                        await QualitySystemViews.showTasksCatalog(
+                            this.currentViewParams.teamCode || this.currentViewParams.teamId
+                        );
+                    }
+                    break;
+                case 'qsChecks':
+                    // Checks catalog - team ID/code passed via params
+                    if (this.currentViewParams?.teamId || this.currentViewParams?.teamCode) {
+                        await QualitySystemViews.showChecksCatalog(
+                            this.currentViewParams.teamCode || this.currentViewParams.teamId
+                        );
+                    }
+                    break;
+                case 'qsEvaluation':
+                    // Evaluation view - evaluation ID passed via params
+                    if (this.currentViewParams?.evaluationId) {
+                        await QualitySystemViews.showEvaluationView(this.currentViewParams.evaluationId);
+                    }
+                    break;
+                case 'qsResult':
+                    // Result view - evaluation ID passed via params
+                    if (this.currentViewParams?.evaluationId) {
+                        await QualitySystemViews.showResultView(this.currentViewParams.evaluationId);
+                    }
+                    break;
                 case 'roles':
                     await RolesView.init();
                     break;
