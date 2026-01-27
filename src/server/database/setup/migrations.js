@@ -167,6 +167,42 @@ function runMigrations(db, all) {
         migrationsRun++;
     }
     
+    // Migration 15: Create user_teams junction table for multi-team membership
+    if (!tableExists('user_teams')) {
+        console.log('  [Migration 15] Creating user_teams table...');
+        db.run(`
+            CREATE TABLE IF NOT EXISTS user_teams (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                team_id TEXT NOT NULL,
+                is_supervisor INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+                UNIQUE(user_id, team_id)
+            )
+        `);
+        db.run('CREATE INDEX IF NOT EXISTS idx_user_teams_user ON user_teams(user_id)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_user_teams_team ON user_teams(team_id)');
+        
+        // Migrate existing user team assignments
+        const usersWithTeams = all('SELECT id, team_id, is_supervisor FROM users WHERE team_id IS NOT NULL');
+        const { v4: uuidv4 } = require('uuid');
+        const now = new Date().toISOString();
+        for (const user of usersWithTeams) {
+            try {
+                const id = uuidv4();
+                db.run(
+                    'INSERT OR IGNORE INTO user_teams (id, user_id, team_id, is_supervisor, created_at) VALUES (?, ?, ?, ?, ?)',
+                    [id, user.id, user.team_id, user.is_supervisor || 0, now]
+                );
+            } catch (e) {
+                // Ignore duplicates
+            }
+        }
+        migrationsRun++;
+    }
+    
     if (migrationsRun > 0) {
         console.log(`Migrations completed: ${migrationsRun} migration(s) applied`);
     } else {

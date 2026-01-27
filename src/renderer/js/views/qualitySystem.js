@@ -57,8 +57,7 @@ const QualitySystemViews = {
                 const trackingEl = document.getElementById('qs-stat-tracking-total');
                 if (trackingEl) {
                     const avg = trackingStats.statistics.averageScore || 0;
-                    const pass = trackingStats.statistics.passingRate || 0;
-                    trackingEl.textContent = `Ø ${avg}% · ${pass}% bestanden`;
+                    trackingEl.textContent = `Ø ${avg}%`;
                 }
             }
         } catch (e) {
@@ -73,8 +72,7 @@ const QualitySystemViews = {
                     const myResultsEl = document.getElementById('qs-stat-my-results');
                     if (myResultsEl) {
                         const avg = myResults.statistics?.averageScore || 0;
-                        const pass = myResults.statistics?.passingRate || 0;
-                        myResultsEl.textContent = `Ø ${avg}% · ${pass}% bestanden`;
+                        myResultsEl.textContent = `Ø ${avg}%`;
                     }
                 }
             } catch (e) {
@@ -86,7 +84,7 @@ const QualitySystemViews = {
         this.setupTileHandlers();
         
         // Show/hide tiles based on permissions
-        this.updateTileVisibility();
+        await this.updateTileVisibility();
     },
     
     async generateTeamTiles() {
@@ -136,7 +134,7 @@ const QualitySystemViews = {
                     </div>
                     <h3>${team.name}</h3>
                     <p>Quality Checks für ${team.name} durchführen und verwalten</p>
-                    <span class="kc-tile-stat">Ø ${team.avgScore} · ${team.passingRate} bestanden</span>
+                    <span class="kc-tile-stat">Ø ${team.avgScore}</span>
                 </div>
             `;
         }).join('');
@@ -190,14 +188,39 @@ const QualitySystemViews = {
         });
     },
     
-    updateTileVisibility() {
+    async updateTileVisibility() {
         const toolsContainer = document.getElementById('qs-tools-tiles');
         if (!toolsContainer) return;
+        
+        // Check if user is supervisor of any team
+        let isSupervisorOfAnyTeam = false;
+        const isAdmin = Permissions.isAdmin();
+        
+        if (isAdmin) {
+            isSupervisorOfAnyTeam = true;
+        } else {
+            try {
+                const currentUser = Permissions.currentUser;
+                if (currentUser && currentUser.id) {
+                    const userTeamsResult = await window.api.teams.getUserTeams(currentUser.id);
+                    if (userTeamsResult.success && userTeamsResult.teams) {
+                        isSupervisorOfAnyTeam = userTeamsResult.teams.some(t => t.is_supervisor === 1);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to check supervisor status:', error);
+            }
+        }
         
         // Show/hide static tiles based on permissions
         toolsContainer.querySelectorAll('.kc-tile[data-permission]').forEach(tile => {
             const perm = tile.dataset.permission;
-            if (perm) {
+            const navigate = tile.dataset.navigate;
+            
+            // For Settings tile, also check supervisor status
+            if (navigate === 'qsSettings') {
+                tile.style.display = (Permissions.hasPermission(perm) && isSupervisorOfAnyTeam) ? '' : 'none';
+            } else if (perm) {
                 tile.style.display = Permissions.hasPermission(perm) ? '' : 'none';
             }
         });
@@ -487,11 +510,22 @@ const QualitySystemViews = {
         document.getElementById('qs-manage-task-categories-btn').onclick = () => this.showManageCategoriesModal('task');
         document.getElementById('qs-add-task-btn').onclick = () => this.showTaskModal();
         
+        // Setup empty state button
+        const emptyAddBtn = document.getElementById('qs-tasks-empty-add-btn');
+        if (emptyAddBtn) {
+            emptyAddBtn.onclick = () => this.showTaskModal();
+        }
+        
         // Setup filters
-        document.getElementById('qs-tasks-search').oninput = () => this.filterTasks();
-        document.getElementById('qs-tasks-category-filter').onchange = () => this.filterTasks();
-        document.getElementById('qs-tasks-scoring-filter').onchange = () => this.filterTasks();
-        document.getElementById('qs-tasks-archived-filter').onchange = () => this.loadTasks();
+        const searchInput = document.getElementById('qs-tasks-search');
+        const categoryFilter = document.getElementById('qs-tasks-category-filter');
+        const scoringFilter = document.getElementById('qs-tasks-scoring-filter');
+        const archivedFilter = document.getElementById('qs-tasks-archived-filter');
+        
+        if (searchInput) searchInput.oninput = () => this.filterTasks();
+        if (categoryFilter) categoryFilter.onchange = () => this.filterTasks();
+        if (scoringFilter) scoringFilter.onchange = () => this.filterTasks();
+        if (archivedFilter) archivedFilter.onchange = () => this.loadTasks();
         
         // Load data
         await this.loadTaskCategories();
@@ -694,6 +728,20 @@ const QualitySystemViews = {
         // Setup action buttons
         document.getElementById('qs-manage-check-categories-btn').onclick = () => this.showManageCategoriesModal('check');
         document.getElementById('qs-add-check-btn').onclick = () => this.showCheckModal();
+        
+        // Setup empty state button
+        const emptyAddBtn = document.getElementById('qs-checks-empty-add-btn');
+        if (emptyAddBtn) {
+            emptyAddBtn.onclick = () => this.showCheckModal();
+        }
+        
+        // Setup filters
+        const searchInput = document.getElementById('qs-checks-search');
+        const categoryFilter = document.getElementById('qs-checks-category-filter');
+        const archivedFilter = document.getElementById('qs-checks-archived-filter');
+        
+        if (searchInput) searchInput.oninput = () => this.filterChecks();
+        if (archivedFilter) archivedFilter.onchange = () => this.loadChecks();
         
         // Load data
         await this.loadCheckCategories();
@@ -2100,28 +2148,33 @@ const QualitySystemViews = {
                 return;
             }
             
-            // Get current user info
-            const currentUser = App.currentUser;
+            // Get current user info from Permissions
+            const currentUser = Permissions.currentUser;
             if (!currentUser) {
                 this.settingsTeams = [];
                 return;
             }
             
-            // Check user permissions
-            const isAdmin = currentUser.is_admin || currentUser.isAdmin;
-            const isSupervisor = currentUser.is_supervisor || currentUser.isSupervisor;
-            const roleIsSupervisor = currentUser.role_is_supervisor;
-            const roleIsManagement = currentUser.role_is_management;
+            // Check if user is admin
+            const isAdmin = Permissions.isAdmin();
             
-            if (isAdmin || roleIsManagement) {
-                // Admin/Management can see all teams
+            if (isAdmin) {
+                // Admin can see all teams
                 this.settingsTeams = teamsResult.teams;
-            } else if (isSupervisor || roleIsSupervisor) {
-                // Supervisor can only see their own team
-                const userTeamId = currentUser.team_id || currentUser.teamId;
-                this.settingsTeams = teamsResult.teams.filter(t => t.id === userTeamId);
-            } else {
-                // Regular user - no team settings visible
+                return;
+            }
+            
+            // For non-admins, load user's teams and filter to teams where they are a supervisor
+            try {
+                const userTeamsResult = await window.api.teams.getUserTeams(currentUser.id);
+                if (userTeamsResult.success && userTeamsResult.teams) {
+                    // Filter to only teams where user is a supervisor
+                    this.settingsTeams = userTeamsResult.teams.filter(t => t.is_supervisor === 1);
+                } else {
+                    this.settingsTeams = [];
+                }
+            } catch (error) {
+                console.error('Failed to load user teams:', error);
                 this.settingsTeams = [];
             }
         } catch (error) {

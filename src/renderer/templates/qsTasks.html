@@ -27,15 +27,10 @@
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters - Single row with search and scoring filter -->
     <div class="view-filters">
-        <div class="filter-group">
+        <div class="filter-group" style="flex: 1; max-width: 300px;">
             <input type="text" id="qs-tasks-search" class="form-input" placeholder="Aufgaben suchen...">
-        </div>
-        <div class="filter-group">
-            <select id="qs-tasks-category-filter" class="form-select">
-                <option value="">Alle Kategorien</option>
-            </select>
         </div>
         <div class="filter-group">
             <select id="qs-tasks-scoring-filter" class="form-select">
@@ -52,6 +47,10 @@
             </label>
         </div>
     </div>
+    <!-- Hidden category filter for JS compatibility -->
+    <select id="qs-tasks-category-filter" class="form-select" style="display: none;">
+        <option value="">Alle Kategorien</option>
+    </select>
 
     <!-- Task Categories & Tasks List -->
     <div class="qs-tasks-content">

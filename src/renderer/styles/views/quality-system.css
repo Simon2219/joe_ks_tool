@@ -187,7 +187,13 @@
 
 .qs-filter-group {
     display: flex;
+    flex-direction: row;
     gap: var(--space-sm);
+    align-items: center;
+}
+
+.qs-filter-group input[type="date"] {
+    min-width: 140px;
 }
 
 /* ============================================
