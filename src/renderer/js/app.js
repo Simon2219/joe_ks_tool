@@ -275,15 +275,25 @@ const App = {
      * @param {string} viewName - Name of the view to load
      */
     async loadViewTemplate(viewName) {
+        // Map views that share templates
+        const templateMap = {
+            'qsTeamBilla': 'qsTeam',
+            'qsTeamSocial': 'qsTeam',
+            'qsTeamSupport': 'qsTeam'
+        };
+        
+        const templateName = templateMap[viewName] || viewName;
+        const elementId = templateMap[viewName] ? `view-${templateName}` : `view-${viewName}`;
+        
         // If already loaded, just return
-        if (this.loadedViews.has(viewName)) {
-            return document.getElementById(`view-${viewName}`);
+        if (this.loadedViews.has(templateName)) {
+            return document.getElementById(elementId);
         }
 
         const container = document.getElementById('views-container');
         
         try {
-            const html = await TemplateLoader.load(viewName);
+            const html = await TemplateLoader.load(templateName);
             
             // Create a temporary container to parse the HTML
             const temp = document.createElement('div');
@@ -296,7 +306,7 @@ const App = {
             container.appendChild(viewElement);
             
             // Mark as loaded
-            this.loadedViews.add(viewName);
+            this.loadedViews.add(templateName);
             
             return viewElement;
         } catch (error) {
@@ -374,6 +384,14 @@ const App = {
             return;
         }
 
+        // Map views that share templates
+        const viewToElementMap = {
+            'qsTeamBilla': 'qsTeam',
+            'qsTeamSocial': 'qsTeam',
+            'qsTeamSupport': 'qsTeam'
+        };
+        const targetElementId = viewToElementMap[viewName] || viewName;
+        
         // Load template if needed
         await this.loadViewTemplate(viewName);
 
@@ -383,7 +401,7 @@ const App = {
         });
 
         // Show target view
-        const targetView = document.getElementById(`view-${viewName}`);
+        const targetView = document.getElementById(`view-${targetElementId}`);
         if (targetView) {
             targetView.classList.add('active');
         }
