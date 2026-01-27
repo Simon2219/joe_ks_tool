@@ -38,6 +38,14 @@ const QualitySystemViews = {
     getTeamByCode(code) {
         return this.teams.find(t => t.teamCode === code || t.team_code === code);
     },
+    
+    // Highlight the correct team in the sidebar navigation
+    highlightTeamNav(teamId, teamCode) {
+        document.querySelectorAll('.qs-team-nav-item').forEach(item => {
+            const isMatch = item.dataset.teamId === teamId || item.dataset.teamCode === teamCode;
+            item.classList.toggle('active', isMatch);
+        });
+    },
 
     // ============================================
     // MAIN TILES PAGE
@@ -257,6 +265,9 @@ const QualitySystemViews = {
         
         this.currentTeam = team;
         this.currentTeamId = team.id;
+        
+        // Ensure sidebar highlighting is correct for this team
+        this.highlightTeamNav(team.id, team.teamCode || team.team_code);
         
         const teamCode = team.teamCode || team.team_code;
         
@@ -487,6 +498,9 @@ const QualitySystemViews = {
         this.currentTeamId = team.id;
         const teamCodeVal = team.teamCode || team.team_code;
         
+        // Ensure sidebar highlighting for this team
+        this.highlightTeamNav(team.id, teamCodeVal);
+        
         // Load the template if not already loaded
         const container = document.getElementById('views-container');
         if (!document.getElementById('view-qsTasks')) {
@@ -515,12 +529,13 @@ const QualitySystemViews = {
             emptyAddBtn.onclick = () => this.showTaskModal();
         }
         
-        // Setup collapsible sidebar
+        // Setup collapsible sidebar toggle button
         const categoryToggle = document.getElementById('qs-task-categories-toggle');
         const categorySidebar = document.getElementById('qs-task-categories-sidebar');
         if (categoryToggle && categorySidebar) {
             categoryToggle.onclick = () => {
                 categorySidebar.classList.toggle('collapsed');
+                categoryToggle.classList.toggle('expanded');
             };
         }
         
@@ -620,51 +635,105 @@ const QualitySystemViews = {
         
         emptyState.style.display = 'none';
         
-        list.innerHTML = tasks.map(task => `
-            <div class="qs-task-item ${task.isArchived ? 'archived' : ''}" data-task-id="${task.id}">
-                <div class="qs-task-header">
-                    <h4>
-                        ${task.title || 'Ohne Titel'}
-                        <span class="qs-task-number">${task.taskNumber}</span>
-                    </h4>
-                    <div class="qs-task-actions">
-                        <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.showTaskModal('${task.id}')" title="Bearbeiten" data-permission="qs_tasks_edit">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                            </svg>
-                        </button>
-                        ${task.isArchived ? `
-                            <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.restoreTask('${task.id}')" title="Wiederherstellen" data-permission="qs_tasks_delete">
+        // Group tasks by category (like Knowledge Check)
+        const groupedTasks = this.groupTasksByCategory(tasks);
+        
+        list.innerHTML = groupedTasks.map(group => this.renderTaskCategory(group)).join('');
+        
+        // Setup category toggle handlers
+        list.querySelectorAll('.qs-category-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const category = e.target.closest('.qs-category');
+                if (category) category.classList.toggle('collapsed');
+            });
+        });
+        
+        // Setup task item click handlers
+        list.querySelectorAll('.qs-task-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.qs-task-actions')) return;
+                const taskId = item.dataset.taskId;
+                if (taskId) this.showTaskModal(taskId);
+            });
+            item.classList.add('clickable');
+        });
+    },
+    
+    groupTasksByCategory(tasks) {
+        const groups = {};
+        const uncategorized = [];
+        
+        tasks.forEach(task => {
+            if (task.categoryId && task.categoryName) {
+                if (!groups[task.categoryId]) {
+                    groups[task.categoryId] = {
+                        id: task.categoryId,
+                        name: task.categoryName,
+                        weight: task.categoryWeight || 1,
+                        tasks: []
+                    };
+                }
+                groups[task.categoryId].tasks.push(task);
+            } else {
+                uncategorized.push(task);
+            }
+        });
+        
+        const result = Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
+        
+        if (uncategorized.length > 0) {
+            result.push({
+                id: 'uncategorized',
+                name: 'Ohne Kategorie',
+                weight: 1,
+                tasks: uncategorized
+            });
+        }
+        
+        return result;
+    },
+    
+    renderTaskCategory(group) {
+        const { id, name, weight, tasks } = group;
+        const isUncategorized = id === 'uncategorized';
+        
+        return `
+            <div class="qs-category" data-category-id="${id}">
+                <div class="qs-category-header">
+                    <button type="button" class="qs-category-toggle btn-icon" title="Kategorie ein-/ausklappen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div class="qs-category-info">
+                        <h3>${name}</h3>
+                        <span class="qs-category-meta">${tasks.length} Aufgaben · Gewichtung: ${weight}</span>
+                    </div>
+                    <div class="qs-category-actions">
+                        ${!isUncategorized ? `
+                            <button class="btn btn-sm btn-secondary" onclick="QualitySystemViews.showTaskModal(null, '${id}')" title="Aufgabe hinzufügen" data-permission="qs_tasks_create">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                    <polyline points="1 4 1 10 7 10"></polyline>
-                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
                                 </svg>
                             </button>
-                        ` : `
-                            <button class="btn btn-icon btn-sm btn-danger" onclick="QualitySystemViews.deleteTask('${task.id}')" title="Löschen" data-permission="qs_tasks_delete">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                </svg>
-                            </button>
-                        `}
+                        ` : ''}
                     </div>
                 </div>
-                <div class="qs-task-body">${task.taskText}</div>
-                <div class="qs-task-meta">
-                    <span class="qs-task-meta-item">
-                        <span class="scoring-badge ${task.scoringType}">${this.getScoringTypeLabel(task)}</span>
-                    </span>
-                    <span class="qs-task-meta-item">Gewichtung: ${task.effectiveWeight}</span>
-                    ${task.categoryName ? `<span class="qs-task-meta-item">Kategorie: ${task.categoryName}</span>` : ''}
-                    ${task.references?.length ? `<span class="qs-task-meta-item">${task.references.length} Referenz(en)</span>` : ''}
+                <div class="qs-category-content">
+                    ${tasks.length === 0 ? `
+                        <div class="qs-empty-category">
+                            <span>Keine Aufgaben in dieser Kategorie</span>
+                        </div>
+                    ` : tasks.map(task => this.renderTaskItem(task)).join('')}
                 </div>
             </div>
-        `).join('');
-        
-        // Update permission-based visibility
-        Permissions.updateViewElements();
+        `;
+    },
+    
+                </div>
+            </div>
+        `;
     },
     
     getScoringTypeLabel(task) {
@@ -714,6 +783,9 @@ const QualitySystemViews = {
         this.currentTeamId = team.id;
         const teamCodeVal = team.teamCode || team.team_code;
         
+        // Ensure sidebar highlighting for this team
+        this.highlightTeamNav(team.id, teamCodeVal);
+        
         // Load the template if not already loaded
         const container = document.getElementById('views-container');
         if (!document.getElementById('view-qsChecks')) {
@@ -742,12 +814,13 @@ const QualitySystemViews = {
             emptyAddBtn.onclick = () => this.showCheckModal();
         }
         
-        // Setup collapsible sidebar
+        // Setup collapsible sidebar toggle button
         const categoryToggle = document.getElementById('qs-check-categories-toggle');
         const categorySidebar = document.getElementById('qs-check-categories-sidebar');
         if (categoryToggle && categorySidebar) {
             categoryToggle.onclick = () => {
                 categorySidebar.classList.toggle('collapsed');
+                categoryToggle.classList.toggle('expanded');
             };
         }
         
@@ -815,8 +888,7 @@ const QualitySystemViews = {
     },
     
     renderChecks(checks) {
-        // Use list container (qs-checks-list) - same layout as tasks
-        const list = document.getElementById('qs-checks-list') || document.getElementById('qs-checks-grid');
+        const list = document.getElementById('qs-checks-list');
         const emptyState = document.getElementById('qs-checks-empty');
         
         if (checks.length === 0) {
@@ -827,36 +899,133 @@ const QualitySystemViews = {
         
         if (emptyState) emptyState.style.display = 'none';
         
-        // Use list layout like tasks - clickable item + action buttons
-        list.innerHTML = checks.map(check => `
+        // Group checks by category (like Knowledge Check)
+        const groupedChecks = this.groupChecksByCategory(checks);
+        
+        list.innerHTML = groupedChecks.map(group => this.renderCheckCategory(group)).join('');
+        
+        // Setup category toggle handlers
+        list.querySelectorAll('.qs-category-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const category = e.target.closest('.qs-category');
+                if (category) category.classList.toggle('collapsed');
+            });
+        });
+        
+        // Setup check item click handlers
+        list.querySelectorAll('.qs-task-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.qs-task-actions')) return;
+                const checkId = item.dataset.checkId;
+                if (checkId) this.showCheckDetails(checkId);
+            });
+            item.classList.add('clickable');
+        });
+        
+        // Update permission-based visibility
+        Permissions.updateViewElements();
+    },
+    
+    groupChecksByCategory(checks) {
+        const groups = {};
+        const uncategorized = [];
+        
+        checks.forEach(check => {
+            if (check.categoryId && check.categoryName) {
+                if (!groups[check.categoryId]) {
+                    groups[check.categoryId] = {
+                        id: check.categoryId,
+                        name: check.categoryName,
+                        checks: []
+                    };
+                }
+                groups[check.categoryId].checks.push(check);
+            } else {
+                uncategorized.push(check);
+            }
+        });
+        
+        const result = Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
+        
+        if (uncategorized.length > 0) {
+            result.push({
+                id: 'uncategorized',
+                name: 'Ohne Kategorie',
+                checks: uncategorized
+            });
+        }
+        
+        return result;
+    },
+    
+    renderCheckCategory(group) {
+        const { id, name, checks } = group;
+        const isUncategorized = id === 'uncategorized';
+        
+        return `
+            <div class="qs-category" data-category-id="${id}">
+                <div class="qs-category-header">
+                    <button type="button" class="qs-category-toggle btn-icon" title="Kategorie ein-/ausklappen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div class="qs-category-info">
+                        <h3>${name}</h3>
+                        <span class="qs-category-meta">${checks.length} Checks</span>
+                    </div>
+                    <div class="qs-category-actions">
+                        ${!isUncategorized ? `
+                            <button class="btn btn-sm btn-secondary" onclick="QualitySystemViews.showCheckModal(null, '${id}')" title="Check hinzufügen" data-permission="qs_checks_create">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="qs-category-content">
+                    ${checks.length === 0 ? `
+                        <div class="qs-empty-category">
+                            <span>Keine Checks in dieser Kategorie</span>
+                        </div>
+                    ` : checks.map(check => this.renderCheckItem(check)).join('')}
+                </div>
+            </div>
+        `;
+    },
+    
+    renderCheckItem(check) {
+        return `
             <div class="qs-task-item ${check.isArchived ? 'archived' : ''}" data-check-id="${check.id}">
                 <div class="qs-task-header">
-                    <h4 class="qs-task-clickable" onclick="QualitySystemViews.showCheckDetails('${check.id}')">
+                    <h4>
                         ${check.name}
                         <span class="qs-task-number">${check.checkNumber}</span>
                     </h4>
                     <div class="qs-task-actions">
-                        <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.showCheckDetails('${check.id}')" title="Details anzeigen">
+                        <button class="btn btn-icon btn-sm" onclick="event.stopPropagation(); QualitySystemViews.showCheckDetails('${check.id}')" title="Details anzeigen">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                 <circle cx="12" cy="12" r="3"></circle>
                             </svg>
                         </button>
-                        <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.showCheckModal('${check.id}')" title="Bearbeiten" data-permission="qs_checks_edit">
+                        <button class="btn btn-icon btn-sm" onclick="event.stopPropagation(); QualitySystemViews.showCheckModal('${check.id}')" title="Bearbeiten" data-permission="qs_checks_edit">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
                         ${check.isArchived ? `
-                            <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.restoreCheck('${check.id}')" title="Wiederherstellen" data-permission="qs_checks_delete">
+                            <button class="btn btn-icon btn-sm" onclick="event.stopPropagation(); QualitySystemViews.restoreCheck('${check.id}')" title="Wiederherstellen" data-permission="qs_checks_delete">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                     <polyline points="1 4 1 10 7 10"></polyline>
                                     <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                                 </svg>
                             </button>
                         ` : `
-                            <button class="btn btn-icon btn-sm btn-danger" onclick="QualitySystemViews.deleteCheck('${check.id}')" title="Löschen" data-permission="qs_checks_delete">
+                            <button class="btn btn-icon btn-sm btn-danger" onclick="event.stopPropagation(); QualitySystemViews.deleteCheck('${check.id}')" title="Löschen" data-permission="qs_checks_delete">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                     <polyline points="3 6 5 6 21 6"></polyline>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -865,32 +1034,13 @@ const QualitySystemViews = {
                         `}
                     </div>
                 </div>
-                <div class="qs-task-body" onclick="QualitySystemViews.showCheckDetails('${check.id}')" style="cursor: pointer;">
-                    ${check.description || 'Keine Beschreibung'}
-                </div>
+                <div class="qs-task-body">${check.description || 'Keine Beschreibung'}</div>
                 <div class="qs-task-meta">
-                    <span class="qs-task-meta-item">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <line x1="8" y1="6" x2="21" y2="6"></line>
-                            <line x1="8" y1="12" x2="21" y2="12"></line>
-                            <line x1="8" y1="18" x2="21" y2="18"></line>
-                        </svg>
-                        ${check.taskCount || 0} Aufgaben
-                    </span>
-                    <span class="qs-task-meta-item">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                        </svg>
-                        ${check.passingScore}% zum Bestehen
-                    </span>
-                    ${check.categoryName ? `<span class="qs-task-meta-item">Kategorie: ${check.categoryName}</span>` : ''}
+                    <span class="qs-task-meta-item">${check.taskCount || 0} Aufgaben</span>
+                    <span class="qs-task-meta-item">${check.passingScore}% zum Bestehen</span>
                 </div>
             </div>
-        `).join('');
-        
-        // Update permission-based visibility
-        Permissions.updateViewElements();
+        `;
     },
     
     filterChecks() {
