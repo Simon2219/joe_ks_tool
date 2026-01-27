@@ -3,8 +3,96 @@
    ============================================ */
 
 /* ============================================
-   MAIN TILES PAGE - Using KC Tile Styles
+   MAIN TILES PAGE
    ============================================ */
+
+.qs-main-container {
+    padding: var(--space-lg);
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.qs-section {
+    margin-bottom: var(--space-lg);
+}
+
+.qs-section-title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border);
+}
+
+.qs-section-divider {
+    height: 1px;
+    background: var(--border);
+    margin: var(--space-xl) 0;
+}
+
+.qs-tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-lg);
+    justify-content: center;
+}
+
+/* Ensure all tiles are same size */
+.qs-tiles-grid .kc-tile {
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+}
+
+.qs-tiles-grid .kc-tile h3 {
+    margin: var(--space-md) 0 var(--space-sm);
+}
+
+.qs-tiles-grid .kc-tile p {
+    flex: 1;
+    margin: 0 0 var(--space-md);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+}
+
+.qs-tiles-grid .kc-tile .kc-tile-stat {
+    margin-top: auto;
+}
+
+.qs-loading-teams {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: var(--space-xl);
+}
+
+.qs-no-teams-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--text-muted);
+}
+
+/* Nav team dot indicator */
+.qs-team-nav-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: var(--space-sm);
+    flex-shrink: 0;
+}
+
+/* Spacing in nav for qs teams container */
+#qs-nav-teams-container {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-xs);
+    padding-bottom: var(--space-xs);
+}
+
+#qs-nav-teams-container:empty {
+    display: none;
+}
 
 /* QS-specific icon colors that override the default gradient */
 .qs-tile .kc-tile-icon.qs-icon-billa {
@@ -31,31 +119,75 @@
    TEAM VIEW
    ============================================ */
 
-/* Team Stats - now use .kc-results-overview with .quality-stat-card */
+/* View Toggle Container - Centered */
+.qs-view-toggle-container {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-md) var(--space-lg);
+}
 
 .qs-view-toggle {
-    display: flex;
-    gap: var(--space-sm);
-    padding: 0 var(--space-lg) var(--space-md);
-}
-
-.btn-toggle {
-    flex: 1;
-    max-width: 200px;
-    background: var(--surface);
+    display: inline-flex;
+    gap: 0;
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 4px;
 }
 
-.btn-toggle.active {
+.qs-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-lg);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.qs-toggle-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.qs-toggle-btn.active {
     background: var(--brand-primary);
     color: white;
-    border-color: var(--brand-primary);
 }
 
-.btn-toggle svg {
+.qs-toggle-btn svg {
     width: 16px;
     height: 16px;
-    margin-right: var(--space-xs);
+}
+
+/* Team Filters - Always inline */
+.qs-team-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    align-items: center;
+}
+
+.qs-team-filters .form-input,
+.qs-team-filters .form-select {
+    min-width: 150px;
+    flex: 0 0 auto;
+}
+
+.qs-team-filters #qs-team-search {
+    flex: 1;
+    min-width: 200px;
+    max-width: 300px;
+}
+
+.qs-filter-group {
+    display: flex;
+    gap: var(--space-sm);
 }
 
 /* ============================================

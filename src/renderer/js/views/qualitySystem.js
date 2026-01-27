@@ -98,13 +98,29 @@ const QualitySystemViews = {
             return;
         }
         
+        // Generate a tile for each team with relevant stats
+        const teamsWithStats = await Promise.all(this.teams.map(async team => {
+            let avgScore = '--';
+            let passingRate = '--';
+            try {
+                const statsResult = await api.qs.getTeamStatistics(team.id);
+                if (statsResult.success && statsResult.statistics) {
+                    avgScore = `${statsResult.statistics.averageScore || 0}%`;
+                    passingRate = `${statsResult.statistics.passingRate || 0}%`;
+                }
+            } catch (e) {
+                console.error('Failed to load stats for team:', team.id, e);
+            }
+            return { ...team, avgScore, passingRate };
+        }));
+        
         // Generate a tile for each team
-        container.innerHTML = this.teams.map(team => {
+        container.innerHTML = teamsWithStats.map(team => {
             const teamColor = team.color || '#3b82f6';
             return `
                 <div class="kc-tile qs-tile qs-team-tile" 
                      data-team-id="${team.id}" 
-                     data-team-code="${team.teamCode}"
+                     data-team-code="${team.teamCode || team.team_code}"
                      data-permission="qs_view">
                     <div class="kc-tile-icon" style="background: linear-gradient(135deg, ${teamColor} 0%, ${this.lightenColor(teamColor, 20)} 100%);">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -116,7 +132,7 @@ const QualitySystemViews = {
                     </div>
                     <h3>${team.name}</h3>
                     <p>Quality Checks für ${team.name} durchführen und verwalten</p>
-                    <span class="kc-tile-stat">${team.agentCount || 0} Mitglieder</span>
+                    <span class="kc-tile-stat">Ø ${team.avgScore} · ${team.passingRate} bestanden</span>
                 </div>
             `;
         }).join('');
@@ -159,7 +175,7 @@ const QualitySystemViews = {
     
     setupTileHandlers() {
         // Setup click handlers for static tiles (Tracking, My Results, Settings)
-        document.querySelectorAll('#qs-tiles-container > .kc-tile[data-navigate]').forEach(tile => {
+        document.querySelectorAll('#qs-tools-tiles .kc-tile[data-navigate]').forEach(tile => {
             tile.onclick = () => {
                 const view = tile.dataset.navigate;
                 const perm = tile.dataset.permission;
@@ -213,23 +229,45 @@ const QualitySystemViews = {
         this.currentTeam = team;
         this.currentTeamId = team.id;
         
+        const teamCode = team.teamCode || team.team_code;
+        
         // Update title
         document.getElementById('qs-team-title').textContent = team.name;
         
         // Setup back button
         document.getElementById('qs-team-back-btn').onclick = () => App.navigateTo('qualitySystem');
         
-        // Setup action buttons
-        document.getElementById('qs-team-tasks-btn').onclick = () => this.showTasksCatalog(teamCode);
-        document.getElementById('qs-team-checks-btn').onclick = () => this.showChecksCatalog(teamCode);
-        document.getElementById('qs-new-evaluation-btn').onclick = () => this.showNewEvaluationModal();
+        // Setup action buttons - use arrow functions to preserve context
+        const tasksBtn = document.getElementById('qs-team-tasks-btn');
+        const checksBtn = document.getElementById('qs-team-checks-btn');
+        const newEvalBtn = document.getElementById('qs-new-evaluation-btn');
+        
+        if (tasksBtn) {
+            tasksBtn.onclick = () => this.showTasksCatalog(teamCode);
+        }
+        if (checksBtn) {
+            checksBtn.onclick = () => this.showChecksCatalog(teamCode);
+        }
+        if (newEvalBtn) {
+            newEvalBtn.onclick = () => this.showNewEvaluationModal();
+        }
         
         // Setup view toggle
-        document.getElementById('qs-view-agents-btn').onclick = () => this.toggleTeamView('agents');
-        document.getElementById('qs-view-evaluations-btn').onclick = () => this.toggleTeamView('evaluations');
+        const agentsBtn = document.getElementById('qs-view-agents-btn');
+        const evaluationsBtn = document.getElementById('qs-view-evaluations-btn');
+        
+        if (agentsBtn) {
+            agentsBtn.onclick = () => this.toggleTeamView('agents');
+        }
+        if (evaluationsBtn) {
+            evaluationsBtn.onclick = () => this.toggleTeamView('evaluations');
+        }
         
         // Setup search
-        document.getElementById('qs-team-search').oninput = (e) => this.filterTeamView(e.target.value);
+        const searchInput = document.getElementById('qs-team-search');
+        if (searchInput) {
+            searchInput.oninput = (e) => this.filterTeamView(e.target.value);
+        }
         
         // Load data
         await this.loadTeamStats();
@@ -241,14 +279,18 @@ const QualitySystemViews = {
     },
     
     async loadTeamStats() {
-        const result = await api.qs.getTeamStatistics(this.currentTeamId);
-        if (result.success) {
-            const stats = result.statistics;
-            document.getElementById('qs-stat-team-agents').textContent = stats.totalAgents;
-            document.getElementById('qs-stat-team-evaluations').textContent = stats.totalEvaluations;
-            document.getElementById('qs-stat-team-week').textContent = stats.evaluationsThisWeek;
-            document.getElementById('qs-stat-team-avg').textContent = `${stats.averageScore}%`;
-            document.getElementById('qs-stat-team-pass').textContent = `${stats.passingRate}%`;
+        try {
+            const result = await api.qs.getTeamStatistics(this.currentTeamId);
+            if (result.success && result.statistics) {
+                const stats = result.statistics;
+                // Update stats with relevant metrics (no agent/evaluation counts)
+                document.getElementById('qs-stat-team-avg').textContent = `${stats.averageScore || 0}%`;
+                document.getElementById('qs-stat-team-pass').textContent = `${stats.passingRate || 0}%`;
+                document.getElementById('qs-stat-team-week').textContent = stats.evaluationsThisWeek || 0;
+                document.getElementById('qs-stat-team-month').textContent = stats.evaluationsThisMonth || 0;
+            }
+        } catch (error) {
+            console.error('Failed to load team stats:', error);
         }
     },
     
@@ -283,23 +325,25 @@ const QualitySystemViews = {
             <tr data-agent-id="${agent.id}">
                 <td>${agent.first_name} ${agent.last_name}</td>
                 <td>${agent.role_name || '-'}</td>
-                <td>${agent.stats.totalEvaluations}</td>
-                <td>${agent.stats.averageScore}%</td>
+                <td>${agent.stats.averageScore || 0}%</td>
+                <td>${agent.stats.passingRate || 0}%</td>
                 <td>${agent.stats.recentEvaluations?.[0]?.createdAt ? 
                     new Date(agent.stats.recentEvaluations[0].createdAt).toLocaleDateString('de-DE') : '-'}</td>
                 <td>
-                    <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.viewAgentDetails('${agent.id}')" title="Details">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
-                    <button class="btn btn-icon btn-sm btn-primary" onclick="QualitySystemViews.startEvaluationForAgent('${agent.id}')" title="Neuer Check" data-permission="qs_evaluate">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                    </button>
+                    <div class="table-actions">
+                        <button class="btn btn-icon btn-sm" onclick="QualitySystemViews.viewAgentDetails('${agent.id}')" title="Details">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        <button class="btn btn-icon btn-sm btn-primary" onclick="QualitySystemViews.startEvaluationForAgent('${agent.id}')" title="Neuer Check" data-permission="qs_evaluate">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -429,9 +473,8 @@ const QualitySystemViews = {
         
         // Setup back button
         document.getElementById('qs-tasks-back-btn').onclick = () => {
-            if (teamCode === 'billa') App.navigateTo('qsTeamBilla');
-            else if (teamCode === 'social_media') App.navigateTo('qsTeamSocial');
-            else App.navigateTo('qualitySystem');
+            // Navigate back to the team view with context
+            App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCode });
         };
         
         // Setup action buttons
@@ -638,9 +681,8 @@ const QualitySystemViews = {
         
         // Setup back button
         document.getElementById('qs-checks-back-btn').onclick = () => {
-            if (teamCode === 'billa') App.navigateTo('qsTeamBilla');
-            else if (teamCode === 'social_media') App.navigateTo('qsTeamSocial');
-            else App.navigateTo('qualitySystem');
+            // Navigate back to the team view with context
+            App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCode });
         };
         
         // Setup action buttons
@@ -792,27 +834,27 @@ const QualitySystemViews = {
         document.getElementById('qs-tracking-avg').textContent = `${stats.averageScore}%`;
         document.getElementById('qs-tracking-pass').textContent = `${stats.passingRate}%`;
         
-        // Team cards
+        // Team cards - showing relevant metrics (no agent/evaluation counts)
         const teamCardsEl = document.getElementById('qs-team-cards');
         teamCardsEl.innerHTML = stats.teamStats.map(team => `
             <div class="qs-team-stat-card">
                 <h4>${team.teamName}</h4>
                 <div class="team-stats-grid">
                     <div class="mini-stat">
-                        <div class="mini-stat-value">${team.totalEvaluations}</div>
-                        <div class="mini-stat-label">Evaluierungen</div>
-                    </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat-value">${team.totalAgents}</div>
-                        <div class="mini-stat-label">Agents</div>
-                    </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat-value">${team.averageScore}%</div>
+                        <div class="mini-stat-value">${team.averageScore || 0}%</div>
                         <div class="mini-stat-label">Ø Score</div>
                     </div>
                     <div class="mini-stat">
-                        <div class="mini-stat-value">${team.passingRate}%</div>
-                        <div class="mini-stat-label">Bestanden</div>
+                        <div class="mini-stat-value">${team.passingRate || 0}%</div>
+                        <div class="mini-stat-label">Bestehensrate</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-value">${team.evaluationsThisWeek || 0}</div>
+                        <div class="mini-stat-label">Diese Woche</div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-value">${team.avgHandleTime || '--'}</div>
+                        <div class="mini-stat-label">Ø Bearbeitungszeit</div>
                     </div>
                 </div>
             </div>

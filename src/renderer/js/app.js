@@ -213,6 +213,9 @@ const App = {
         document.getElementById('login-password').value = '';
         document.getElementById('login-error').classList.add('hidden');
 
+        // Populate dynamic navigation elements (like QS teams)
+        await this.populateQSTeamsNav();
+
         // Initialize the default view
         await this.navigateTo('dashboard');
 
@@ -230,6 +233,47 @@ const App = {
         document.getElementById('user-initials').textContent = initials;
         document.getElementById('user-name').textContent = fullName;
         document.getElementById('user-role').textContent = roleName;
+    },
+
+    /**
+     * Populates the QS navigation submenu with teams dynamically
+     */
+    async populateQSTeamsNav() {
+        const container = document.getElementById('qs-nav-teams-container');
+        if (!container) return;
+        
+        try {
+            const result = await window.api.teams.getAll();
+            if (!result.success || !result.teams?.length) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            // Generate nav items for each team
+            container.innerHTML = result.teams.map(team => `
+                <a href="#" class="nav-item nav-subitem qs-team-nav-item" 
+                   data-view="qsTeam" 
+                   data-team-id="${team.id}"
+                   data-team-code="${team.teamCode || team.team_code}"
+                   data-permission="qs_view">
+                    <span class="qs-team-nav-dot" style="background: ${team.color || '#3b82f6'};"></span>
+                    <span>${team.name}</span>
+                </a>
+            `).join('');
+            
+            // Add click handlers for team nav items
+            container.querySelectorAll('.qs-team-nav-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const teamId = item.dataset.teamId;
+                    const teamCode = item.dataset.teamCode;
+                    this.navigateTo('qsTeam', { teamId, teamCode });
+                });
+            });
+        } catch (error) {
+            console.error('Failed to populate QS teams nav:', error);
+            container.innerHTML = '';
+        }
     },
 
     /**
@@ -322,6 +366,14 @@ const App = {
         // Update active nav item
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.toggle('active', item.dataset.view === viewName);
+        });
+        
+        // Update active state for dynamic QS team nav items
+        document.querySelectorAll('.qs-team-nav-item').forEach(item => {
+            const isActive = viewName === 'qsTeam' && 
+                            (item.dataset.teamId === this.currentViewParams?.teamId ||
+                             item.dataset.teamCode === this.currentViewParams?.teamCode);
+            item.classList.toggle('active', isActive);
         });
 
         // Update submenu parent states and expand/collapse based on active section

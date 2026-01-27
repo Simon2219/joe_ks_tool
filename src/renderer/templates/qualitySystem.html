@@ -1,51 +1,63 @@
 <section id="view-qualitySystem" class="view">
-    <div class="kc-tiles-container" id="qs-tiles-container">
-        <!-- Team tiles will be dynamically generated here -->
-        <div id="qs-team-tiles-dynamic">
-            <!-- Loading state -->
-            <div class="qs-loading-teams">
-                <p class="text-muted">Lade Teams...</p>
+    <div class="qs-main-container">
+        <!-- Team Section -->
+        <div class="qs-section">
+            <h3 class="qs-section-title">Teams</h3>
+            <div class="qs-tiles-grid" id="qs-team-tiles-dynamic">
+                <!-- Team tiles will be dynamically generated here -->
+                <div class="qs-loading-teams">
+                    <p class="text-muted">Lade Teams...</p>
+                </div>
             </div>
         </div>
         
-        <!-- Quality Tracking Tile -->
-        <div class="kc-tile qs-tile" data-navigate="qsTracking" data-permission="qs_tracking_view">
-            <div class="kc-tile-icon qs-icon-tracking">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="20" x2="18" y2="10"></line>
-                    <line x1="12" y1="20" x2="12" y2="4"></line>
-                    <line x1="6" y1="20" x2="6" y2="14"></line>
-                </svg>
-            </div>
-            <h3>Quality Tracking</h3>
-            <p>Übersicht über alle Quality Checks und Statistiken</p>
-            <span class="kc-tile-stat" id="qs-stat-tracking-total">0 Evaluierungen</span>
-        </div>
+        <!-- Divider -->
+        <div class="qs-section-divider"></div>
         
-        <!-- My Results Tile (for agents) -->
-        <div class="kc-tile qs-tile" data-navigate="qsMyResults" data-permission="qs_results_view_own">
-            <div class="kc-tile-icon qs-icon-results">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
+        <!-- Tools Section -->
+        <div class="qs-section">
+            <h3 class="qs-section-title">Übersicht & Tools</h3>
+            <div class="qs-tiles-grid" id="qs-tools-tiles">
+                <!-- Quality Tracking Tile -->
+                <div class="kc-tile qs-tile" data-navigate="qsTracking" data-permission="qs_tracking_view">
+                    <div class="kc-tile-icon qs-icon-tracking">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                    </div>
+                    <h3>Quality Tracking</h3>
+                    <p>Übersicht über alle Quality Checks und Statistiken</p>
+                    <span class="kc-tile-stat" id="qs-stat-tracking-total">0 Evaluierungen</span>
+                </div>
+                
+                <!-- My Results Tile (for agents) -->
+                <div class="kc-tile qs-tile" data-navigate="qsMyResults" data-permission="qs_results_view_own">
+                    <div class="kc-tile-icon qs-icon-results">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                    </div>
+                    <h3>Meine Ergebnisse</h3>
+                    <p>Ihre persönlichen Quality Check Ergebnisse und Statistiken</p>
+                    <span class="kc-tile-stat" id="qs-stat-my-results">0 Checks</span>
+                </div>
+                
+                <!-- Settings Tile (for supervisors) -->
+                <div class="kc-tile qs-tile" data-navigate="qsSettings" data-permission="qs_settings_manage">
+                    <div class="kc-tile-icon qs-icon-settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </div>
+                    <h3>Einstellungen</h3>
+                    <p>Supervisor-Einstellungen und Standardwerte konfigurieren</p>
+                    <span class="kc-tile-stat">Konfiguration</span>
+                </div>
             </div>
-            <h3>Meine Ergebnisse</h3>
-            <p>Ihre persönlichen Quality Check Ergebnisse und Statistiken</p>
-            <span class="kc-tile-stat" id="qs-stat-my-results">0 Checks</span>
-        </div>
-        
-        <!-- Settings Tile (for supervisors) -->
-        <div class="kc-tile qs-tile" data-navigate="qsSettings" data-permission="qs_settings_manage">
-            <div class="kc-tile-icon qs-icon-settings">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-            </div>
-            <h3>Einstellungen</h3>
-            <p>Supervisor-Einstellungen und Standardwerte konfigurieren</p>
-            <span class="kc-tile-stat">Konfiguration</span>
         </div>
     </div>
     

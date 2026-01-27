@@ -106,7 +106,7 @@
                         <span>TicketSystem</span>
                     </a>
                     <!-- Quality System v2 with Sub-menu -->
-                    <div class="nav-item-group" data-permission="qs_view">
+                    <div class="nav-item-group" data-permission="qs_view" id="qs-nav-group">
                         <a href="#" class="nav-item has-submenu" data-view="qualitySystem" data-permission="qs_view">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -114,13 +114,10 @@
                             </svg>
                             <span>Quality System</span>
                         </a>
-                        <div class="nav-submenu">
-                            <a href="#" class="nav-item nav-subitem" data-view="qsTeamBilla" data-permission="qs_team_billa_access">
-                                <span>BILLA</span>
-                            </a>
-                            <a href="#" class="nav-item nav-subitem" data-view="qsTeamSocial" data-permission="qs_team_social_access">
-                                <span>Social Media</span>
-                            </a>
+                        <div class="nav-submenu" id="qs-nav-submenu">
+                            <!-- Team items will be dynamically populated -->
+                            <div id="qs-nav-teams-container"></div>
+                            <!-- Static items -->
                             <a href="#" class="nav-item nav-subitem" data-view="qsTracking" data-permission="qs_tracking_view">
                                 <span>Quality Tracking</span>
                             </a>

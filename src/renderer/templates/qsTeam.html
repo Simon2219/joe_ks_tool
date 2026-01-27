@@ -41,76 +41,72 @@
         </div>
     </div>
 
-    <!-- Team Stats -->
-    <div class="kc-results-overview" id="qs-team-stats">
-        <div class="quality-stat-card">
-            <span class="stat-value" id="qs-stat-team-agents">0</span>
-            <span class="stat-label">Agents</span>
-        </div>
-        <div class="quality-stat-card">
-            <span class="stat-value" id="qs-stat-team-evaluations">0</span>
-            <span class="stat-label">Evaluierungen</span>
-        </div>
-        <div class="quality-stat-card">
-            <span class="stat-value" id="qs-stat-team-week">0</span>
-            <span class="stat-label">Diese Woche</span>
-        </div>
+    <!-- Team Stats - Using shared quality stat cards -->
+    <div class="kc-results-overview" id="qs-team-stats" style="padding: 0 var(--space-lg) var(--space-lg);">
         <div class="quality-stat-card">
             <span class="stat-value" id="qs-stat-team-avg">0%</span>
             <span class="stat-label">Ø Score</span>
         </div>
         <div class="quality-stat-card">
             <span class="stat-value" id="qs-stat-team-pass">0%</span>
-            <span class="stat-label">Bestanden</span>
+            <span class="stat-label">Bestehensrate</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="qs-stat-team-week">0</span>
+            <span class="stat-label">Diese Woche</span>
+        </div>
+        <div class="quality-stat-card">
+            <span class="stat-value" id="qs-stat-team-month">0</span>
+            <span class="stat-label">Diesen Monat</span>
         </div>
     </div>
 
-    <!-- View Toggle -->
-    <div class="qs-view-toggle">
-        <button class="btn btn-toggle active" id="qs-view-agents-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-            </svg>
-            Agents
-        </button>
-        <button class="btn btn-toggle" id="qs-view-evaluations-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-            </svg>
-            Evaluierungen
-        </button>
+    <!-- View Toggle - Centered -->
+    <div class="qs-view-toggle-container">
+        <div class="qs-view-toggle">
+            <button class="btn qs-toggle-btn active" id="qs-view-agents-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                </svg>
+                Agents
+            </button>
+            <button class="btn qs-toggle-btn" id="qs-view-evaluations-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                Evaluierungen
+            </button>
+        </div>
     </div>
 
-    <!-- Filters -->
-    <div class="view-filters" id="qs-team-filters">
-        <div class="filter-group">
-            <input type="text" id="qs-team-search" class="form-input" placeholder="Suchen...">
-        </div>
-        <div class="filter-group" id="qs-filter-status-group" style="display: none;">
+    <!-- Filters - Always inline -->
+    <div class="qs-team-filters">
+        <input type="text" id="qs-team-search" class="form-input" placeholder="Suchen...">
+        <div class="qs-filter-group" id="qs-filter-status-group" style="display: none;">
             <select id="qs-filter-status" class="form-select">
                 <option value="">Alle Status</option>
                 <option value="completed">Abgeschlossen</option>
                 <option value="in_progress">In Bearbeitung</option>
             </select>
         </div>
-        <div class="filter-group" id="qs-filter-date-group" style="display: none;">
+        <div class="qs-filter-group" id="qs-filter-date-group" style="display: none;">
             <input type="date" id="qs-filter-date-from" class="form-input" placeholder="Von">
             <input type="date" id="qs-filter-date-to" class="form-input" placeholder="Bis">
         </div>
     </div>
 
     <!-- Agents View -->
-    <div class="qs-agents-view" id="qs-agents-view">
+    <div class="qs-agents-view" id="qs-agents-view" style="padding: 0 var(--space-lg);">
         <div class="table-container">
             <table class="data-table sortable" id="qs-agents-table">
                 <thead>
                     <tr>
                         <th data-sort="name">Name</th>
                         <th data-sort="role">Rolle</th>
-                        <th data-sort="evaluations">Evaluierungen</th>
                         <th data-sort="avgScore">Ø Score</th>
+                        <th data-sort="passingRate">Bestehensrate</th>
                         <th data-sort="lastEvaluation">Letzte Evaluierung</th>
                         <th>Aktionen</th>
                     </tr>
@@ -131,7 +127,7 @@
     </div>
 
     <!-- Evaluations View -->
-    <div class="qs-evaluations-view" id="qs-evaluations-view" style="display: none;">
+    <div class="qs-evaluations-view" id="qs-evaluations-view" style="display: none; padding: 0 var(--space-lg);">
         <div class="table-container">
             <table class="data-table sortable" id="qs-evaluations-table">
                 <thead>
