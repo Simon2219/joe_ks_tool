@@ -39,6 +39,15 @@ const QualitySystemViews = {
         return this.teams.find(t => t.teamCode === code || t.team_code === code);
     },
     
+    // Map team codes to their sidebar view names
+    getTeamViewName(teamCode) {
+        const teamViewMap = {
+            'billa': 'qsTeamBilla',
+            'social_media': 'qsTeamSocial',
+            'support': 'qsTeamSupport'
+        };
+        return teamViewMap[teamCode] || 'qualitySystem';
+    },
 
     // ============================================
     // MAIN TILES PAGE
@@ -172,8 +181,9 @@ const QualitySystemViews = {
         this.currentTeamId = teamId;
         this.currentTeam = this.teams.find(t => t.id === teamId);
         
-        // Navigate to the generic team view
-        App.navigateTo('qsTeam', { teamId, teamCode });
+        // Navigate to the specific team view based on team code
+        const teamViewName = this.getTeamViewName(teamCode);
+        App.navigateTo(teamViewName, { teamId, teamCode });
     },
     
     setupTileHandlers() {
@@ -501,9 +511,10 @@ const QualitySystemViews = {
         // Update title
         document.getElementById('qs-tasks-title').textContent = `${team.name} - Aufgaben Katalog`;
         
-        // Setup back button
+        // Setup back button - navigate to the specific team view
+        const teamViewName = this.getTeamViewName(teamCodeVal);
         document.getElementById('qs-tasks-back-btn').onclick = () => {
-            App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCodeVal });
+            App.navigateTo(teamViewName, { teamId: team.id, teamCode: teamCodeVal });
         };
         
         // Setup action buttons
@@ -820,9 +831,10 @@ const QualitySystemViews = {
         // Update title
         document.getElementById('qs-checks-title').textContent = `${team.name} - Check Katalog`;
         
-        // Setup back button
+        // Setup back button - navigate to the specific team view
+        const teamViewName = this.getTeamViewName(teamCodeVal);
         document.getElementById('qs-checks-back-btn').onclick = () => {
-            App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCodeVal });
+            App.navigateTo(teamViewName, { teamId: team.id, teamCode: teamCodeVal });
         };
         
         // Setup action buttons
@@ -1306,12 +1318,12 @@ const QualitySystemViews = {
         const evaluation = result.evaluation;
         this.currentEvaluation = evaluation;
         
-        // Setup back button
+        // Setup back button - navigate to the specific team view
         document.getElementById('qs-result-back-btn').onclick = () => {
             if (this.currentTeam) {
-                if (this.currentTeam.teamCode === 'billa') App.navigateTo('qsTeamBilla');
-                else if (this.currentTeam.teamCode === 'social_media') App.navigateTo('qsTeamSocial');
-                else App.navigateTo('qualitySystem');
+                const teamCode = this.currentTeam.teamCode || this.currentTeam.team_code;
+                const teamViewName = this.getTeamViewName(teamCode);
+                App.navigateTo(teamViewName, { teamId: this.currentTeam.id, teamCode: teamCode });
             } else {
                 App.navigateTo('qualitySystem');
             }
@@ -2159,10 +2171,15 @@ const QualitySystemViews = {
         document.getElementById('qs-eval-channel').textContent = evaluation.interactionChannel || 'Ticket';
         document.getElementById('qs-eval-reference').value = evaluation.interactionReference || '';
         
-        // Setup buttons
+        // Setup buttons - navigate back to the team view
         document.getElementById('qs-eval-back-btn').onclick = () => {
             if (confirm('Änderungen verwerfen?')) {
-                App.navigateTo('qualitySystem');
+                if (this.currentTeam) {
+                    const teamViewName = this.getTeamViewName(this.currentTeam.teamCode || this.currentTeam.team_code);
+                    App.navigateTo(teamViewName, { teamId: this.currentTeam.id, teamCode: this.currentTeam.teamCode || this.currentTeam.team_code });
+                } else {
+                    App.navigateTo('qualitySystem');
+                }
             }
         };
         document.getElementById('qs-eval-submit-btn').onclick = () => this.submitCurrentEvaluation();
