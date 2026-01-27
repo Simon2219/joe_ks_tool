@@ -5,6 +5,8 @@
 
 const App = {
     currentView: 'dashboard',
+    currentViewParams: null,
+    currentQsTeamView: null,
     isAuthenticated: false,
     loadedViews: new Set(),
 
@@ -213,9 +215,6 @@ const App = {
         document.getElementById('login-password').value = '';
         document.getElementById('login-error').classList.add('hidden');
 
-        // Populate dynamic navigation elements (like QS teams)
-        await this.populateQSTeamsNav();
-
         // Initialize the default view
         await this.navigateTo('dashboard');
 
@@ -233,47 +232,6 @@ const App = {
         document.getElementById('user-initials').textContent = initials;
         document.getElementById('user-name').textContent = fullName;
         document.getElementById('user-role').textContent = roleName;
-    },
-
-    /**
-     * Populates the QS navigation submenu with teams dynamically
-     */
-    async populateQSTeamsNav() {
-        const container = document.getElementById('qs-nav-teams-container');
-        if (!container) return;
-        
-        try {
-            const result = await window.api.teams.getAll();
-            if (!result.success || !result.teams?.length) {
-                container.innerHTML = '';
-                return;
-            }
-            
-            // Generate nav items for each team
-            container.innerHTML = result.teams.map(team => `
-                <a href="#" class="nav-item nav-subitem qs-team-nav-item" 
-                   data-view="qsTeam" 
-                   data-team-id="${team.id}"
-                   data-team-code="${team.teamCode || team.team_code}"
-                   data-permission="qs_view">
-                    <span class="qs-team-nav-dot" style="background: ${team.color || '#3b82f6'};"></span>
-                    <span>${team.name}</span>
-                </a>
-            `).join('');
-            
-            // Add click handlers for team nav items
-            container.querySelectorAll('.qs-team-nav-item').forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const teamId = item.dataset.teamId;
-                    const teamCode = item.dataset.teamCode;
-                    this.navigateTo('qsTeam', { teamId, teamCode });
-                });
-            });
-        } catch (error) {
-            console.error('Failed to populate QS teams nav:', error);
-            container.innerHTML = '';
-        }
     },
 
     /**
@@ -360,29 +318,27 @@ const App = {
         // Define which views belong to which submenu groups
         const submenuGroups = {
             knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcTestRuns', 'kcArchive', 'kcAssigned'],
-            qualitySystem: ['qualitySystem', 'qsTeam', 'qsTeamBilla', 'qsTeamSocial', 'qsTracking', 'qsMyResults', 'qsSettings', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult']
+            qualitySystem: ['qualitySystem', 'qsTeamBilla', 'qsTeamSocial', 'qsTeamSupport', 'qsTracking', 'qsMyResults', 'qsSettings', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult']
         };
         
-        // Update active nav item
-        document.querySelectorAll('.nav-item').forEach(item => {
+        // QS child views that should highlight their parent team
+        const qsTeamChildViews = ['qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult'];
+        
+        // Determine which sidebar item should be highlighted
+        let sidebarHighlight = viewName;
+        if (qsTeamChildViews.includes(viewName) && this.currentQsTeamView) {
+            // For child views, highlight the parent team
+            sidebarHighlight = this.currentQsTeamView;
+        }
+        
+        // Update active nav item (top-level items like Dashboard, UserSystem, etc.)
+        document.querySelectorAll('.nav-item:not(.nav-subitem)').forEach(item => {
             item.classList.toggle('active', item.dataset.view === viewName);
         });
         
-        // Update active state for dynamic QS team nav items
-        // Also keep team active when in qsTasks, qsChecks, qsEvaluation, qsResult
-        const qsTeamRelatedViews = ['qsTeam', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult'];
-        const isQsTeamRelated = qsTeamRelatedViews.includes(viewName);
-        
-        document.querySelectorAll('.qs-team-nav-item').forEach(item => {
-            const isActive = isQsTeamRelated && 
-                            (item.dataset.teamId === this.currentViewParams?.teamId ||
-                             item.dataset.teamCode === this.currentViewParams?.teamCode);
-            item.classList.toggle('active', isActive);
-        });
-        
-        // Also update nav-subitem active states for QS static items
-        document.querySelectorAll('#qs-nav-submenu .nav-subitem:not(.qs-team-nav-item)').forEach(item => {
-            item.classList.toggle('active', item.dataset.view === viewName);
+        // Update nav-subitem active states (submenu items)
+        document.querySelectorAll('.nav-subitem').forEach(item => {
+            item.classList.toggle('active', item.dataset.view === sidebarHighlight);
         });
 
         // Update submenu parent states and expand/collapse based on active section
@@ -439,9 +395,9 @@ const App = {
             tickets: 'TicketSystem',
             quality: 'QualitySystem',
             qualitySystem: 'Quality System',
-            qsTeam: params?.teamCode ? params.teamCode : 'Team',
             qsTeamBilla: 'BILLA',
             qsTeamSocial: 'Social Media',
+            qsTeamSupport: 'Support',
             qsTracking: 'Quality Tracking',
             qsMyResults: 'Meine Ergebnisse',
             qsSettings: 'Quality Check Settings',
@@ -511,19 +467,17 @@ const App = {
                 case 'qualitySystem':
                     await QualitySystemViews.showMainPage();
                     break;
-                case 'qsTeam':
-                    // Dynamic team view - team ID/code passed via params
-                    if (this.currentViewParams?.teamId) {
-                        await QualitySystemViews.showTeamView(this.currentViewParams.teamId);
-                    } else if (this.currentViewParams?.teamCode) {
-                        await QualitySystemViews.showTeamView(this.currentViewParams.teamCode);
-                    }
-                    break;
                 case 'qsTeamBilla':
+                    this.currentQsTeamView = 'qsTeamBilla';
                     await QualitySystemViews.showTeamView('billa');
                     break;
                 case 'qsTeamSocial':
+                    this.currentQsTeamView = 'qsTeamSocial';
                     await QualitySystemViews.showTeamView('social_media');
+                    break;
+                case 'qsTeamSupport':
+                    this.currentQsTeamView = 'qsTeamSupport';
+                    await QualitySystemViews.showTeamView('support');
                     break;
                 case 'qsTracking':
                     await QualitySystemViews.showTrackingView();
