@@ -272,10 +272,10 @@ const QualitySystemViews = {
         const newEvalBtn = document.getElementById('qs-new-evaluation-btn');
         
         if (tasksBtn) {
-            tasksBtn.onclick = () => this.showTasksCatalog(teamCode);
+            tasksBtn.onclick = () => App.navigateTo('qsTasks', { teamId: this.currentTeamId, teamCode: teamCode });
         }
         if (checksBtn) {
-            checksBtn.onclick = () => this.showChecksCatalog(teamCode);
+            checksBtn.onclick = () => App.navigateTo('qsChecks', { teamId: this.currentTeamId, teamCode: teamCode });
         }
         if (newEvalBtn) {
             newEvalBtn.onclick = () => this.showNewEvaluationModal();
@@ -480,21 +480,21 @@ const QualitySystemViews = {
     // ============================================
     
     async showTasksCatalog(teamCode) {
-        const team = this.getTeamByCode(teamCode);
+        const team = this.getTeamByCode(teamCode) || this.getTeamById(teamCode);
         if (!team) return;
         
         this.currentTeam = team;
         this.currentTeamId = team.id;
+        const teamCodeVal = team.teamCode || team.team_code;
         
         // Load the template if not already loaded
-        const container = document.getElementById('main-content');
+        const container = document.getElementById('views-container');
         if (!document.getElementById('view-qsTasks')) {
             const template = await fetch('templates/qsTasks.html').then(r => r.text());
             container.insertAdjacentHTML('beforeend', template);
         }
         
-        // Hide other views and show tasks
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        // Ensure view is visible (App.navigateTo may have already done this)
         document.getElementById('view-qsTasks').classList.add('active');
         
         // Update title
@@ -502,7 +502,7 @@ const QualitySystemViews = {
         
         // Setup back button
         document.getElementById('qs-tasks-back-btn').onclick = () => {
-            App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCode });
+            App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCodeVal });
         };
         
         // Setup action buttons
@@ -707,21 +707,21 @@ const QualitySystemViews = {
     // ============================================
     
     async showChecksCatalog(teamCode) {
-        const team = this.getTeamByCode(teamCode);
+        const team = this.getTeamByCode(teamCode) || this.getTeamById(teamCode);
         if (!team) return;
         
         this.currentTeam = team;
         this.currentTeamId = team.id;
+        const teamCodeVal = team.teamCode || team.team_code;
         
         // Load the template if not already loaded
-        const container = document.getElementById('main-content');
+        const container = document.getElementById('views-container');
         if (!document.getElementById('view-qsChecks')) {
             const template = await fetch('templates/qsChecks.html').then(r => r.text());
             container.insertAdjacentHTML('beforeend', template);
         }
         
-        // Hide other views and show checks
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        // Ensure view is visible (App.navigateTo may have already done this)
         document.getElementById('view-qsChecks').classList.add('active');
         
         // Update title
@@ -729,7 +729,7 @@ const QualitySystemViews = {
         
         // Setup back button
         document.getElementById('qs-checks-back-btn').onclick = () => {
-            App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCode });
+            App.navigateTo('qsTeam', { teamId: team.id, teamCode: teamCodeVal });
         };
         
         // Setup action buttons
