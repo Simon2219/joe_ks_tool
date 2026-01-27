@@ -369,11 +369,20 @@ const App = {
         });
         
         // Update active state for dynamic QS team nav items
+        // Also keep team active when in qsTasks, qsChecks, qsEvaluation, qsResult
+        const qsTeamRelatedViews = ['qsTeam', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult'];
+        const isQsTeamRelated = qsTeamRelatedViews.includes(viewName);
+        
         document.querySelectorAll('.qs-team-nav-item').forEach(item => {
-            const isActive = viewName === 'qsTeam' && 
+            const isActive = isQsTeamRelated && 
                             (item.dataset.teamId === this.currentViewParams?.teamId ||
                              item.dataset.teamCode === this.currentViewParams?.teamCode);
             item.classList.toggle('active', isActive);
+        });
+        
+        // Also update nav-subitem active states for QS static items
+        document.querySelectorAll('#qs-nav-submenu .nav-subitem:not(.qs-team-nav-item)').forEach(item => {
+            item.classList.toggle('active', item.dataset.view === viewName);
         });
 
         // Update submenu parent states and expand/collapse based on active section

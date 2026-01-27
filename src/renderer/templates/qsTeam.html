@@ -81,17 +81,15 @@
         </div>
     </div>
 
-    <!-- Filters - Always inline -->
+    <!-- Filters - Inline with proper alignment -->
     <div class="qs-team-filters">
         <input type="text" id="qs-team-search" class="form-input" placeholder="Suchen...">
-        <div class="qs-filter-group" id="qs-filter-status-group" style="display: none;">
-            <select id="qs-filter-status" class="form-select">
-                <option value="">Alle Status</option>
-                <option value="completed">Abgeschlossen</option>
-                <option value="in_progress">In Bearbeitung</option>
-            </select>
-        </div>
-        <div class="qs-filter-group" id="qs-filter-date-group" style="display: none;">
+        <select id="qs-filter-status" class="form-select" style="display: none;">
+            <option value="">Alle Status</option>
+            <option value="completed">Abgeschlossen</option>
+            <option value="in_progress">In Bearbeitung</option>
+        </select>
+        <div class="qs-date-filters" id="qs-filter-date-group" style="display: none;">
             <input type="date" id="qs-filter-date-from" class="form-input" placeholder="Von">
             <input type="date" id="qs-filter-date-to" class="form-input" placeholder="Bis">
         </div>
@@ -116,7 +114,7 @@
                 </tbody>
             </table>
         </div>
-        <div class="empty-state" id="qs-agents-empty" style="display: none;">
+        <div class="qs-empty-state" id="qs-agents-empty" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                 <circle cx="9" cy="7" r="4"></circle>
@@ -147,7 +145,7 @@
                 </tbody>
             </table>
         </div>
-        <div class="empty-state" id="qs-evaluations-empty" style="display: none;">
+        <div class="qs-empty-state" id="qs-evaluations-empty" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>

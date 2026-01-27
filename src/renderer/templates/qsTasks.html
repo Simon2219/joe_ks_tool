@@ -27,47 +27,48 @@
         </div>
     </div>
 
-    <!-- Filters - Single row with search and scoring filter -->
-    <div class="view-filters">
-        <div class="filter-group" style="flex: 1; max-width: 300px;">
-            <input type="text" id="qs-tasks-search" class="form-input" placeholder="Aufgaben suchen...">
-        </div>
-        <div class="filter-group">
-            <select id="qs-tasks-scoring-filter" class="form-select">
-                <option value="">Alle Scoring-Typen</option>
-                <option value="points">Punkte</option>
-                <option value="scale">Skala</option>
-                <option value="checkbox">Checkbox</option>
-            </select>
-        </div>
-        <div class="filter-group">
-            <label class="checkbox-label">
-                <input type="checkbox" id="qs-tasks-archived-filter">
-                Archiviert anzeigen
-            </label>
-        </div>
-    </div>
-    <!-- Hidden category filter for JS compatibility -->
-    <select id="qs-tasks-category-filter" class="form-select" style="display: none;">
-        <option value="">Alle Kategorien</option>
-    </select>
-
-    <!-- Task Categories & Tasks List -->
-    <div class="qs-tasks-content">
+    <!-- Task Categories & Tasks List - Sidebar with collapsible categories on left -->
+    <div class="qs-catalog-layout">
         <div class="qs-categories-sidebar" id="qs-task-categories-sidebar">
-            <div class="qs-categories-header">
+            <div class="qs-categories-header" id="qs-task-categories-toggle">
                 <h3>Kategorien</h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="collapse-icon">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
             </div>
             <div class="qs-categories-list" id="qs-task-categories-list">
                 <!-- Populated by JS -->
             </div>
         </div>
 
-        <div class="qs-tasks-main">
-            <div class="qs-tasks-list" id="qs-tasks-list">
+        <div class="qs-catalog-main">
+            <!-- Filters - Right aligned -->
+            <div class="qs-catalog-filters">
+                <div class="filter-search">
+                    <input type="text" id="qs-tasks-search" class="form-input" placeholder="Aufgaben suchen...">
+                </div>
+                <div class="filter-controls">
+                    <select id="qs-tasks-scoring-filter" class="form-select">
+                        <option value="">Alle Scoring-Typen</option>
+                        <option value="points">Punkte</option>
+                        <option value="scale">Skala</option>
+                        <option value="checkbox">Checkbox</option>
+                    </select>
+                    <label class="form-checkbox-inline">
+                        <input type="checkbox" id="qs-tasks-archived-filter">
+                        <span>Archiviert anzeigen</span>
+                    </label>
+                </div>
+            </div>
+            <!-- Hidden category filter for JS compatibility -->
+            <select id="qs-tasks-category-filter" class="form-select" style="display: none;">
+                <option value="">Alle Kategorien</option>
+            </select>
+
+            <div class="qs-catalog-list" id="qs-tasks-list">
                 <!-- Populated by JS -->
             </div>
-            <div class="empty-state" id="qs-tasks-empty" style="display: none;">
+            <div class="qs-catalog-empty" id="qs-tasks-empty" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="8" y1="6" x2="21" y2="6"></line>
                     <line x1="8" y1="12" x2="21" y2="12"></line>

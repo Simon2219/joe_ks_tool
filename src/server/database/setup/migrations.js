@@ -203,6 +203,35 @@ function runMigrations(db, all) {
         migrationsRun++;
     }
     
+    // Migration 16: Add qs_settings JSON column to teams table (replaces qs_team_settings table)
+    if (tableExists('teams') && !columnExists('teams', 'qs_settings')) {
+        console.log('  [Migration 16] Adding qs_settings column to teams table...');
+        db.run("ALTER TABLE teams ADD COLUMN qs_settings TEXT DEFAULT '{}'");
+        
+        // Migrate existing settings from qs_team_settings if it exists
+        if (tableExists('qs_team_settings')) {
+            console.log('  [Migration 16] Migrating existing team settings...');
+            const existingSettings = all('SELECT team_id, setting_key, setting_value FROM qs_team_settings');
+            const settingsByTeam = {};
+            
+            for (const setting of existingSettings) {
+                if (!settingsByTeam[setting.team_id]) {
+                    settingsByTeam[setting.team_id] = {};
+                }
+                settingsByTeam[setting.team_id][setting.setting_key] = setting.setting_value;
+            }
+            
+            for (const [teamId, settings] of Object.entries(settingsByTeam)) {
+                db.run('UPDATE teams SET qs_settings = ? WHERE id = ?', [JSON.stringify(settings), teamId]);
+            }
+            
+            // Drop the old table
+            console.log('  [Migration 16] Dropping deprecated qs_team_settings table...');
+            db.run('DROP TABLE IF EXISTS qs_team_settings');
+        }
+        migrationsRun++;
+    }
+    
     if (migrationsRun > 0) {
         console.log(`Migrations completed: ${migrationsRun} migration(s) applied`);
     } else {
