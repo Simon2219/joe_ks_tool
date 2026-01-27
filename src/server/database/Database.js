@@ -448,30 +448,32 @@ const TeamsSystem = {
     },
     
     delete(id) {
-        const usersInTeam = all('SELECT id FROM users WHERE team_id = ?', [id]);
+        // Check user_teams table for team membership
+        const usersInTeam = all('SELECT id FROM user_teams WHERE team_id = ?', [id]);
         if (usersInTeam.length > 0) {
-            throw new Error('Cannot delete team with assigned users');
+            throw new Error('Cannot delete team with assigned users. Remove all members first.');
         }
         
-        run('DELETE FROM team_permissions WHERE team_id = ?', [id]);
+        run('DELETE FROM user_teams WHERE team_id = ?', [id]);
         run('DELETE FROM teams WHERE id = ?', [id]);
         saveDb();
         return true;
     },
     
+    /**
+     * @deprecated Use getTeamMembers() instead for user_teams based membership
+     */
     getMembers(teamId) {
-        return all(`
-            SELECT u.*, r.name as role_name, r.is_admin
-            FROM users u 
-            LEFT JOIN roles r ON u.role_id = r.id 
-            WHERE u.team_id = ? AND u.is_active = 1
-            ORDER BY u.last_name, u.first_name
-        `, [teamId]);
+        // Use new method that reads from user_teams
+        return this.getTeamMembers(teamId);
     },
     
+    /**
+     * @deprecated Use getTeamMemberCount() instead for user_teams based counts
+     */
     getMemberCount(teamId) {
-        const result = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId]);
-        return result ? result.count : 0;
+        // Use new method that counts from user_teams
+        return this.getTeamMemberCount(teamId);
     },
     
     getPermissions(teamId) {
@@ -517,9 +519,10 @@ const TeamsSystem = {
     },
     
     getStatistics(teamId) {
+        // Use user_teams table for accurate member count
         return {
-            memberCount: this.getMemberCount(teamId),
-            activeUsers: get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [teamId])?.count || 0
+            memberCount: this.getTeamMemberCount(teamId),
+            activeUsers: this.getTeamMemberCount(teamId) // Same as memberCount since we only count active users
         };
     },
     
@@ -1093,10 +1096,18 @@ const QS = {
     
     formatTeam(t) {
         if (!t) return null;
-        // Count agents (users assigned to this team)
-        const agentCount = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_active = 1', [t.id])?.count || 0;
-        // Count supervisors
-        const supervisorCount = get('SELECT COUNT(*) as count FROM users WHERE team_id = ? AND is_supervisor = 1 AND is_active = 1', [t.id])?.count || 0;
+        // Count agents from user_teams table (users assigned to this team)
+        const agentCount = get(`
+            SELECT COUNT(*) as count FROM user_teams ut
+            JOIN users u ON ut.user_id = u.id
+            WHERE ut.team_id = ? AND u.is_active = 1
+        `, [t.id])?.count || 0;
+        // Count supervisors from user_teams table
+        const supervisorCount = get(`
+            SELECT COUNT(*) as count FROM user_teams ut
+            JOIN users u ON ut.user_id = u.id
+            WHERE ut.team_id = ? AND ut.is_supervisor = 1 AND u.is_active = 1
+        `, [t.id])?.count || 0;
         
         return {
             id: t.id,

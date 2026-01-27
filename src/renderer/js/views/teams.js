@@ -81,67 +81,85 @@ const TeamsView = {
         if (emptyState) emptyState.style.display = 'none';
         container.innerHTML = this.teams.map(team => this.renderTeamRow(team)).join('');
 
-        // Bind all event handlers
+        // Bind all event handlers (uses event delegation, safe to call multiple times)
         this.bindTeamRowEvents();
+        
+        // Reload members for any expanded teams
+        this.expandedTeams.forEach(async (teamId) => {
+            const row = document.querySelector(`.team-row[data-id="${teamId}"]`);
+            if (row) {
+                row.classList.add('expanded');
+                await this.loadTeamMembers(teamId);
+                this.updateTeamMembersList(teamId);
+            }
+        });
     },
 
     /**
-     * Binds events for team rows
+     * Binds events for team rows - uses event delegation for reliability
      */
     bindTeamRowEvents() {
         const container = document.getElementById('teams-list');
         if (!container) return;
 
-        // Toggle expand/collapse
-        container.querySelectorAll('.team-row-header').forEach(header => {
-            header.addEventListener('click', (e) => {
-                // Don't toggle if clicking on action buttons
-                if (e.target.closest('.team-row-actions')) return;
+        // Remove any existing listener to prevent duplicates
+        container.removeEventListener('click', this.handleContainerClick);
+        
+        // Use event delegation - one listener on container
+        this.handleContainerClick = async (e) => {
+            const target = e.target;
+            
+            // Handle expand/collapse - click on header but not action buttons
+            const header = target.closest('.team-row-header');
+            if (header && !target.closest('.team-row-actions') && !target.closest('button')) {
                 const teamId = header.closest('.team-row').dataset.id;
-                this.toggleTeamExpanded(teamId);
-            });
-        });
-
-        // Edit buttons
-        container.querySelectorAll('.btn-edit-team').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+                await this.toggleTeamExpanded(teamId);
+                return;
+            }
+            
+            // Handle edit button
+            const editBtn = target.closest('.btn-edit-team');
+            if (editBtn) {
                 e.stopPropagation();
-                this.editTeam(btn.dataset.id);
-            });
-        });
-
-        // Delete buttons
-        container.querySelectorAll('.btn-delete-team').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+                this.editTeam(editBtn.dataset.id);
+                return;
+            }
+            
+            // Handle delete button
+            const deleteBtn = target.closest('.btn-delete-team');
+            if (deleteBtn) {
                 e.stopPropagation();
-                this.deleteTeam(btn.dataset.id);
-            });
-        });
-
-        // Add user buttons
-        container.querySelectorAll('.btn-add-user-to-team').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+                this.deleteTeam(deleteBtn.dataset.id);
+                return;
+            }
+            
+            // Handle add user button
+            const addUserBtn = target.closest('.btn-add-user-to-team');
+            if (addUserBtn) {
                 e.stopPropagation();
-                this.showAddUserModal(btn.dataset.teamId);
-            });
-        });
-
-        // Remove user buttons
-        container.querySelectorAll('.btn-remove-from-team').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+                this.showAddUserModal(addUserBtn.dataset.teamId);
+                return;
+            }
+            
+            // Handle remove user button
+            const removeBtn = target.closest('.btn-remove-from-team');
+            if (removeBtn) {
                 e.stopPropagation();
-                this.removeUserFromTeam(btn.dataset.teamId, btn.dataset.userId);
-            });
-        });
-
-        // Toggle supervisor buttons
-        container.querySelectorAll('.btn-toggle-supervisor').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+                this.removeUserFromTeam(removeBtn.dataset.teamId, removeBtn.dataset.userId);
+                return;
+            }
+            
+            // Handle toggle supervisor button
+            const supervisorBtn = target.closest('.btn-toggle-supervisor');
+            if (supervisorBtn) {
                 e.stopPropagation();
-                const isSupervisor = btn.dataset.isSupervisor === 'true';
-                this.toggleSupervisor(btn.dataset.teamId, btn.dataset.userId, !isSupervisor);
-            });
-        });
+                const isSupervisor = supervisorBtn.dataset.isSupervisor === 'true';
+                this.toggleSupervisor(supervisorBtn.dataset.teamId, supervisorBtn.dataset.userId, !isSupervisor);
+                return;
+            }
+        };
+        
+        container.addEventListener('click', this.handleContainerClick);
     },
 
     /**
@@ -206,9 +224,20 @@ const TeamsView = {
                 </table>
             `;
         }
-
-        // Rebind events for new elements
-        this.bindTeamRowEvents();
+        
+        // Update member count display
+        const memberCountEl = row.querySelector('.team-member-count');
+        if (memberCountEl) {
+            const count = members.length;
+            memberCountEl.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                </svg>
+                ${count} ${count === 1 ? 'Mitglied' : 'Mitglieder'}
+            `;
+        }
+        // Note: Event delegation handles clicks - no need to rebind
     },
 
     /**
@@ -295,7 +324,7 @@ const TeamsView = {
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="9" cy="7" r="4"></circle>
                             </svg>
-                            ${team.memberCount || 0} Mitglieder
+                            ${team.memberCount || 0} ${team.memberCount === 1 ? 'Mitglied' : 'Mitglieder'}
                         </span>
                     </div>
                     <div class="team-row-actions">
