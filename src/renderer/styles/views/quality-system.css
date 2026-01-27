@@ -2,9 +2,31 @@
    QUALITY SYSTEM v2 STYLES
    ============================================ */
 
-/* Catalog views - reduce top space */
+/* Catalog views - proper header spacing */
 .view.qs-catalog-view .view-header {
     margin-bottom: var(--space-md);
+}
+
+/* Evaluation view - ensure no extra top spacing */
+.view.qs-eval-view .view-header {
+    margin-bottom: var(--space-md);
+}
+
+.view.qs-eval-view .qs-eval-header-info {
+    padding: 0 0 var(--space-md);
+}
+
+.view.qs-eval-view .qs-eval-progress {
+    padding: 0 0 var(--space-md);
+}
+
+.view.qs-eval-view .qs-eval-tasks {
+    padding: 0;
+}
+
+.view.qs-eval-view .qs-eval-notes-section,
+.view.qs-eval-view .qs-eval-evidence-section {
+    margin: var(--space-lg) 0;
 }
 
 /* ============================================
@@ -268,11 +290,77 @@
    CATALOG LAYOUT (Tasks & Checks)
    ============================================ */
 
+/* Top filter bar - sticky */
+.qs-catalog-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-primary);
+    padding: var(--space-sm) 0;
+}
+
+/* Categories toggle button - minimal square */
+.qs-categories-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.qs-categories-toggle-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--brand-primary);
+}
+
+.qs-categories-toggle-btn svg {
+    width: 18px;
+    height: 18px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+.qs-categories-toggle-btn.expanded svg {
+    transform: rotate(180deg);
+}
+
+/* Filters container - flexible */
+.qs-catalog-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.qs-catalog-filters .filter-search {
+    flex: 1;
+    min-width: 180px;
+    max-width: 300px;
+}
+
+.qs-catalog-filters .filter-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-left: auto;
+}
+
+/* Main catalog content area */
 .qs-catalog-layout {
     display: flex;
     gap: var(--space-lg);
-    padding: 0;
-    min-height: 500px;
+    min-height: 400px;
 }
 
 /* Collapsible Categories Sidebar */
@@ -283,29 +371,18 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
-    transition: width 0.25s ease;
+    transition: width 0.25s ease, opacity 0.25s ease;
+    align-self: flex-start;
+    position: sticky;
+    top: 60px;
 }
 
 .qs-categories-sidebar.collapsed {
-    width: 48px;
-}
-
-.qs-categories-sidebar.collapsed .qs-categories-list {
-    display: none;
-}
-
-.qs-categories-sidebar.collapsed .qs-categories-header {
-    justify-content: center;
-    padding: var(--space-md) var(--space-sm);
-    border-bottom: none;
-}
-
-.qs-categories-sidebar.collapsed .qs-categories-header h3 {
-    display: none;
-}
-
-.qs-categories-sidebar.collapsed .collapse-icon {
-    transform: rotate(-90deg);
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+    border: none;
+    margin-left: calc(-1 * var(--space-lg));
 }
 
 .qs-categories-header {
@@ -335,8 +412,8 @@
 }
 
 .qs-categories-header .collapse-icon {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     color: var(--text-muted);
     transition: transform 0.2s ease;
     flex-shrink: 0;
@@ -389,29 +466,6 @@
     flex-direction: column;
 }
 
-/* Catalog Filters - Right aligned */
-.qs-catalog-filters {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    margin-bottom: var(--space-md);
-    flex-wrap: wrap;
-}
-
-.qs-catalog-filters .filter-search {
-    flex: 1;
-    min-width: 200px;
-    max-width: 300px;
-}
-
-.qs-catalog-filters .filter-controls {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    margin-left: auto;
-    flex-wrap: wrap;
-}
-
 /* Custom Checkbox Inline - with green/red styling */
 .form-checkbox-inline {
     display: flex;
@@ -460,15 +514,86 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='3'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
-/* Catalog List - Scrollable */
+/* Catalog List - Category-based like Knowledge Check */
 .qs-catalog-list {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
-    overflow-y: auto;
-    max-height: calc(100vh - 350px);
-    padding-right: var(--space-xs);
+    gap: var(--space-md);
+}
+
+/* Category container - same style as KC */
+.qs-category {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.qs-category-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.qs-category-header:hover {
+    background: var(--bg-hover);
+}
+
+.qs-category-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--transition-fast);
+    color: var(--text-muted);
+}
+
+.qs-category-toggle svg {
+    width: 20px;
+    height: 20px;
+}
+
+.qs-category.collapsed .qs-category-toggle {
+    transform: rotate(-90deg);
+}
+
+.qs-category-info {
+    flex: 1;
+}
+
+.qs-category-info h3 {
+    font-size: var(--text-h3);
+    font-weight: var(--font-semibold);
+    margin: 0 0 var(--space-xs);
+}
+
+.qs-category-meta {
+    font-size: var(--text-caption);
+    color: var(--text-muted);
+}
+
+.qs-category-actions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.qs-category-content {
+    padding: var(--space-md);
+}
+
+.qs-category.collapsed .qs-category-content {
+    display: none;
+}
+
+.qs-empty-category {
+    text-align: center;
+    padding: var(--space-lg);
+    color: var(--text-muted);
 }
 
 /* Catalog Empty State */
@@ -523,23 +648,32 @@
     gap: var(--space-md);
 }
 
-/* Task Item - with contrast background */
+/* Task Item - inside category */
 .qs-task-item {
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: var(--space-md);
+    margin-bottom: var(--space-sm);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
+.qs-task-item:last-child {
+    margin-bottom: 0;
+}
+
 .qs-task-item:hover {
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
     border-color: var(--brand-primary);
 }
 
 .qs-task-item.archived {
     opacity: 0.6;
     background: var(--bg-tertiary);
+}
+
+.qs-task-item.clickable {
+    cursor: pointer;
 }
 
 .qs-task-header {
@@ -810,31 +944,46 @@
     text-align: center;
 }
 
-/* Scale Scoring */
+/* Scale Scoring - Better visibility */
 .qs-scoring-scale {
     display: flex;
-    gap: var(--space-xs);
+    gap: var(--space-sm);
+    flex-wrap: wrap;
 }
 
 .qs-scale-btn {
-    width: 40px;
-    height: 40px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 var(--space-sm);
     border: 2px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
     cursor: pointer;
     font-weight: 600;
+    font-size: var(--text-base);
+    color: var(--text-primary);
     transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .qs-scale-btn:hover {
     border-color: var(--brand-primary);
+    background: var(--bg-hover);
 }
 
 .qs-scale-btn.selected {
     background: var(--brand-primary);
     color: white;
     border-color: var(--brand-primary);
+    box-shadow: 0 2px 8px rgba(214, 171, 83, 0.3);
+}
+
+/* Scale labels */
+.qs-scoring-scale + small {
+    display: block;
+    margin-top: var(--space-sm);
 }
 
 /* Checkbox Scoring */
