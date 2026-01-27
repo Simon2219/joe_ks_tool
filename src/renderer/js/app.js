@@ -277,6 +277,7 @@ const App = {
     async loadViewTemplate(viewName) {
         // Map views that share templates
         const templateMap = {
+            'qsTeam': 'qsTeam',
             'qsTeamBilla': 'qsTeam',
             'qsTeamSocial': 'qsTeam',
             'qsTeamSupport': 'qsTeam'
@@ -328,7 +329,7 @@ const App = {
         // Define which views belong to which submenu groups
         const submenuGroups = {
             knowledgeCheck: ['knowledgeCheck', 'kcQuestions', 'kcTests', 'kcTestRuns', 'kcArchive', 'kcAssigned'],
-            qualitySystem: ['qualitySystem', 'qsTeamBilla', 'qsTeamSocial', 'qsTeamSupport', 'qsTracking', 'qsMyResults', 'qsSettings', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult']
+            qualitySystem: ['qualitySystem', 'qsTeam', 'qsTeamBilla', 'qsTeamSocial', 'qsTeamSupport', 'qsTracking', 'qsMyResults', 'qsSettings', 'qsTasks', 'qsChecks', 'qsEvaluation', 'qsResult']
         };
         
         // QS child views that should highlight their parent team
@@ -386,6 +387,7 @@ const App = {
 
         // Map views that share templates
         const viewToElementMap = {
+            'qsTeam': 'qsTeam',
             'qsTeamBilla': 'qsTeam',
             'qsTeamSocial': 'qsTeam',
             'qsTeamSupport': 'qsTeam'
@@ -413,6 +415,7 @@ const App = {
             tickets: 'TicketSystem',
             quality: 'QualitySystem',
             qualitySystem: 'Quality System',
+            qsTeam: 'Team',
             qsTeamBilla: 'BILLA',
             qsTeamSocial: 'Social Media',
             qsTeamSupport: 'Support',
@@ -484,6 +487,14 @@ const App = {
                     break;
                 case 'qualitySystem':
                     await QualitySystemViews.showMainPage();
+                    break;
+                case 'qsTeam':
+                    // Generic team view - team code passed via params
+                    if (this.currentViewParams?.teamCode) {
+                        const teamViewMap = { 'billa': 'qsTeamBilla', 'social_media': 'qsTeamSocial', 'support': 'qsTeamSupport' };
+                        this.currentQsTeamView = teamViewMap[this.currentViewParams.teamCode] || null;
+                        await QualitySystemViews.showTeamView(this.currentViewParams.teamCode);
+                    }
                     break;
                 case 'qsTeamBilla':
                     this.currentQsTeamView = 'qsTeamBilla';
