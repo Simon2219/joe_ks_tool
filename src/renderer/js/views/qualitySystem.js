@@ -731,11 +731,6 @@ const QualitySystemViews = {
         `;
     },
     
-                </div>
-            </div>
-        `;
-    },
-    
     getScoringTypeLabel(task) {
         switch (task.scoringType) {
             case 'points': return `Punkte (max ${task.maxPoints})`;
