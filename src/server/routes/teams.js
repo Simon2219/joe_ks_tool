@@ -20,10 +20,10 @@ router.get('/', requirePermission('teams_view'), (req, res) => {
         const includeInactive = req.query.includeInactive === 'true';
         const teams = includeInactive ? TeamsSystem.getAllIncludingInactive() : TeamsSystem.getAll();
         
-        // Add member counts
+        // Add member counts using user_teams table
         const teamsWithStats = teams.map(team => ({
             ...team,
-            memberCount: TeamsSystem.getMemberCount(team.id)
+            memberCount: TeamsSystem.getTeamMemberCount(team.id)
         }));
         
         res.json({ success: true, teams: teamsWithStats });

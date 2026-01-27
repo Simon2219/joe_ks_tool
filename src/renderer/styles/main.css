@@ -728,15 +728,65 @@ img, svg {
     gap: var(--space-md);
 }
 
+.view-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.view-header-left h1 {
+    margin: 0;
+    font-size: var(--text-h2);
+    font-weight: var(--font-semibold);
+}
+
+/* Back button in header */
+.btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.btn-back svg {
+    width: 16px;
+    height: 16px;
+}
+
 .view-actions {
     display: flex;
     gap: var(--space-sm);
+    flex-wrap: wrap;
 }
 
 .view-filters {
     display: flex;
     gap: var(--space-sm);
     flex-wrap: wrap;
+    align-items: center;
+    padding: var(--space-md) 0;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+/* Checkbox label in filters */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
 }
 
 /* Inline filters - for compact filter rows */

@@ -346,6 +346,91 @@ const Modal = {
                 onClose: () => done()
             });
         });
+    },
+    
+    /**
+     * Shows a modal with HTML content and custom buttons
+     * This is a convenience method for showing modals with button configurations
+     * Used by Quality System and other views
+     */
+    show(options = {}) {
+        const {
+            title = 'Modal',
+            content = '',    // HTML string or DOM node
+            size = 'default', // 'small', 'medium', 'large', 'full'
+            buttons = [],     // Array of { text, className, action, permission }
+            onClose = null
+        } = options;
+        
+        // Convert size names
+        let modalSize = size;
+        if (size === 'small') modalSize = 'sm';
+        if (size === 'medium') modalSize = 'default';
+        if (size === 'large') modalSize = 'lg';
+        
+        // Build content as DOM node
+        let contentNode;
+        if (typeof content === 'string') {
+            const template = document.createElement('template');
+            template.innerHTML = content.trim();
+            contentNode = template.content.cloneNode(true);
+            // Wrap in a div if it's a fragment with multiple children
+            if (contentNode.childNodes.length > 1 || contentNode.firstChild?.nodeType === Node.TEXT_NODE) {
+                const wrapper = document.createElement('div');
+                wrapper.appendChild(contentNode);
+                contentNode = wrapper;
+            } else {
+                contentNode = contentNode.firstElementChild || document.createElement('div');
+            }
+        } else if (content instanceof Node) {
+            contentNode = content;
+        } else {
+            contentNode = document.createElement('div');
+        }
+        
+        // Build footer with buttons
+        const footer = document.createElement('div');
+        footer.style.display = 'flex';
+        footer.style.gap = 'var(--space-sm)';
+        footer.style.justifyContent = 'flex-end';
+        
+        for (const btn of buttons) {
+            // Check permission if specified
+            if (btn.permission && typeof Permissions !== 'undefined' && !Permissions.hasPermission(btn.permission)) {
+                continue;
+            }
+            
+            const button = document.createElement('button');
+            button.className = `btn ${btn.className || 'btn-secondary'}`;
+            button.type = 'button';
+            button.textContent = btn.text || 'Button';
+            
+            if (btn.action === 'close') {
+                button.addEventListener('click', () => this.close());
+            } else if (typeof btn.action === 'function') {
+                button.addEventListener('click', () => btn.action());
+            }
+            
+            footer.appendChild(button);
+        }
+        
+        // If no buttons, add a close button
+        if (footer.childNodes.length === 0) {
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.type = 'button';
+            closeBtn.textContent = 'Schließen';
+            closeBtn.addEventListener('click', () => this.close());
+            footer.appendChild(closeBtn);
+        }
+        
+        this.open({
+            title,
+            content: contentNode,
+            footer,
+            size: modalSize,
+            onClose
+        });
     },    
 
     /**
