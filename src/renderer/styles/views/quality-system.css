@@ -31,34 +31,7 @@
    TEAM VIEW
    ============================================ */
 
-.qs-team-stats {
-    display: flex;
-    gap: var(--space-md);
-    padding: 0 var(--space-lg) var(--space-lg);
-    flex-wrap: wrap;
-}
-
-.qs-team-stats .stat-card {
-    flex: 1;
-    min-width: 120px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--space-md);
-    text-align: center;
-}
-
-.qs-team-stats .stat-value {
-    font-size: var(--text-2xl);
-    font-weight: 700;
-    color: var(--brand-primary);
-}
-
-.qs-team-stats .stat-label {
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-    margin-top: var(--space-xs);
-}
+/* Team Stats - now use .kc-results-overview with .quality-stat-card */
 
 .qs-view-toggle {
     display: flex;
